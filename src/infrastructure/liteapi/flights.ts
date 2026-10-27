@@ -11,6 +11,7 @@ const segmentSchema = z.object({
   departureTime: z.string(),
   arrivalTime: z.string(),
   carrier: z.object({ marketingName: z.string() }),
+  direction: z.enum(["OUTBOUND", "INBOUND"]),
 });
 
 const offerPriceSchema = z.object({
@@ -80,6 +81,7 @@ export function mapFlightOffers(
           departAt: segment.departureTime,
           arriveAt: segment.arrivalTime,
           carrier: segment.carrier.marketingName,
+          direction: segment.direction === "OUTBOUND" ? ("outbound" as const) : ("inbound" as const),
         })),
         refundable: fare.terms?.refundable ?? false,
         expiresAt: fare.expiration,

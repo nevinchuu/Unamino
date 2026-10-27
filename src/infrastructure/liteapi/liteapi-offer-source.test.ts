@@ -136,8 +136,8 @@ describe("flight search", () => {
       provider: "liteapi", listingId: "84c97554838a65a7",
     });
     expect(first.legs).toHaveLength(2);
-    expect(first.legs[0]).toMatchObject({ origin: "SIN", destination: "BKK", departAt: "2026-12-11T09:15:00", carrier: "Scoot" });
-    expect(first.legs[1]).toMatchObject({ origin: "BKK", destination: "SIN", departAt: "2026-12-13T17:00:00" });
+    expect(first.legs[0]).toMatchObject({ origin: "SIN", destination: "BKK", departAt: "2026-12-11T09:15:00", carrier: "Scoot", direction: "outbound" });
+    expect(first.legs[1]).toMatchObject({ origin: "BKK", destination: "SIN", departAt: "2026-12-13T17:00:00", direction: "inbound" });
     expect(first.id).not.toBe(first.listingId);
     expect(first.expiresAt).toBe("2026-10-27T01:27:09.481Z");
   });

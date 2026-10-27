@@ -45,6 +45,8 @@ const flightLegSchema = z.object({
   departAt: localDateTime,
   arriveAt: localDateTime,
   carrier: z.string().min(1),
+  /** Which way the traveller is going. The first outbound and first inbound legs set the departure times. */
+  direction: z.enum(["outbound", "inbound"]),
 });
 
 const flightFields = {
