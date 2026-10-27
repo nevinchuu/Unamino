@@ -61,7 +61,7 @@ describe("describeStage", () => {
   });
 
   it("says a plan ended, and points to a newer plan when there is one, or to the agent when there is not", () => {
-    expect(describeStage(view("expired", [person("ana")]))).toMatchObject({ headline: "This plan ended", tone: "ended", detail: "Mention @agent in the chat to start a new one." });
+    expect(describeStage(view("expired", [person("ana")]))).toMatchObject({ headline: "This plan ended", tone: "ended", detail: "Mention @trippy in the chat to start a new one." });
     expect(describeStage(view("expired", [person("ana")], { replacedBy: "plan-2" })).detail).toBe("A newer plan took its place.");
   });
 

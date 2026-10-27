@@ -6,7 +6,7 @@ import { MAX_MESSAGE_LENGTH } from "@/domain/group/types";
 import { cn } from "@/lib/utils";
 
 const MAX_HEIGHT_PX = 120;
-const MENTION = "@agent ";
+const MENTION = "@trippy ";
 
 interface ComposerProps {
   readonly onSend: (body: string) => void;
@@ -15,7 +15,7 @@ interface ComposerProps {
   readonly disabled?: boolean;
 }
 
-/** The bar at the bottom: a box that grows as you type, a shortcut for @agent, and a round send button. */
+/** The bar at the bottom: a box that grows as you type, a shortcut for @trippy, and a round send button. */
 export function Composer({ onSend, replyingTo, onCancelReply, disabled = false }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
@@ -95,11 +95,11 @@ export function Composer({ onSend, replyingTo, onCancelReply, disabled = false }
             type="button"
             onClick={insertMention}
             disabled={disabled}
-            aria-label="Mention the trip agent"
+            aria-label="Mention Trippy"
             className="mb-0.5 ml-1 inline-flex shrink-0 items-center gap-0.5 rounded-full bg-accent px-2 py-1 text-xs font-semibold text-accent-foreground disabled:opacity-50"
           >
             <AtSign className="size-3" />
-            agent
+            trippy
           </button>
         </div>
         <button

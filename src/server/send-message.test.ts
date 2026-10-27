@@ -42,7 +42,7 @@ describe("sendChatMessage", () => {
 
   it("starts a run when the message mentions the agent, and hands it back to be run after the response", async () => {
     const { deps, runs } = setup();
-    const sent = await send(deps, ana, "@agent plan Bangkok");
+    const sent = await send(deps, ana, "@trippy plan Bangkok");
     expect(sent.ok && sent.value.run).toMatchObject({ groupId: GROUP, triggerMessageId: "m-1" });
     expect(runs.started).toHaveLength(1);
   });
@@ -56,8 +56,8 @@ describe("sendChatMessage", () => {
 
   it("says the agent is busy, once, instead of starting a second run", async () => {
     const { deps, runs, agentMessages } = setup();
-    await send(deps, ana, "@agent first");
-    const second = await send(deps, ana, "@agent second");
+    await send(deps, ana, "@trippy first");
+    const second = await send(deps, ana, "@trippy second");
     expect(second.ok && second.value.run).toBeNull();
     expect(runs.started).toHaveLength(1);
     expect(agentMessages.agentMessages).toHaveLength(1);
@@ -86,7 +86,7 @@ describe("sendChatMessage", () => {
   it("keeps the message posted when the run cannot start", async () => {
     const { deps } = setup();
     const failing: SendDeps = { ...deps, agent: { ...deps.agent, runs: { ...deps.agent.runs, start: async () => err({ code: "unavailable", message: "db down" }) } } };
-    const sent = await send(failing, ana, "@agent plan Bangkok");
-    expect(sent).toMatchObject({ ok: true, value: { run: null, message: { body: "@agent plan Bangkok" } } });
+    const sent = await send(failing, ana, "@trippy plan Bangkok");
+    expect(sent).toMatchObject({ ok: true, value: { run: null, message: { body: "@trippy plan Bangkok" } } });
   });
 });

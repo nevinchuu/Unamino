@@ -77,7 +77,7 @@ describe("runPlanAction", () => {
   it("tells the group when the plan ended because a listing went, or time ran out", async () => {
     const gone = setup({ outcome: ok({ status: "plan_ended", plan: SNAPSHOT, reason: "listing_unavailable", effectsFailed: false }) });
     expect(await run(gone.deps, "agree", ana, 1)).toEqual({ ok: true, outcome: "plan_ended", reason: "listing_unavailable" });
-    expect(gone.said[0]).toMatch(/no longer available, so the plan has ended. Mention @agent/);
+    expect(gone.said[0]).toMatch(/no longer available, so the plan has ended. Mention @trippy/);
 
     const late = setup({ outcome: ok({ status: "plan_ended", plan: SNAPSHOT, reason: "deadline_passed", effectsFailed: false }) });
     await run(late.deps, "approve", ana, 1);
@@ -87,7 +87,7 @@ describe("runPlanAction", () => {
   it("tells the group who declined, in their own name, and how to start again", async () => {
     const declined = setup();
     await run(declined.deps, "decline");
-    expect(declined.said).toEqual(["Ana declined the plan, so it has ended. Mention @agent to start a new one."]);
+    expect(declined.said).toEqual(["Ana declined the plan, so it has ended. Mention @trippy to start a new one."]);
 
     const backedOut = setup();
     await run(backedOut.deps, "declineAmount");

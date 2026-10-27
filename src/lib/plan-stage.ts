@@ -20,7 +20,7 @@ export function describeStage(view: PlanViewDto): StageView {
     return {
       step: null,
       headline: "This plan ended",
-      detail: view.replacedBy ? "A newer plan took its place." : "Mention @agent in the chat to start a new one.",
+      detail: view.replacedBy ? "A newer plan took its place." : "Mention @trippy in the chat to start a new one.",
       tone: "ended",
     };
   }
@@ -30,7 +30,7 @@ export function describeStage(view: PlanViewDto): StageView {
   if (status === "held") return { step: null, headline: "Everyone's in", detail: "Every hold is in place. Booking is next.", tone: "good" };
 
   if (!me.inPlan) {
-    return { step: null, headline: "You joined after this plan was made", detail: "Mention @agent in the chat and it will make a plan that includes you.", tone: "waiting" };
+    return { step: null, headline: "You joined after this plan was made", detail: "Mention @trippy in the chat and it will make a plan that includes you.", tone: "waiting" };
   }
 
   if (status === "approving") {

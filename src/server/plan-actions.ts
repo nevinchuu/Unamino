@@ -27,7 +27,7 @@ const NOT_SIGNED_IN = "Open your invite link to rejoin this group.";
 const NOT_FOUND = "We couldn't find that plan.";
 const TRY_AGAIN = "Something went wrong on our side. Try again in a moment.";
 
-const NEW_PLAN_HINT = "Mention @agent to start a new one.";
+const NEW_PLAN_HINT = "Mention @trippy to start a new one.";
 
 /** What to tell a person when an action was refused. Never the internal reason. */
 export function describeServiceError(error: ServiceError): string {

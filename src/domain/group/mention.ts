@@ -1,9 +1,9 @@
 import type { MessageKind } from "./types";
 
-const MENTION = "@agent";
+const MENTION = "@trippy";
 
-/** `@agent` as a word of its own: not inside an email address, and not the start of a longer word like @agents. */
-const AGENT_MENTION_SOURCE = String.raw`(^|[^\w@])@agent(?![\w-])`;
+/** `@trippy` as a word of its own: not inside an email address, and not the start of a longer word like @trippys. */
+const AGENT_MENTION_SOURCE = String.raw`(^|[^\w@])@trippy(?![\w-])`;
 const AGENT_MENTION = new RegExp(AGENT_MENTION_SOURCE, "i");
 
 export const mentionsAgent = (body: string): boolean => AGENT_MENTION.test(body);
@@ -14,7 +14,7 @@ export interface TextPart {
 }
 
 /**
- * A message cut into plain text and the `@agent` mentions in it, by the same rule that decides whether a message
+ * A message cut into plain text and the `@trippy` mentions in it, by the same rule that decides whether a message
  * calls the agent, so what is highlighted is exactly what counts. The parts always add up to the original text.
  */
 export function splitAgentMentions(body: string): readonly TextPart[] {
@@ -31,7 +31,7 @@ export function splitAgentMentions(body: string): readonly TextPart[] {
 }
 
 /**
- * Does this message call the agent? Typing `@agent` does, and so does replying to one of the agent's own messages,
+ * Does this message call the agent? Typing `@trippy` does, and so does replying to one of the agent's own messages,
  * which is how a group answers its questions. Only people can call it: the agent's and the system's own lines never
  * do, so the agent cannot start itself.
  */

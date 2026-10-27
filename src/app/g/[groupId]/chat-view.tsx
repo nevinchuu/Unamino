@@ -210,7 +210,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
             <AgentAvatar size={48} />
             <h2 className="font-semibold">Say hi to your group</h2>
             <p className="text-sm text-muted-foreground">
-              When you&apos;re ready to plan a trip, mention <span className="font-semibold text-primary">@agent</span>, like &ldquo;@agent plan Bangkok, 11 to 13 Dec&rdquo;.
+              When you&apos;re ready to plan a trip, mention <span className="font-semibold text-primary">@trippy</span>, like &ldquo;@trippy plan Bangkok, 11 to 13 Dec&rdquo;.
             </p>
             {isOrganiser ? (
               <Link href={`/g/${groupId}/info`} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
@@ -246,7 +246,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
           <div className="mt-3 flex items-end gap-2" role="status">
             <AgentAvatar size={32} />
             <div className="rounded-2xl rounded-tl-md bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
-              Trip agent is thinking
+              Trippy is thinking
               <span className="ml-1 inline-flex gap-0.5" aria-hidden="true">
                 <span className="size-1 animate-pulse rounded-full bg-muted-foreground" />
                 <span className="size-1 animate-pulse rounded-full bg-muted-foreground [animation-delay:200ms]" />

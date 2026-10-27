@@ -5,7 +5,7 @@ import type { PlanStatus } from "@/domain/plan/statuses";
 import { isUuid } from "./ids";
 
 /** What the agent is called in the chat. */
-export const AGENT_NAME = "Trip agent";
+export const AGENT_NAME = "Trippy";
 const FORMER_MEMBER = "Former member";
 
 /** How many messages one poll may bring. A poll that hits it is simply followed by another straight away. */
