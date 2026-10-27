@@ -52,7 +52,7 @@ export async function buildPlan(input: BuildPlanInput): Promise<Result<BuiltPlan
   let best: BuiltPlan | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const proposed = await planner.proposePlan({ memberIds, constraints, offers, feedback });
+    const proposed = await planner.proposePlan({ memberIds, constraints, offers, requiredKinds, feedback });
     if (!proposed.ok) {
       if (proposed.error.code === "planner_unavailable") return err({ code: "planner_unavailable", message: proposed.error.message });
       lastProblem = proposed.error.message;

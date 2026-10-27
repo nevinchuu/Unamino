@@ -1,6 +1,6 @@
 import type { Result } from "@/lib/result";
 import type { ConstraintSet } from "@/domain/constraints/schema";
-import type { Offer } from "@/domain/offers/schema";
+import type { Offer, OfferKind } from "@/domain/offers/schema";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { FreeGap } from "@/domain/schedule/types";
 import type { PlannerError } from "./errors";
@@ -14,6 +14,8 @@ export interface ChatMessage {
 export interface ExtractConstraintsInput {
   readonly memberIds: readonly string[];
   readonly messages: readonly ChatMessage[];
+  /** What a bare amount such as "$350" means. Without it, a budget with no stated currency cannot be read. */
+  readonly defaultCurrency?: string;
 }
 
 export interface ProposePlanInput {
@@ -21,6 +23,8 @@ export interface ProposePlanInput {
   readonly constraints: ConstraintSet;
   /** The only offers the planner may pick from. */
   readonly offers: readonly Offer[];
+  /** Kinds every member must have at least one of, so the planner knows what a complete plan needs. */
+  readonly requiredKinds?: readonly OfferKind[];
   /** What was wrong with the previous attempt, in plain words, so the next one can fix it. */
   readonly feedback: readonly string[];
 }
