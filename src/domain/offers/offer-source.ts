@@ -9,12 +9,16 @@ interface QueryBase {
 export interface HotelQuery extends QueryBase {
   readonly kind: "hotel";
   readonly city: string;
+  /** ISO 3166 two-letter country code of the city, which the hotel search needs. */
+  readonly countryCode: string;
   readonly checkIn: string;
   readonly checkOut: string;
 }
 
 export interface FlightQuery extends QueryBase {
   readonly kind: "flight";
+  /** The destination city's name, used to label the offers. */
+  readonly city: string;
   readonly origin: string;
   readonly destination: string;
   readonly departDate: string;

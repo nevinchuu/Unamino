@@ -13,6 +13,7 @@ const source = new FixtureOfferSource(parsed.value, () => NOW);
 const hotelQuery = (guests: number): HotelQuery => ({
   kind: "hotel",
   city: "Bangkok",
+  countryCode: "TH",
   checkIn: "2026-12-11",
   checkOut: "2026-12-13",
   guests,
@@ -54,18 +55,18 @@ describe("FixtureOfferSource", () => {
 
   it("finds round-trip flights for the right route and dates", async () => {
     const offers = await search({
-      kind: "flight", origin: "SIN", destination: "BKK", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 4,
+      kind: "flight", city: "Bangkok", origin: "SIN", destination: "BKK", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 4,
     });
     expect(offers.map((offer) => offer.id)).toEqual(["fx-flt-evening", "fx-flt-early"]);
   });
 
   it("does not return round trips for a one-way query", async () => {
-    const offers = await search({ kind: "flight", origin: "SIN", destination: "BKK", departDate: "2026-12-11", guests: 4 });
+    const offers = await search({ kind: "flight", city: "Bangkok", origin: "SIN", destination: "BKK", departDate: "2026-12-11", guests: 4 });
     expect(offers).toEqual([]);
   });
 
   it("does not match a different route, date or city", async () => {
-    expect(await search({ kind: "flight", origin: "BKK", destination: "SIN", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 4 })).toEqual([]);
+    expect(await search({ kind: "flight", city: "Bangkok", origin: "BKK", destination: "SIN", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 4 })).toEqual([]);
     expect(await search({ kind: "activity", city: "Bangkok", date: "2026-12-13", guests: 4 })).toEqual([]);
     expect(await search({ ...hotelQuery(3), city: "Phuket" })).toEqual([]);
   });
@@ -77,7 +78,7 @@ describe("FixtureOfferSource", () => {
   });
 
   it("counts expiry from the time of the search and returns schema-valid offers", async () => {
-    const [flight] = await search({ kind: "flight", origin: "SIN", destination: "BKK", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 4 });
+    const [flight] = await search({ kind: "flight", city: "Bangkok", origin: "SIN", destination: "BKK", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 4 });
     expect(flight.expiresAt).toBe("2026-10-27T01:09:00.000Z");
     expect(offerSchema.safeParse(flight).success).toBe(true);
     expect(isOfferExpired(flight, NOW)).toBe(false);

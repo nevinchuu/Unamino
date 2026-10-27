@@ -1,0 +1,242 @@
+{
+  "guestLevel": 0,
+  "sandbox": true,
+  "hotels": [
+    {
+      "id": "lp35d80",
+      "name": "lebua at State Tower",
+      "address": "State Tower 1055 Silom Road, Bangrak",
+      "country_code": "TH",
+      "city_name": "Bangkok",
+      "latitude": 13.721837,
+      "longitude": 100.516904,
+      "rating": 8.8,
+      "stars": 5,
+      "review_count": 9765
+    },
+    {
+      "id": "lp6557cd88",
+      "name": "Ascott Thonglor Bangkok",
+      "address": "1, Soi Sukhumvit 59 (Boonchana) Klong Tan Nua, Wattana",
+      "country_code": "TH",
+      "city_name": "Bangkok",
+      "latitude": 13.722673,
+      "longitude": 100.580997,
+      "rating": 0,
+      "stars": 5,
+      "review_count": 2586
+    }
+  ],
+  "data": [
+    {
+      "hotelId": "lp35d80",
+      "roomTypes": [
+        {
+          "roomTypeId": "GEZDIOBNGIZDANJUGR6FERSOPQZDAMRWGEZDAOBQGYYDA7BRPRJDCMJVGB6DIMZUGEZA",
+          "offerId": "AwJ2MQAAAABq4U0aAyzDbjbeVnRUM3ZCjprn8NX3MbFQSDp5pgXdWUbD9osLkwFC_nVVAtkwx_Eqs6m-gxPVAunreet2h__yEbmZtq3mfh-FGqGDaJzoSAZiqSwH5LHaen9uPTStZX-9XmcfOvbBI3NhcP1TB7vfba49cHr6QVumssRTHJjwUnb7BjojB8PJ6Sx3W1mJ6XpOQmBJXeDveOFHfWoDKrT4WvFJg5EO9YvE4KGXQROHBdPi3-UoBl-sR_R2DdlgtaQB8Btbb_QjVTrjapK_r3TcxxYr0053l9v6z0EqvxIS0VCzN_yV8MWgXWMeZIMVISYEXCXERoGtng__k4WwcK2jLqB_HU0Hx_tY25B7ymJXpXOkrj6npBHMwOQXaUvGswBRb-zm3HXqndTe6PouyvUKWewdSzZZJ9LUoLu_IE09-gJ_7UrY4ap5kmDsLOIZy-muVOmNL_RTqepDORTPaFxMYwdsqbAOALHTLrfQ7iG54BBnHtG19ej2D0L8MbDMmFE6tkOlmiYNSla5L8N-gwniHgNUfAVpTtLGhCJTmz_OL2lnSD2FA8CRBt15Z9ZUz6uUxp0LsNc9K6_FvfVLq0O7D4jB20znAOrWcVhgrQCIFVM9mOdgp1AfLJ7Hi2MTAEJE_vBD5j1A-H1MzSGXb7DbYfQW4AVzwRImwxZDCbAxFm3oApvJmgEw5T_jY5h7hIibjRk-FuLkR91qcaG8UxkhdeN0gJwSVUh5x6KhTwWQncYZDFmmo7ECLlKLKEmvTR2C-aH5gs6VASUBzWCMlDPfZERlTtjtFRzJAdTgr0uEKdDmgiLZog1jf8Qz8PZUzzP5xzgBI_6Dt83gm_R-PO9S1YrTiF5PPfDeX4KaLiQUOoK93PnarUdyq59rmq-FWO2JeybPsQfd0aBnFMmxbt0q_fiD1n1k7MoNmlabfpPtH_yYBqTCiNN1BYdLlwntkLvT84jmWzCVJvPVoyjEiiPluYG4r93tIIi_02fKlggLiI3VoGogq5G_OpenmPkqzO6kKW4XPsq40IAVHZ4ZUZFiYZyMoxHPT_3lahW10krx4pbqdxcift2kfGUuEsjEwmDtxVy_Yk3VwzlGehyr-IiHhqjt9pJCpM5xncEUW-tyc8WielSpU8Wpo3rdSGya81Pr5GVg4FW2BlkNsExlRkCOWayWPTUhqb5a7s7y4WVrKI27zxeMRlh47ZM8IJG1hmLM",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5NFEVCNJZFFOR2JGNKEWTSSKJDUSWKEJ5GVUWCHKUZUIU2OLJKUOWJSKRCU2QSXI5GTGRCTJZNFKRZUGRKEKTKCLBDVSM2EKNHFEVSHGQZVQWKNJJCEOSKZIRCU4USSI5EVSVCDG5BFGR2BLJCE2TKKKNDUKWSYLFNEYT2MGVFVMRZXINKESNJWIZFVKMSFKBIVUVKDJVBUIUCRGJCEWTKSLJIFEVKWIFNDEVSKII3EIQ2OLJNEOTKZIRGU2WSZI5GVSVCNJVBFST2KKNCTENCKIRDUSWSEIFHEUVKHKFJFIQ2NKJKUQQKXKRCU2USRI5KTERCJG5BVGSK2JBEFSTKSKFDUSM2EINGVEUKIIFMUITKNIJIVAUKZLBMVKUSSI5CTEVCBG5BFKR2NGJCEGTKSIREUUQSDI5KVGR2KLFJFIRKNIJJUOWKXKRBU2USOI5ATIQ2BJVBFOSCJLFCECSKZPQ2DGNBOGEZHYMRQGI3C2MJSFUYDQIBQGY5DAMB2GAYHYQSJPR6HY7CMIVBFKQJAKNKUSVCFEBBUSVCZEBLESRKXPQYC4MBQPQYC4MBQPR6DALRQGB6DALRQGA",
+              "occupancyNumber": 1,
+              "name": "LEBUA SUITE CITY VIEW",
+              "maxOccupancy": 3,
+              "adultCount": 3,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "BI",
+              "boardName": "Breakfast Included",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 434.12,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 499.24,
+                    "currency": "USD",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 434.12,
+                    "currency": "USD"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "service charge (taxable)",
+                    "amount": 36.58,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "sales tax",
+                    "amount": 28.68,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-12-08 06:00:00",
+                    "amount": 217.06,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 434.12,
+            "currency": "USD"
+          },
+          "suggestedSellingPrice": {
+            "amount": 499.24,
+            "currency": "USD",
+            "source": ""
+          },
+          "offerInitialPrice": {
+            "amount": 434.12,
+            "currency": "USD"
+          },
+          "priceType": "commission",
+          "rateType": "standard",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ],
+          "paymentSchedule": "now"
+        }
+      ],
+      "et": 10800
+    },
+    {
+      "hotelId": "lp6557cd88",
+      "roomTypes": [
+        {
+          "roomTypeId": "GIYDSMRNGE3TAMBSGUZTANRUPRHFERSOPQZDAMRWGEYDENRQGI2TS7BRPRJDCMJVGB6DEOJXGU3Q",
+          "offerId": "AwJ2MQAAAABq4U0aynPahcTGnNnThjbUzQT5euwap74NbPLy0XdDi9nBAFnMQEwS8sqmCnoo0hgeh5d7J-wu90lYbzv4ShXiG8QnNNSaSTYim4Nc24xxHKWGb4qH5bwFSHV04BH6GPRkLTbK9JSv_qpQdwlFKQEXihyQV7NIhrXb_r8WN23Bo0XzQwpvBs5X-sA_lIHIyR1F78mTvtKKXUoEy2kgr6FvKlMEdTZnu8CKlTm8-zKwlJe3HpU_h03gA6PTZmH3w_HJkELTzmGX_rbYRZI3aNvwfKkjecZvlLp5cTztsJIe01vqBj9pIFbLylYS7Xyet5WDzUlLTDFAzp55fM8tVZXmLU75f4a-8VzHTwqZrzbtxtxB2WiLxNpdMQ5hXEBkZ3vh8ZJb5Gsq5uoMeY4UMcNgCQiAzTvq0zfC5hzD4zr1j0gOEGERwsDHgu16YnEOgWJEh-I7GQ6_x082pKGemPl9LT2XfUTFXmQMMKgCjjWMDyZoSO5paK-K6sewHKWkv9WQ6X5rWw_9VgOwRZ8iaFvCyiERMkawi02A9xNUAqeTxsHd4yos4TcD4pKVikWlF8TaPDcEoe24hVdgM3ZaZk3NyjKBnp9GsIfl7yt3ySy2cl0Lo7LzWoufl4Qn9q7NQnX_rkmbPfhlJlvRPuo4BKamiWg7SzR2KQhbgAy5QC263GmHwUBMQhWCQyy1AcILX0DYVwX0jryGXcdc73TsFYvEX3LusxxTX8OwasXTC-My9RBBCuHYYPyjL7Id6y6k3ePk3nkwsdBqY5nyphZ3gxbPoNqYQLIZZl8Y9HH3wPZ4cVOkv6kLKPhoJTXi48TQsPmgGEAH0ywmfQlJUEvCSHFHCb2z_cSToHk-zMuD7mXUmr6tlRwjZqZcdQtOLhVW69VK8di9dzCFrCrPX8w6_PCoWaNQ-g7yYEgoLMSqUggzD9z3SY7G5zxdZphc7SGQ2pdGE0iJ-J34k2G3CYWjaBTOTIzn_CtO9e_S5-Fj4AdnbOdxx0hYLkhNSoEOIy1UD51ZQB9Ao-IDF6kEqwSbPVbnyaCnWI_kvNtACgILbyFhV5Z28sQ2qdmmnaCexdZq4l023QM9",
+          "supplier": "nuitee",
+          "supplierId": 2,
+          "rates": [
+            {
+              "rateId": "I5MTERCNJZFFOTKNGNKEWTS2LFDVSMSUIVGUEWCHJEZUOTKOKRDUOWSTJBMU2SSEI5EVSRCFJZJFER2JLFKEGN2CKNDUCWSEJVGUUU2HIVNFQWK2JRHUYNKLKZDTOQ2UJE2TMRSLKUZEKUCRLJKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WS2I5GVSRCNJVNFSR2NLFKE2TKCLFHUUU2FGI2EURCHIUZVIQKNIJJUOVK2KRAU4USVIVGVURCBJ5FFGRSVLFKE6TKCKFDUSMSUI5GUEV2HKI3EKNCVKNDUUWRWIRCU2QSTI5MVSVCBJVJFOR2BLJCEWT2MGRDUMNSGIVGUUUSHKVMUQWKNKJNEONBSKRHUSMSTJI2FEVJUKVJUOSSZKJKEKTKCKNDVSV2UINGUETSHJEZUGQKNIJJUQSJSKRJUSWL4GI4TOLRVG56HYUSPPR6HY7CEMVWHK6DFEBJG633NPQYC4MBQPQYC4MBQPR6DALRQGB6DALRQGA",
+              "occupancyNumber": 1,
+              "name": "Deluxe Room",
+              "maxOccupancy": 3,
+              "adultCount": 3,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 297.57,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 342.2,
+                    "currency": "USD",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": [
+                  {
+                    "amount": 297.57,
+                    "currency": "USD"
+                  }
+                ],
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "sales tax",
+                    "amount": 19.81,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "service charge (taxable)",
+                    "amount": 24.94,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [],
+                "hotelRemarks": [],
+                "refundableTag": "NRFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ],
+          "offerRetailRate": {
+            "amount": 297.57,
+            "currency": "USD"
+          },
+          "suggestedSellingPrice": {
+            "amount": 342.2,
+            "currency": "USD",
+            "source": ""
+          },
+          "offerInitialPrice": {
+            "amount": 297.57,
+            "currency": "USD"
+          },
+          "priceType": "commission",
+          "rateType": "package",
+          "paymentTypes": [
+            "NUITEE_PAY"
+          ],
+          "paymentSchedule": "now"
+        }
+      ],
+      "et": 10800
+    }
+  ]
+}

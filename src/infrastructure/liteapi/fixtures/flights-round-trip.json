@@ -1,0 +1,968 @@
+{
+  "data": [
+    {
+      "journeys": [
+        {
+          "cheapestOffer": {
+            "offerId": "AwJ2MQAAAABq4U0WOLUT4U-cvxGetQxTaelIvrpJadG0SQBtH5WMPbvEV-jB3ueQpaghsDY4t_n8Qua4MSDggxpNV79_ICJtB0ZKNoqWQRj1ItIS2X6hwRePuXLzxWFa8FrlPz9naA_TnGyUOrIAk4DbD-18YR9qluKFeoXKPbNA201pB_JBanvC1WmTIJlHhUn_FyshFhNer7QUqD4F-oTUDSnjgky8bsRNZYh1702lBiaxJZKW-qyrdii6MNVJCkKX0faf-UiGzD0hmGggaDieh6L1qB7w6RU6TYGp",
+            "expiration": "2026-10-27T01:27:09.481Z",
+            "pricing": {
+              "display": {
+                "total": 1067.43,
+                "currency": "USD",
+                "base": 535.43,
+                "fees": 0,
+                "taxes": 532,
+                "perPassenger": {
+                  "adult": {
+                    "base": 133.86,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 133,
+                    "total": 266.86
+                  },
+                  "child": {
+                    "base": 0,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 0,
+                    "total": 0
+                  },
+                  "infant": {
+                    "base": 0,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 0,
+                    "total": 0
+                  }
+                }
+              },
+              "converted": true
+            },
+            "baggage": {
+              "hasCarryOnBag": false,
+              "hasCheckedBag": true,
+              "included": [
+                {
+                  "bagType": "checked",
+                  "description": "Checked bag",
+                  "passengerType": "ALL",
+                  "pieces": 1,
+                  "pricing": {
+                    "display": {
+                      "amount": 0,
+                      "currency": "USD"
+                    },
+                    "converted": true
+                  },
+                  "unit": "kg",
+                  "weightKg": 30
+                }
+              ]
+            },
+            "fare": {
+              "family": "",
+              "mixedCabin": false,
+              "mixedFareFamily": false,
+              "seatsRemaining": 7
+            },
+            "segmentFares": [
+              {
+                "bookingCode": "O",
+                "cabin": "Economy",
+                "fareBasisCode": "O2TR24",
+                "fareFamily": "",
+                "seatsRemaining": 7,
+                "segmentKey": "69fa3d4d"
+              },
+              {
+                "bookingCode": "O",
+                "cabin": "Economy",
+                "fareBasisCode": "O2TR24",
+                "fareFamily": "",
+                "seatsRemaining": 7,
+                "segmentKey": "c9fa2f72"
+              }
+            ],
+            "terms": {
+              "changeable": true,
+              "refundable": false,
+              "summary": [
+                {
+                  "level": "danger",
+                  "message": "Non-refundable"
+                },
+                {
+                  "level": "warning",
+                  "message": "Changes allowed with penalty"
+                },
+                {
+                  "level": "warning",
+                  "message": "Change fee (before departure): 74 EUR"
+                },
+                {
+                  "level": "warning",
+                  "message": "Change fee (before departure): 71 EUR"
+                }
+              ],
+              "changeFee": {
+                "pricing": {
+                  "display": {
+                    "amount": 84.66,
+                    "currency": "USD"
+                  },
+                  "converted": true
+                },
+                "applicability": "beforeDeparture",
+                "label": "Change fee (before departure)"
+              },
+              "hasChangeFee": true
+            }
+          },
+          "offers": [
+            {
+              "offerId": "AwJ2MQAAAABq4U0WFO0XipT9aB4sqktdj6urbA9jLC0NSUedhxYow7QmaYFydr0a7C9uB1lVmVgSs0Ve019WEO2FEgEc3wBfhx0vPGQC6SY9t6AWA5p348fWlkZ1b1rw036m4Gah_r0ZpFCDHwopcMLz5k34vCTzl2ZrfrOZt6RMQmeEfzfQviur-ydlOKCkUadDIhakuabgXyWlbGgpG0-gvQ1zXTmZG1fyQbg4lyB3Hy6qH_xJJOaBBZsfxzB4OzD6ZNbZ1N1BRlHSrGyL0Mfhtv-bsECQ9gIOqLed",
+              "expiration": "2026-10-27T01:27:09.481Z",
+              "pricing": {
+                "display": {
+                  "total": 1067.43,
+                  "currency": "USD",
+                  "base": 535.43,
+                  "fees": 0,
+                  "taxes": 532,
+                  "perPassenger": {
+                    "adult": {
+                      "base": 133.86,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 133,
+                      "total": 266.86
+                    },
+                    "child": {
+                      "base": 0,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 0,
+                      "total": 0
+                    },
+                    "infant": {
+                      "base": 0,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 0,
+                      "total": 0
+                    }
+                  }
+                },
+                "converted": true
+              },
+              "baggage": {
+                "hasCarryOnBag": false,
+                "hasCheckedBag": true,
+                "included": [
+                  {
+                    "bagType": "checked",
+                    "description": "Checked bag",
+                    "passengerType": "ALL",
+                    "pieces": 1,
+                    "pricing": {
+                      "display": {
+                        "amount": 0,
+                        "currency": "USD"
+                      },
+                      "converted": true
+                    },
+                    "unit": "kg",
+                    "weightKg": 30
+                  }
+                ]
+              },
+              "fare": {
+                "family": "",
+                "mixedCabin": false,
+                "mixedFareFamily": false,
+                "seatsRemaining": 7
+              },
+              "segmentFares": [
+                {
+                  "bookingCode": "O",
+                  "cabin": "Economy",
+                  "fareBasisCode": "O2TR24",
+                  "fareFamily": "",
+                  "seatsRemaining": 7,
+                  "segmentKey": "69fa3d4d"
+                },
+                {
+                  "bookingCode": "O",
+                  "cabin": "Economy",
+                  "fareBasisCode": "O2TR24",
+                  "fareFamily": "",
+                  "seatsRemaining": 7,
+                  "segmentKey": "c9fa2f72"
+                }
+              ],
+              "terms": {
+                "changeable": true,
+                "refundable": false,
+                "summary": [
+                  {
+                    "level": "danger",
+                    "message": "Non-refundable"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Changes allowed with penalty"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Change fee (before departure): 74 EUR"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Change fee (before departure): 71 EUR"
+                  }
+                ],
+                "changeFee": {
+                  "pricing": {
+                    "display": {
+                      "amount": 84.66,
+                      "currency": "USD"
+                    },
+                    "converted": true
+                  },
+                  "applicability": "beforeDeparture",
+                  "label": "Change fee (before departure)"
+                },
+                "hasChangeFee": true
+              }
+            }
+          ],
+          "isCheapest": true,
+          "journeyKey": "84c97554838a65a7",
+          "legDurations": [
+            {
+              "dayChange": 0,
+              "direction": "OUTBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "overnightFlight": false
+            },
+            {
+              "dayChange": 0,
+              "direction": "INBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "overnightFlight": false
+            }
+          ],
+          "parameters": {
+            "adults": 0,
+            "children": 0,
+            "infants": 0
+          },
+          "segments": [
+            {
+              "arrivalTime": "2026-12-11T10:50:00",
+              "carrier": {
+                "marketingCode": "TR",
+                "marketingName": "Scoot",
+                "operatingCode": "TR",
+                "operatingName": "Scoot"
+              },
+              "departureTime": "2026-12-11T09:15:00",
+              "originCode": "SIN",
+              "destinationCode": "BKK",
+              "direction": "OUTBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "flight": {
+                "marketingNumber": "624",
+                "operatingNumber": "624"
+              },
+              "segmentKey": "69fa3d4d",
+              "originName": "Singapore Changi Airport",
+              "destinationName": "Suvarnabhumi Airport",
+              "stopCount": 0
+            },
+            {
+              "arrivalTime": "2026-12-13T20:35:00",
+              "carrier": {
+                "marketingCode": "TR",
+                "marketingName": "Scoot",
+                "operatingCode": "TR",
+                "operatingName": "Scoot"
+              },
+              "departureTime": "2026-12-13T17:00:00",
+              "originCode": "BKK",
+              "destinationCode": "SIN",
+              "direction": "INBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "flight": {
+                "marketingNumber": "689",
+                "operatingNumber": "689"
+              },
+              "segmentKey": "c9fa2f72",
+              "originName": "Suvarnabhumi Airport",
+              "destinationName": "Singapore Changi Airport",
+              "stopCount": 0
+            }
+          ],
+          "timestamp": "2026-10-27T01:16:49.143Z",
+          "totalDuration": {
+            "iso8601": "PT5H10M",
+            "minutes": 310
+          }
+        },
+        {
+          "cheapestOffer": {
+            "offerId": "AwJ2MQAAAABq4U0WGlqyY_F8mgYpekZ0IpYyucZju7pNXNRsLLcuX-2F3Bfkl_uq6DjsMGJVculQL-EC--IL7_cojccJksn67qUd1u7mvFmJSKvLUfJx1nH3We3mT94xi42OUBG307vTY8GDezcPWS4fjkq_0R993DS2nqK41uEj8-Qu-0SwxJhfwvvZjM4Dk5urI1-hoENue4FSygFWSIVcHv2fQYSs2Eq4guZaFy3mhWd7Wrz-hy1tHBZ2uiB5NQKdrodwQWlyHQBwEkU6GgHNR7wRxgtRcaeZl1uG",
+            "expiration": "2026-10-27T01:27:09.481Z",
+            "pricing": {
+              "display": {
+                "total": 1067.43,
+                "currency": "USD",
+                "base": 535.43,
+                "fees": 0,
+                "taxes": 532,
+                "perPassenger": {
+                  "adult": {
+                    "base": 133.86,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 133,
+                    "total": 266.86
+                  },
+                  "child": {
+                    "base": 0,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 0,
+                    "total": 0
+                  },
+                  "infant": {
+                    "base": 0,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 0,
+                    "total": 0
+                  }
+                }
+              },
+              "converted": true
+            },
+            "baggage": {
+              "hasCarryOnBag": false,
+              "hasCheckedBag": true,
+              "included": [
+                {
+                  "bagType": "checked",
+                  "description": "Checked bag",
+                  "passengerType": "ALL",
+                  "pieces": 1,
+                  "pricing": {
+                    "display": {
+                      "amount": 0,
+                      "currency": "USD"
+                    },
+                    "converted": true
+                  },
+                  "unit": "kg",
+                  "weightKg": 30
+                }
+              ]
+            },
+            "fare": {
+              "family": "",
+              "mixedCabin": false,
+              "mixedFareFamily": false,
+              "seatsRemaining": 7
+            },
+            "segmentFares": [
+              {
+                "bookingCode": "O",
+                "cabin": "Economy",
+                "fareBasisCode": "O2TR24",
+                "fareFamily": "",
+                "seatsRemaining": 7,
+                "segmentKey": "69fa3d4d"
+              },
+              {
+                "bookingCode": "O",
+                "cabin": "Economy",
+                "fareBasisCode": "O2TR24",
+                "fareFamily": "",
+                "seatsRemaining": 7,
+                "segmentKey": "d24692c5"
+              }
+            ],
+            "terms": {
+              "changeable": true,
+              "refundable": false,
+              "summary": [
+                {
+                  "level": "danger",
+                  "message": "Non-refundable"
+                },
+                {
+                  "level": "warning",
+                  "message": "Changes allowed with penalty"
+                },
+                {
+                  "level": "warning",
+                  "message": "Change fee (before departure): 74 EUR"
+                },
+                {
+                  "level": "warning",
+                  "message": "Change fee (before departure): 71 EUR"
+                }
+              ],
+              "changeFee": {
+                "pricing": {
+                  "display": {
+                    "amount": 84.66,
+                    "currency": "USD"
+                  },
+                  "converted": true
+                },
+                "applicability": "beforeDeparture",
+                "label": "Change fee (before departure)"
+              },
+              "hasChangeFee": true
+            }
+          },
+          "offers": [
+            {
+              "offerId": "AwJ2MQAAAABq4U0WYOIUCQhBjf3MbENtIXcjH_qSyoHdANvwFmER6FCpi62DZvlfq8iQnhwnUGW7ERHVZQHy2ZcBDpjjcnTQDpuAJOmNtmpjJRv1lu3FX6gAzkBtuzijCouRE2PdiNKCiQwzMpgJE6ravnz7R1D7LFXzvM9dj8EuB0HXRexKu5o_KlaGxFtQ0sq5X69cX_ADtPjZj0SGXaCa8-HaU-2DUiGEypcev8eUqoRlOU9yquhRrywRn1Lwt8XF9iWBo-iAzLR9EAmQ1RQ6XRDcYCbX3KVolEYe",
+              "expiration": "2026-10-27T01:27:09.481Z",
+              "pricing": {
+                "display": {
+                  "total": 1067.43,
+                  "currency": "USD",
+                  "base": 535.43,
+                  "fees": 0,
+                  "taxes": 532,
+                  "perPassenger": {
+                    "adult": {
+                      "base": 133.86,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 133,
+                      "total": 266.86
+                    },
+                    "child": {
+                      "base": 0,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 0,
+                      "total": 0
+                    },
+                    "infant": {
+                      "base": 0,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 0,
+                      "total": 0
+                    }
+                  }
+                },
+                "converted": true
+              },
+              "baggage": {
+                "hasCarryOnBag": false,
+                "hasCheckedBag": true,
+                "included": [
+                  {
+                    "bagType": "checked",
+                    "description": "Checked bag",
+                    "passengerType": "ALL",
+                    "pieces": 1,
+                    "pricing": {
+                      "display": {
+                        "amount": 0,
+                        "currency": "USD"
+                      },
+                      "converted": true
+                    },
+                    "unit": "kg",
+                    "weightKg": 30
+                  }
+                ]
+              },
+              "fare": {
+                "family": "",
+                "mixedCabin": false,
+                "mixedFareFamily": false,
+                "seatsRemaining": 7
+              },
+              "segmentFares": [
+                {
+                  "bookingCode": "O",
+                  "cabin": "Economy",
+                  "fareBasisCode": "O2TR24",
+                  "fareFamily": "",
+                  "seatsRemaining": 7,
+                  "segmentKey": "69fa3d4d"
+                },
+                {
+                  "bookingCode": "O",
+                  "cabin": "Economy",
+                  "fareBasisCode": "O2TR24",
+                  "fareFamily": "",
+                  "seatsRemaining": 7,
+                  "segmentKey": "d24692c5"
+                }
+              ],
+              "terms": {
+                "changeable": true,
+                "refundable": false,
+                "summary": [
+                  {
+                    "level": "danger",
+                    "message": "Non-refundable"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Changes allowed with penalty"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Change fee (before departure): 74 EUR"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Change fee (before departure): 71 EUR"
+                  }
+                ],
+                "changeFee": {
+                  "pricing": {
+                    "display": {
+                      "amount": 84.66,
+                      "currency": "USD"
+                    },
+                    "converted": true
+                  },
+                  "applicability": "beforeDeparture",
+                  "label": "Change fee (before departure)"
+                },
+                "hasChangeFee": true
+              }
+            }
+          ],
+          "isCheapest": false,
+          "journeyKey": "b88558a90983ea55",
+          "legDurations": [
+            {
+              "dayChange": 0,
+              "direction": "OUTBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "overnightFlight": false
+            },
+            {
+              "dayChange": 0,
+              "direction": "INBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "overnightFlight": false
+            }
+          ],
+          "parameters": {
+            "adults": 0,
+            "children": 0,
+            "infants": 0
+          },
+          "segments": [
+            {
+              "arrivalTime": "2026-12-11T10:50:00",
+              "carrier": {
+                "marketingCode": "TR",
+                "marketingName": "Scoot",
+                "operatingCode": "TR",
+                "operatingName": "Scoot"
+              },
+              "departureTime": "2026-12-11T09:15:00",
+              "originCode": "SIN",
+              "destinationCode": "BKK",
+              "direction": "OUTBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "flight": {
+                "marketingNumber": "624",
+                "operatingNumber": "624"
+              },
+              "segmentKey": "69fa3d4d",
+              "originName": "Singapore Changi Airport",
+              "destinationName": "Suvarnabhumi Airport",
+              "stopCount": 0
+            },
+            {
+              "arrivalTime": "2026-12-13T15:25:00",
+              "carrier": {
+                "marketingCode": "TR",
+                "marketingName": "Scoot",
+                "operatingCode": "TR",
+                "operatingName": "Scoot"
+              },
+              "departureTime": "2026-12-13T11:50:00",
+              "originCode": "BKK",
+              "destinationCode": "SIN",
+              "direction": "INBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "flight": {
+                "marketingNumber": "625",
+                "operatingNumber": "625"
+              },
+              "segmentKey": "d24692c5",
+              "originName": "Suvarnabhumi Airport",
+              "destinationName": "Singapore Changi Airport",
+              "stopCount": 0
+            }
+          ],
+          "timestamp": "2026-10-27T01:16:49.143Z",
+          "totalDuration": {
+            "iso8601": "PT5H10M",
+            "minutes": 310
+          }
+        },
+        {
+          "cheapestOffer": {
+            "offerId": "AwJ2MQAAAABq4U0WxpdCzUFbVqk9NrbF709T-6jpL518ddjwDwIhGtjK9mgkxYk2fbdC_RKhp_uZVwoPhU8kwPSl3Q7u585u07SGRnhhK_TYocFuWwa0va7u7EIsqc2NKTmHbBWUMu15ZsrSgedxPlNDxU74mjk4UOQ6Pv1ZgTwIwOxr01ELqbJO-iO7U3OhIXoBPuZ_yVMtUxZX_medbZ7HOvmiJ_mRuYaZ5lQ049eUIClybk2Qkn8Jyqxe6sWsDF4RuuLIu7-s_AaHb1-qGD_Ul8bmDwJLPYjdB46O",
+            "expiration": "2026-10-27T01:27:09.481Z",
+            "pricing": {
+              "display": {
+                "total": 1067.43,
+                "currency": "USD",
+                "base": 535.43,
+                "fees": 0,
+                "taxes": 532,
+                "perPassenger": {
+                  "adult": {
+                    "base": 133.86,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 133,
+                    "total": 266.86
+                  },
+                  "child": {
+                    "base": 0,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 0,
+                    "total": 0
+                  },
+                  "infant": {
+                    "base": 0,
+                    "currency": "USD",
+                    "fees": 0,
+                    "taxes": 0,
+                    "total": 0
+                  }
+                }
+              },
+              "converted": true
+            },
+            "baggage": {
+              "hasCarryOnBag": false,
+              "hasCheckedBag": true,
+              "included": [
+                {
+                  "bagType": "checked",
+                  "description": "Checked bag",
+                  "passengerType": "ALL",
+                  "pieces": 1,
+                  "pricing": {
+                    "display": {
+                      "amount": 0,
+                      "currency": "USD"
+                    },
+                    "converted": true
+                  },
+                  "unit": "kg",
+                  "weightKg": 30
+                }
+              ]
+            },
+            "fare": {
+              "family": "",
+              "mixedCabin": false,
+              "mixedFareFamily": false,
+              "seatsRemaining": 7
+            },
+            "segmentFares": [
+              {
+                "bookingCode": "O",
+                "cabin": "Economy",
+                "fareBasisCode": "O2TR24",
+                "fareFamily": "",
+                "seatsRemaining": 7,
+                "segmentKey": "69fa3d4d"
+              },
+              {
+                "bookingCode": "O",
+                "cabin": "Economy",
+                "fareBasisCode": "O2TR24",
+                "fareFamily": "",
+                "seatsRemaining": 7,
+                "segmentKey": "e83dc09a"
+              }
+            ],
+            "terms": {
+              "changeable": true,
+              "refundable": false,
+              "summary": [
+                {
+                  "level": "danger",
+                  "message": "Non-refundable"
+                },
+                {
+                  "level": "warning",
+                  "message": "Changes allowed with penalty"
+                },
+                {
+                  "level": "warning",
+                  "message": "Change fee (before departure): 74 EUR"
+                },
+                {
+                  "level": "warning",
+                  "message": "Change fee (before departure): 71 EUR"
+                }
+              ],
+              "changeFee": {
+                "pricing": {
+                  "display": {
+                    "amount": 84.66,
+                    "currency": "USD"
+                  },
+                  "converted": true
+                },
+                "applicability": "beforeDeparture",
+                "label": "Change fee (before departure)"
+              },
+              "hasChangeFee": true
+            }
+          },
+          "offers": [
+            {
+              "offerId": "AwJ2MQAAAABq4U0W0iEwg3mkkLM3juQ6KOjpBfjhiHS_m4EztbRK0H5tFDfurtkDqNsxcPdVuQ00-gZj98VEUpWI-saL7MQEd-mAQl5hXbCv_nUMbLj0qxFrXY7R_3fAeWFf2TVej5RU6da4OcMi-occhNr9Wc-sIbROo73wnnYCsOIon5rRqyB1UI9AU9GHLlU3zkBp2rAAUpgcBULZx6CtOaFfOzluwCyTBdVWrQJzap3SYFOeHFt5khxOmlD6XgA70SfY-Xc7qZXF46OBeSP047_e4nQq_iUN66sD",
+              "expiration": "2026-10-27T01:27:09.481Z",
+              "pricing": {
+                "display": {
+                  "total": 1067.43,
+                  "currency": "USD",
+                  "base": 535.43,
+                  "fees": 0,
+                  "taxes": 532,
+                  "perPassenger": {
+                    "adult": {
+                      "base": 133.86,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 133,
+                      "total": 266.86
+                    },
+                    "child": {
+                      "base": 0,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 0,
+                      "total": 0
+                    },
+                    "infant": {
+                      "base": 0,
+                      "currency": "USD",
+                      "fees": 0,
+                      "taxes": 0,
+                      "total": 0
+                    }
+                  }
+                },
+                "converted": true
+              },
+              "baggage": {
+                "hasCarryOnBag": false,
+                "hasCheckedBag": true,
+                "included": [
+                  {
+                    "bagType": "checked",
+                    "description": "Checked bag",
+                    "passengerType": "ALL",
+                    "pieces": 1,
+                    "pricing": {
+                      "display": {
+                        "amount": 0,
+                        "currency": "USD"
+                      },
+                      "converted": true
+                    },
+                    "unit": "kg",
+                    "weightKg": 30
+                  }
+                ]
+              },
+              "fare": {
+                "family": "",
+                "mixedCabin": false,
+                "mixedFareFamily": false,
+                "seatsRemaining": 7
+              },
+              "segmentFares": [
+                {
+                  "bookingCode": "O",
+                  "cabin": "Economy",
+                  "fareBasisCode": "O2TR24",
+                  "fareFamily": "",
+                  "seatsRemaining": 7,
+                  "segmentKey": "69fa3d4d"
+                },
+                {
+                  "bookingCode": "O",
+                  "cabin": "Economy",
+                  "fareBasisCode": "O2TR24",
+                  "fareFamily": "",
+                  "seatsRemaining": 7,
+                  "segmentKey": "e83dc09a"
+                }
+              ],
+              "terms": {
+                "changeable": true,
+                "refundable": false,
+                "summary": [
+                  {
+                    "level": "danger",
+                    "message": "Non-refundable"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Changes allowed with penalty"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Change fee (before departure): 74 EUR"
+                  },
+                  {
+                    "level": "warning",
+                    "message": "Change fee (before departure): 71 EUR"
+                  }
+                ],
+                "changeFee": {
+                  "pricing": {
+                    "display": {
+                      "amount": 84.66,
+                      "currency": "USD"
+                    },
+                    "converted": true
+                  },
+                  "applicability": "beforeDeparture",
+                  "label": "Change fee (before departure)"
+                },
+                "hasChangeFee": true
+              }
+            }
+          ],
+          "isCheapest": false,
+          "journeyKey": "f87ebcbd8d32a387",
+          "legDurations": [
+            {
+              "dayChange": 0,
+              "direction": "OUTBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "overnightFlight": false
+            },
+            {
+              "dayChange": 1,
+              "direction": "INBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "overnightFlight": true
+            }
+          ],
+          "parameters": {
+            "adults": 0,
+            "children": 0,
+            "infants": 0
+          },
+          "segments": [
+            {
+              "arrivalTime": "2026-12-11T10:50:00",
+              "carrier": {
+                "marketingCode": "TR",
+                "marketingName": "Scoot",
+                "operatingCode": "TR",
+                "operatingName": "Scoot"
+              },
+              "departureTime": "2026-12-11T09:15:00",
+              "originCode": "SIN",
+              "destinationCode": "BKK",
+              "direction": "OUTBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "flight": {
+                "marketingNumber": "624",
+                "operatingNumber": "624"
+              },
+              "segmentKey": "69fa3d4d",
+              "originName": "Singapore Changi Airport",
+              "destinationName": "Suvarnabhumi Airport",
+              "stopCount": 0
+            },
+            {
+              "arrivalTime": "2026-12-14T01:55:00",
+              "carrier": {
+                "marketingCode": "TR",
+                "marketingName": "Scoot",
+                "operatingCode": "TR",
+                "operatingName": "Scoot"
+              },
+              "departureTime": "2026-12-13T22:20:00",
+              "originCode": "BKK",
+              "destinationCode": "SIN",
+              "direction": "INBOUND",
+              "duration": {
+                "iso8601": "PT2H35M",
+                "minutes": 155
+              },
+              "flight": {
+                "marketingNumber": "621",
+                "operatingNumber": "621"
+              },
+              "segmentKey": "e83dc09a",
+              "originName": "Suvarnabhumi Airport",
+              "destinationName": "Singapore Changi Airport",
+              "stopCount": 0
+            }
+          ],
+          "timestamp": "2026-10-27T01:16:49.143Z",
+          "totalDuration": {
+            "iso8601": "PT5H10M",
+            "minutes": 310
+          }
+        }
+      ]
+    }
+  ]
+}
