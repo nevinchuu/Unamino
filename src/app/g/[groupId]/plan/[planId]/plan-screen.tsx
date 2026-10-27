@@ -11,6 +11,7 @@ import { countdownText, describeStage } from "@/lib/plan-stage";
 import { cn } from "@/lib/utils";
 import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
+import { CardSheet } from "./card-sheet";
 import { IdeaCard, ItemCard } from "./plan-items";
 import { WhoPays } from "./who-pays";
 
@@ -19,6 +20,9 @@ const POLL_LIVE_MS = 4_000;
 const POLL_FINISHED_MS = 15_000;
 const HIDDEN_RECHECK_MS = 5_000;
 const MAX_BACKOFF_MS = 30_000;
+
+/** Stripe's publishable key. It is public by design, and is read at build time. */
+const PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? null;
 
 type Busy = "agree" | "approve" | "decline" | "declineAmount";
 type Notice = { readonly tone: "error" | "info"; readonly text: string };
@@ -36,6 +40,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   const [busy, setBusy] = useState<Busy | null>(null);
   const [confirming, setConfirming] = useState<"decline" | "declineAmount" | null>(null);
   const [gone, setGone] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const live = LIVE_PLAN_STATUSES.includes(view.status);
@@ -101,6 +106,11 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
     return () => clearInterval(ticking);
   }, [live]);
 
+  const cardPlaced = useCallback(() => {
+    setCardOpen(false);
+    void refetch();
+  }, [refetch]);
+
   async function perform(name: Busy, call: () => Promise<PlanActionResult>) {
     setBusy(name);
     setNotice(null);
@@ -114,6 +124,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
         setNotice({ tone: "info", text: result.reason === "listing_unavailable" ? "A flight or hotel in the plan is no longer available, so the plan has ended." : "The plan ran out of time, so it has ended." });
       }
       await refetch();
+      // With real cards the next step after approving is adding the card, so the form opens straight away.
+      if (name === "approve" && result.ok && result.outcome === "done" && view.payments === "stripe") setCardOpen(true);
     } catch {
       setNotice({ tone: "error", text: "Couldn't reach the server. Check your connection and try again." });
     } finally {
@@ -156,6 +168,10 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           ) : null}
         </section>
 
+        {view.demoBooking && (view.status === "booked" || view.status === "captured") ? (
+          <p className="px-1 text-xs text-muted-foreground">Demo: no flights or hotel were really booked.</p>
+        ) : null}
+
         {!view.pricesAvailable ? (
           <p role="status" className="flex items-start gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <TriangleAlert className="mt-0.5 size-4 shrink-0" />
@@ -185,7 +201,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           </section>
         ) : null}
 
-        <WhoPays people={view.people} status={view.status} currency={view.currency} />
+        <WhoPays people={view.people} status={view.status} currency={view.currency} payments={view.payments} />
       </div>
 
       <div className="border-t border-border bg-background px-4 pt-3 pb-4">
@@ -217,13 +233,22 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
               </Button>
             ) : null}
 
+            {me.cardNeeded && me.approvedMinor !== null ? (
+              <>
+                <Button type="button" className="h-12 w-full rounded-full text-base font-semibold" onClick={() => setCardOpen(true)}>
+                  Add your card · {formatMinor(me.approvedMinor, view.currency)}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">A hold for this amount, not a charge.</p>
+              </>
+            ) : null}
+
             {me.actions.approve && me.shareMinor !== null ? (
               <>
                 <Button type="button" className="h-12 w-full rounded-full text-base font-semibold" disabled={busy !== null} onClick={() => perform("approve", () => approvePlanAmount(view.groupId, view.id, me.shareMinor as number))}>
                   {busy === "approve" ? <Loader2 className="size-5 animate-spin" /> : `Approve ${formatMinor(me.shareMinor, view.currency)}`}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  A hold for this amount, not a charge.{view.demoHolds ? " Demo: no real card is held." : ""}
+                  A hold for this amount, not a charge.{view.payments === "demo" ? " Demo: no real card is held." : ""}
                 </p>
               </>
             ) : null}
@@ -239,7 +264,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
               </button>
             ) : null}
 
-            {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount ? (
+            {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount && !me.cardNeeded ? (
               <Link href={`/g/${view.groupId}`} className="block text-center text-sm font-medium text-primary">
                 Back to the chat
               </Link>
@@ -247,6 +272,17 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           </div>
         )}
       </div>
+
+      <CardSheet
+        // Once the hold is recorded (by this person, or by Stripe telling the server first) there is nothing left to add, so the sheet goes.
+        open={cardOpen && me.cardNeeded}
+        onOpenChange={setCardOpen}
+        groupId={view.groupId}
+        planId={view.id}
+        amountText={me.approvedMinor !== null ? formatMinor(me.approvedMinor, view.currency) : ""}
+        publishableKey={PUBLISHABLE_KEY}
+        onPlaced={cardPlaced}
+      />
     </>
   );
 }

@@ -5,7 +5,7 @@ import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
 
 /** Where one person stands, in the words of the step the plan is on. */
-function progressOf(person: PersonDto, status: PlanViewDto["status"]): { readonly text: string; readonly icon: ReactNode; readonly good: boolean } {
+function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: PlanViewDto["payments"]): { readonly text: string; readonly icon: ReactNode; readonly good: boolean } {
   const tick = <Check className="size-3.5" />;
   const wait = <Clock className="size-3.5" />;
   const cross = <X className="size-3.5" />;
@@ -15,14 +15,18 @@ function progressOf(person: PersonDto, status: PlanViewDto["status"]): { readonl
     if (person.agreement === "declined") return { text: "Declined", icon: cross, good: false };
     return { text: "Hasn't agreed yet", icon: wait, good: false };
   }
-  if (person.approval === "approved") return { text: person.holdPlaced ? "Approved · hold placed" : "Approved", icon: tick, good: true };
+  if (person.approval === "approved") {
+    if (person.holdPlaced) return { text: "Approved · hold placed", icon: tick, good: true };
+    // With real cards the hold is made when they approve and the card is added to it afterwards.
+    return payments === "stripe" ? { text: "Approved · adding card", icon: wait, good: false } : { text: "Approved", icon: tick, good: true };
+  }
   if (person.approval === "needs_reapproval") return { text: "Needs to approve again", icon: wait, good: false };
   if (person.approval === "declined") return { text: "Declined", icon: cross, good: false };
   return { text: "Hasn't approved yet", icon: wait, good: false };
 }
 
 /** Everyone's amount and progress. Your own breaks down into its parts, and the total is shown when every share is in one currency. */
-export function WhoPays({ people, status, currency }: { readonly people: readonly PersonDto[]; readonly status: PlanViewDto["status"]; readonly currency: string }) {
+export function WhoPays({ people, status, currency, payments }: { readonly people: readonly PersonDto[]; readonly status: PlanViewDto["status"]; readonly currency: string; readonly payments: PlanViewDto["payments"] }) {
   const sameCurrency = people.every((person) => person.currency === currency && person.shareMinor !== null);
   const total = sameCurrency ? people.reduce((sum, person) => sum + (person.shareMinor ?? 0), 0) : null;
 
@@ -34,7 +38,7 @@ export function WhoPays({ people, status, currency }: { readonly people: readonl
       <p className="px-2 pb-1 text-xs text-muted-foreground">Each share is the flights, your bed and only the things you take part in.</p>
       <ul>
         {people.map((person) => {
-          const progress = progressOf(person, status);
+          const progress = progressOf(person, status, payments);
           return (
             <li key={person.id} className="rounded-lg px-2 py-2">
               <div className="flex items-center gap-3">

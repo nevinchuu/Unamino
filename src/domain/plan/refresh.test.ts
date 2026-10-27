@@ -108,7 +108,7 @@ describe("refreshPlan", () => {
     it("only sends back the member whose price went past their cap", async () => {
       const s = setup({ status: "approving", members: [approved("ana"), memberSnapshot("ben", { planAgreement: "agreed", agreedShareMinor: 30_000 })], world: { hotels: [hotel({ id: "h2", totalMinor: 50_000, expiresAt: minutesAfter(9).toISOString() })] } });
       const outcome = await refresh(s);
-      expect(outcome).toMatchObject({ status: "refreshed", effects: [{ type: "request_reapproval", memberId: "ana", newAmountMinor: 35_000 }] });
+      expect(outcome).toMatchObject({ status: "refreshed", effects: [{ type: "release_holds", memberIds: ["ana"] }, { type: "request_reapproval", memberId: "ana", newAmountMinor: 35_000 }] });
       expect(s.plans.plan.members.map((member) => member.approval)).toEqual(["needs_reapproval", "pending"]);
     });
 

@@ -8,8 +8,8 @@ const person = (id: string, agreement: PlanAgreementStatus = "pending", approval
 function view(status: PlanStatus, people: PersonDto[], overrides: Partial<PlanViewDto> = {}, inPlan = true): PlanViewDto {
   const mine = people.find((p) => p.isMe);
   return {
-    id: "p", groupId: "g", title: "t", summary: null, status, city: null, dates: null, headcount: people.length, deadlineAt: "2026-10-27T01:09:00.000Z", replacedBy: null, demoHolds: false, currency: "USD", pricesAvailable: true, items: [], ideas: [], people,
-    me: { id: "ana", inPlan, agreement: mine?.agreement ?? null, approval: mine?.approval ?? null, shareMinor: 30_000, approvedMinor: null, actions: { agree: false, decline: false, approve: false, declineAmount: false } },
+    id: "p", groupId: "g", title: "t", summary: null, status, city: null, dates: null, headcount: people.length, deadlineAt: "2026-10-27T01:09:00.000Z", replacedBy: null, payments: "none", demoBooking: false, currency: "USD", pricesAvailable: true, items: [], ideas: [], people,
+    me: { id: "ana", inPlan, agreement: mine?.agreement ?? null, approval: mine?.approval ?? null, shareMinor: 30_000, approvedMinor: null, cardNeeded: false, actions: { agree: false, decline: false, approve: false, declineAmount: false } },
     ...overrides,
   };
 }
@@ -36,6 +36,13 @@ describe("describeStage", () => {
     const stage = describeStage(view("approving", [person("ana", "agreed", "approved"), person("ben", "agreed", "approved"), person("jia", "agreed")]));
     expect(stage).toMatchObject({ headline: "You've approved", tone: "waiting" });
     expect(stage.detail).toBe("2 of 3 have approved. Nothing is charged until everyone is in.");
+  });
+
+  it("asks someone who approved to add their card, until it is on the hold", () => {
+    const base = view("approving", [person("ana", "agreed", "approved"), person("ben", "agreed")]);
+    const needsCard = { ...base, me: { ...base.me, cardNeeded: true } };
+    expect(describeStage(needsCard)).toMatchObject({ step: "Step 2 of 2", headline: "Add your card", tone: "action" });
+    expect(describeStage(base)).toMatchObject({ headline: "You've approved", tone: "waiting" });
   });
 
   it("tells a person whose price rose past their cap, and only them", () => {

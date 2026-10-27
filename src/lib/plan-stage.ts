@@ -35,6 +35,10 @@ export function describeStage(view: PlanViewDto): StageView {
 
   if (status === "approving") {
     const approved = count(view, (person) => person.approval === "approved");
+    // Approved, but the hold is not on their card yet: the next thing to do is theirs.
+    if (me.cardNeeded) {
+      return { step: "Step 2 of 2", headline: "Add your card", detail: "You've approved. Add a card to place your hold, so the trip can be booked once everyone has.", tone: "action" };
+    }
     if (me.approval === "approved") return { step: "Step 2 of 2", headline: "You've approved", detail: `${approved} of ${total} have approved. Nothing is charged until everyone is in.`, tone: "waiting" };
     if (me.approval === "needs_reapproval") {
       return { step: "Step 2 of 2", headline: "Your price went up", detail: "It is now above what you approved. Approve the new amount to stay in.", tone: "action" };

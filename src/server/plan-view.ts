@@ -1,4 +1,5 @@
 import type { Member } from "@/domain/group/types";
+import type { PaymentsMode } from "@/domain/payments/types";
 import { buildPlanView, LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
 import type { PlanViewStore } from "@/domain/plan/view-store";
 import { isUuid } from "./ids";
@@ -7,8 +8,10 @@ export interface PlanViewDeps {
   readonly views: Pick<PlanViewStore, "load">;
   /** Who is asking, in this group. Null for anyone who is not a member of it. */
   readonly memberOf: (groupId: string) => Promise<Member | null>;
-  /** True when card holds are pretended, so the screen says so. */
-  readonly demoHolds: boolean;
+  /** How money is handled, so the screen shows a card form, a demo note, or nothing. */
+  readonly payments: PaymentsMode;
+  /** True when booking is only pretended. */
+  readonly demoBooking?: boolean;
   /** Asks for the offers to be checked again once the response is on its way. Never waited for. */
   readonly scheduleRefresh: (planId: string) => void;
 }
@@ -30,7 +33,7 @@ export async function loadPlanViewFor(deps: PlanViewDeps, planId: string): Promi
 
   // Prices are checked after the answer is sent, so nobody waits for the airline and hotel searches.
   if (LIVE_PLAN_STATUSES.includes(raw.value.status)) deps.scheduleRefresh(planId);
-  return { ok: true, view: buildPlanView(raw.value, member.id, { demoHolds: deps.demoHolds }) };
+  return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking }) };
 }
 
 const json = (body: unknown, status: number): Response => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });

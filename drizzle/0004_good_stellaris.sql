@@ -1,0 +1,1 @@
+ALTER TABLE "plan_members" ADD COLUMN "hold_attempt" integer DEFAULT 0 NOT NULL;

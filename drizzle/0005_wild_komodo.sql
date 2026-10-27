@@ -1,0 +1,1 @@
+ALTER TABLE "effect_log" ADD COLUMN "attempts" integer DEFAULT 0 NOT NULL;

@@ -59,7 +59,12 @@ describe("chatLineFor", () => {
   it("says nothing about holds, which are between a person and their card", () => {
     expect(chatLineFor({ type: "place_hold", memberId: "ana", amountMinor: 1 }, names)).toBeNull();
     expect(chatLineFor({ type: "release_holds", memberIds: ["ana"] }, names)).toBeNull();
-    expect(chatLineFor({ type: "capture_holds", captures: [] }, names)).toBeNull();
+  });
+
+  it("tells the group when everyone was charged, and says so when the booking was only pretended", () => {
+    const charge: PlanEffect = { type: "capture_holds", captures: [{ memberId: "ana", captureMinor: 25_000, releaseMinor: 5_000 }] };
+    expect(chatLineFor(charge, names)).toBe("Booked. Each person was charged their share, and the rest of their hold was let go.");
+    expect(chatLineFor(charge, names, { demoBooking: true })).toBe("Booked. Each person was charged their share, and the rest of their hold was let go. Demo: nothing was really booked.");
   });
 
   it("never puts an amount or a card detail in the chat", () => {
@@ -152,5 +157,25 @@ describe("SimulatedHoldRunner", () => {
     const repo = plan();
     const broken = Object.assign(repo, { load: async (): Promise<Result<never, RepositoryError>> => err({ code: "unavailable", message: "db down" }) });
     expect(await build(broken).run("plan-1", 2, [hold("ana")])).toEqual({ ok: false, error: { message: "The simulated hold could not be recorded" } });
+  });
+});
+
+describe("SimulatedHoldRunner, charging", () => {
+  const booked = () =>
+    new MemoryPlanRepository({ id: "plan-1", version: 1, plan: { status: "booked", deadlineAt: DEADLINE, hardDeadlineAt: new Date("2026-10-29T00:00:00Z"), members: [approved("ana", { holdPlaced: true, currentShareMinor: 25_000 })] } });
+  const charge: PlanEffect = { type: "capture_holds", captures: [{ memberId: "ana", captureMinor: 25_000, releaseMinor: 5_000 }] };
+
+  it("marks the plan paid when asked to charge, since nothing was really held", async () => {
+    const repo = booked();
+    expect(await new SimulatedHoldRunner(repo, () => new MemoryEffectRunner(), () => NOW).run("plan-1", 3, [charge])).toEqual({ ok: true, value: undefined });
+    expect(repo.plan.status).toBe("captured");
+    expect(repo.plan.members[0].chargedMinor).toBe(25_000);
+  });
+
+  it("is fine when the plan is already paid", async () => {
+    const repo = booked();
+    const runner = new SimulatedHoldRunner(repo, () => new MemoryEffectRunner(), () => NOW);
+    await runner.run("plan-1", 3, [charge]);
+    expect(await runner.run("plan-1", 4, [charge])).toEqual({ ok: true, value: undefined });
   });
 });

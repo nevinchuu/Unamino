@@ -1,6 +1,7 @@
 "use server";
 
 import { getContainer } from "@/server/container";
+import { runCardForm, runConfirmHold, type CardFormResult, type ConfirmHoldResult } from "@/server/hold-actions";
 import { runPlanAction, type PlanActionName, type PlanActionResult } from "@/server/plan-actions";
 import { currentMember } from "@/server/session";
 
@@ -27,4 +28,16 @@ export async function approvePlanAmount(groupId: string, planId: string, seenMin
 /** Step 2: back out, which ends the plan for everyone and gives every hold back. */
 export async function declinePlanAmount(groupId: string, planId: string): Promise<PlanActionResult> {
   return act(groupId, planId, "declineAmount");
+}
+
+/** Makes the person's card hold (or finds it) and returns what Stripe's card form needs. Only for the person it belongs to. */
+export async function openCardForm(groupId: string, planId: string): Promise<CardFormResult> {
+  const { payments, views } = getContainer();
+  return runCardForm({ holds: payments.holds, views }, await currentMember(groupId), planId);
+}
+
+/** After the card was confirmed in the browser: asks Stripe whether the hold is really there, and records it if so. */
+export async function confirmCardHold(groupId: string, planId: string): Promise<ConfirmHoldResult> {
+  const { payments, views } = getContainer();
+  return runConfirmHold({ holds: payments.holds, views }, await currentMember(groupId), planId);
 }

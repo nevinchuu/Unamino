@@ -66,6 +66,11 @@ export const planMembers = pgTable(
     holdPlaced: boolean("hold_placed").notNull().default(false),
     /** The payment provider's id for the hold. Kept after the hold is released until the provider confirms, so it can still be cancelled. */
     holdId: text("hold_id"),
+    /**
+     * Which hold this member is on. It goes up each time a hold is let go of, and it is part of the key a hold is
+     * made with, so asking again gives the same hold but a new approval after a release gives a new one.
+     */
+    holdAttempt: integer("hold_attempt").notNull().default(0),
     /** What the member last saw, so the next look can show what moved. */
     lastSeenQuote: jsonb("last_seen_quote").$type<SeenQuote>(),
   },
@@ -119,6 +124,8 @@ export const effectLog = pgTable("effect_log", {
   status: effectStatus("status").notNull().default("pending"),
   payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
   error: text("error"),
+  /** How many times doing it has failed, so a retry that keeps failing is given up on instead of running for ever. */
+  attempts: integer("attempts").notNull().default(0),
   createdAt: createdAt(),
   completedAt: instant("completed_at"),
 }).enableRLS();

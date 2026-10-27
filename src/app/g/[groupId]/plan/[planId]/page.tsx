@@ -25,8 +25,8 @@ async function Plan({ params }: { readonly params: PageProps<"/g/[groupId]/plan/
   const { groupId, planId } = await params;
   if (!(await currentMember(groupId))) return <NotAMember />;
 
-  const { views, plans, demoHolds } = getContainer();
-  const loaded = await loadPlanViewFor({ views, memberOf: currentMember, demoHolds, scheduleRefresh: (id) => after(() => plans.refresh(id, new Date())) }, planId);
+  const { views, plans, payments } = getContainer();
+  const loaded = await loadPlanViewFor({ views, memberOf: currentMember, payments: payments.mode, demoBooking: payments.demoBooking, scheduleRefresh: (id) => after(() => plans.refresh(id, new Date())) }, planId);
 
   // A plan from another group is shown as missing, like one that does not exist.
   if (!loaded.ok || loaded.view.groupId !== groupId) {

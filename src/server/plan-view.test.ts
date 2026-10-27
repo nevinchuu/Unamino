@@ -29,7 +29,7 @@ function setup({ status, member = ana, load }: Setup = {}) {
   const deps: PlanViewDeps = {
     views: { load: load ?? (async (id) => (loaded.push(id), ok(raw(status)))) },
     memberOf: async () => member,
-    demoHolds: false,
+    payments: "none",
     scheduleRefresh: (id) => void refreshed.push(id),
   };
   return { deps, refreshed, loaded };

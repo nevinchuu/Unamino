@@ -50,6 +50,12 @@ const everyMemberHasHold = (plan: PlanSnapshot): boolean =>
 const releaseHolds = (memberIds: readonly string[]): readonly PlanEffect[] =>
   memberIds.length > 0 ? [{ type: "release_holds", memberIds }] : [];
 
+/**
+ * Everyone who approved has a hold to let go of, whether or not their card is on it yet: the hold is made when they
+ * approve, and the card is added to it afterwards. Letting go of one that has no card yet is harmless.
+ */
+const approvedMemberIds = (plan: PlanSnapshot): readonly string[] => plan.members.filter((member) => member.approval === "approved").map((member) => member.id);
+
 const memberIdsOf = (plan: PlanSnapshot): readonly string[] => plan.members.map((member) => member.id);
 
 /** Back to step 1 for everyone: agreements and approvals are cleared, because they were given for a different plan. */
@@ -73,7 +79,7 @@ const reopenReview = (plan: PlanSnapshot): PlanSnapshot => ({
 const expire = (plan: PlanSnapshot): TransitionResult =>
   succeed(
     { ...plan, status: "expired" },
-    releaseHolds(plan.members.filter((member) => member.holdPlaced).map((member) => member.id)),
+    releaseHolds(approvedMemberIds(plan)),
   );
 
 /**
@@ -137,7 +143,7 @@ const handlers: HandlerMap = {
     const wrongStatus = requireStatus(plan, ["reviewing", "approving"], event.type);
     if (wrongStatus) return wrongStatus;
     return succeed(reopenReview(plan), [
-      ...releaseHolds(plan.members.filter((member) => member.holdPlaced).map((member) => member.id)),
+      ...releaseHolds(approvedMemberIds(plan)),
       { type: "request_review", memberIds: memberIdsOf(plan) },
     ]);
   },
@@ -219,7 +225,8 @@ const handlers: HandlerMap = {
       holdPlaced: false,
     };
     return succeed({ ...replaceMember(plan, reopened), status: "approving" }, [
-      ...releaseHolds(member.holdPlaced ? [member.id] : []),
+      // This member approved, so they have a hold to let go of; their new, higher amount needs a new one.
+      ...releaseHolds([member.id]),
       { type: "request_reapproval", memberId: member.id, newAmountMinor: event.currentMinor },
     ]);
   },

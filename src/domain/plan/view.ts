@@ -1,4 +1,5 @@
 import type { Offer } from "@/domain/offers/schema";
+import type { PaymentsMode } from "@/domain/payments/types";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
 import { currentShares } from "./pricing";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
@@ -77,6 +78,8 @@ export interface MeDto {
   readonly approval: ApprovalStatus | null;
   readonly shareMinor: number | null;
   readonly approvedMinor: number | null;
+  /** True when this person has approved and their card still has to be added to the hold. */
+  readonly cardNeeded: boolean;
   readonly actions: PlanActions;
 }
 
@@ -92,8 +95,10 @@ export interface PlanViewDto {
   /** ISO time. Moves later when the offers are renewed. */
   readonly deadlineAt: string;
   readonly replacedBy: string | null;
-  /** True when card holds are pretended, so the screen says so. */
-  readonly demoHolds: boolean;
+  /** How money is handled, so the screen shows a card form, a demo note, or nothing. */
+  readonly payments: PaymentsMode;
+  /** True when booking is only pretended, so the screen says nothing real was booked. */
+  readonly demoBooking: boolean;
   readonly currency: string;
   readonly pricesAvailable: boolean;
   readonly items: readonly PlanItemDto[];
@@ -151,7 +156,7 @@ function ideaOf(idea: ViewIdea): IdeaDto {
  * What one person sees of a plan, worked out from what is stored. Prices are today's, from the stored offers, and
  * what the person may do is decided here from the plan's state and their own, so the screen never has to guess.
  */
-export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { readonly demoHolds: boolean }): PlanViewDto {
+export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { readonly payments: PaymentsMode; readonly demoBooking?: boolean }): PlanViewDto {
   const names = new Map(raw.members.map((member) => [member.id, member.name]));
   const priced = currentShares(raw, raw.picks);
   const shares = new Map(priced.ok ? priced.value.map((share) => [share.memberId, share]) : []);
@@ -194,7 +199,8 @@ export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { rea
     headcount: raw.headcount,
     deadlineAt: raw.deadlineAt.toISOString(),
     replacedBy: raw.replacedByPlanId,
-    demoHolds: options.demoHolds,
+    payments: options.payments,
+    demoBooking: options.demoBooking ?? false,
     currency: raw.baseCurrency,
     pricesAvailable: priced.ok,
     items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names)),
@@ -207,6 +213,7 @@ export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { rea
       approval: mine?.approval ?? null,
       shareMinor: mine?.shareMinor ?? null,
       approvedMinor: mine?.approvedMinor ?? null,
+      cardNeeded: options.payments === "stripe" && approving && mine?.approval === "approved" && mine.holdPlaced === false,
       actions,
     },
   };

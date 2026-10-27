@@ -5,13 +5,15 @@ import type { RepositoryError } from "./repository";
 import type { PlanEffect } from "./types";
 
 export interface ChatEffectDeps {
+  /** True when the booking is only pretended, so the group is told so. */
+  readonly demoBooking?: boolean;
   readonly groupIdOf: (planId: string) => Promise<Result<string | null, RepositoryError>>;
   readonly memberNames: (groupId: string) => Promise<ReadonlyMap<string, string>>;
   readonly messages: Pick<MessageRepository, "postSystem">;
 }
 
 /** The line to put in the chat for an effect, or null when the effect is not something the group needs to be told. */
-export function chatLineFor(effect: PlanEffect, names: ReadonlyMap<string, string>): string | null {
+export function chatLineFor(effect: PlanEffect, names: ReadonlyMap<string, string>, options: { readonly demoBooking?: boolean } = {}): string | null {
   switch (effect.type) {
     case "request_review":
       return "The plan changed, so everyone needs to look at it again.";
@@ -21,9 +23,10 @@ export function chatLineFor(effect: PlanEffect, names: ReadonlyMap<string, strin
       return `${names.get(effect.memberId) ?? "Someone"}'s price went up past the amount they approved, so they need to approve again.`;
     case "book":
       return "Everyone has approved. The next step is booking.";
+    case "capture_holds":
+      return `Booked. Each person was charged their share, and the rest of their hold was let go.${options.demoBooking ? " Demo: nothing was really booked." : ""}`;
     case "place_hold":
     case "release_holds":
-    case "capture_holds":
       return null;
   }
 }
@@ -56,6 +59,6 @@ export class ChatEffectRunner implements EffectRunner {
       const group = await this.deps.groupIdOf(planId);
       if (group.ok && group.value !== null) names = await this.deps.memberNames(group.value);
     }
-    return effects.flatMap((effect) => chatLineFor(effect, names) ?? []);
+    return effects.flatMap((effect) => chatLineFor(effect, names, { demoBooking: this.deps.demoBooking }) ?? []);
   }
 }

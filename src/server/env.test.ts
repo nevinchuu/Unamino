@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readServerEnv, resolveHoldSimulation } from "./env";
+import { readServerEnv, resolveBookingSimulation, resolveHoldSimulation, resolvePaymentsMode } from "./env";
 
 const FULL = { DATABASE_URL: "postgres://x", LITEAPI_KEY: "lite", MUSE_SPARK_API_KEY: "muse" };
 
@@ -45,5 +45,34 @@ describe("hold simulation", () => {
 
   it("is always fine to leave off, even in production", () => {
     expect(resolveHoldSimulation(false, "production")).toEqual({ ok: true, value: false });
+  });
+});
+
+describe("Stripe settings and the payments mode", () => {
+  it("reads the Stripe keys when present and leaves them empty otherwise, never putting a value in an error", () => {
+    expect(readServerEnv(FULL)).toMatchObject({ ok: true, value: { stripeSecretKey: null, stripeWebhookSecret: null } });
+    expect(readServerEnv({ ...FULL, STRIPE_SECRET_KEY: " sk_test_x ", STRIPE_WEBHOOK_SECRET: "whsec_x" })).toMatchObject({ ok: true, value: { stripeSecretKey: "sk_test_x", stripeWebhookSecret: "whsec_x" } });
+  });
+
+  it("holds cards for real only when there is a Stripe key, and only pretends when asked to", () => {
+    expect(resolvePaymentsMode({ simulateHolds: false, stripeSecretKey: "sk_test_x" })).toBe("stripe");
+    expect(resolvePaymentsMode({ simulateHolds: false, stripeSecretKey: null })).toBe("none");
+    expect(resolvePaymentsMode({ simulateHolds: true, stripeSecretKey: "sk_test_x" })).toBe("demo");
+    expect(resolvePaymentsMode({ simulateHolds: true, stripeSecretKey: null })).toBe("demo");
+  });
+});
+
+describe("booking simulation", () => {
+  it("is off unless SIMULATE_BOOKING is exactly 1", () => {
+    expect(readServerEnv(FULL)).toMatchObject({ ok: true, value: { simulateBooking: false } });
+    expect(readServerEnv({ ...FULL, SIMULATE_BOOKING: "1" })).toMatchObject({ ok: true, value: { simulateBooking: true } });
+    for (const other of ["true", "yes", "0", "", "2"]) expect(readServerEnv({ ...FULL, SIMULATE_BOOKING: other })).toMatchObject({ ok: true, value: { simulateBooking: false } });
+  });
+
+  it("is allowed when developing and testing, and refused in production, where it would charge for trips never booked", () => {
+    expect(resolveBookingSimulation(true, "development")).toEqual({ ok: true, value: true });
+    expect(resolveBookingSimulation(true, undefined)).toEqual({ ok: true, value: true });
+    expect(resolveBookingSimulation(true, "production")).toEqual({ ok: false, error: { message: "SIMULATE_BOOKING must not be set in production" } });
+    expect(resolveBookingSimulation(false, "production")).toEqual({ ok: true, value: false });
   });
 });

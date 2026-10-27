@@ -5,9 +5,9 @@ import type { PlanRepository } from "./repository";
 import type { PlanEffect } from "./types";
 
 /**
- * For trying the screens out before payments are connected: answers every request for a card hold by saying it
- * was placed. No card is involved and no money is held. It must never run in production; the server refuses to
- * start it there.
+ * For trying the screens out without Stripe: answers every request for a card hold by saying it was placed, and
+ * every request to charge by saying the plan is paid. No card is involved and no money is held or taken. It must
+ * never run in production; the server refuses to start it there.
  */
 export class SimulatedHoldRunner implements EffectRunner {
   constructor(
@@ -19,6 +19,12 @@ export class SimulatedHoldRunner implements EffectRunner {
 
   async run(planId: string, _version: number, effects: readonly PlanEffect[]): Promise<Result<void, EffectError>> {
     for (const effect of effects) {
+      if (effect.type === "capture_holds") {
+        // Nothing was really held, so there is nothing to charge: the plan is simply marked paid. A plan already marked paid is fine.
+        const paid = await applyPlanEvent(this.plans, planId, { type: "capture_succeeded", at: this.clock() });
+        if (!paid.ok && paid.error.kind !== "transition") return err({ message: "The simulated charge could not be recorded" });
+        continue;
+      }
       if (effect.type !== "place_hold") continue;
       const placed = await applyPlanEvent(this.plans, planId, { type: "hold_placed", at: this.clock(), memberId: effect.memberId });
       // A plan that moved on in the meantime (the member backed out, the price changed) no longer needs this hold.

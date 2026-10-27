@@ -2,17 +2,25 @@ import type { AgentDeps } from "@/domain/agent/run-agent";
 import { StaticFxRates } from "@/domain/agent/static-fx";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { OfferSource } from "@/domain/offers/offer-source";
+import { EffectRetrier, giveUpLine } from "@/domain/payments/effect-retrier";
+import { HoldService } from "@/domain/payments/hold-service";
+import type { HoldStore } from "@/domain/payments/hold-store";
+import { PaymentEffectRunner } from "@/domain/payments/payment-effects";
+import type { PaymentsMode } from "@/domain/payments/types";
 import { ChatEffectRunner } from "@/domain/plan/chat-effects";
 import { CompositeEffectRunner, type EffectRunner } from "@/domain/plan/effects";
 import { PlanService } from "@/domain/plan/service";
+import { SimulatedBookingRunner } from "@/domain/plan/simulated-booking";
 import { SimulatedHoldRunner } from "@/domain/plan/simulated-holds";
 import type { PlanStatusReader } from "@/domain/plan/status-reader";
 import type { PlanViewStore } from "@/domain/plan/view-store";
 import { connectDatabase } from "@/infrastructure/db/client";
 import { PostgresBriefRepository } from "@/infrastructure/db/postgres-brief-repository";
 import { PostgresConstraintRepository } from "@/infrastructure/db/postgres-constraint-repository";
+import { PostgresEffectLog } from "@/infrastructure/db/postgres-effect-log";
 import { PostgresEffectRecorder } from "@/infrastructure/db/postgres-effect-recorder";
 import { PostgresGroupRepository } from "@/infrastructure/db/postgres-group-repository";
+import { PostgresHoldStore } from "@/infrastructure/db/postgres-hold-store";
 import { PostgresMessageRepository } from "@/infrastructure/db/postgres-message-repository";
 import { PostgresPlanDetailsStore } from "@/infrastructure/db/postgres-plan-details-store";
 import { PostgresPlanRepository } from "@/infrastructure/db/postgres-plan-repository";
@@ -25,8 +33,11 @@ import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup
 import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
 import { MuseHttp } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
+import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
+import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
 import type { ChatDeps } from "./chat";
-import { readServerEnv, resolveHoldSimulation } from "./env";
+import type { StripeEventLike } from "./stripe-webhook";
+import { readServerEnv, resolveBookingSimulation, resolveHoldSimulation, resolvePaymentsMode } from "./env";
 import { GROUP_CURRENCY } from "./group-currency";
 
 /** A flight search can take several seconds, and slower when run alongside the hotel searches. */
@@ -44,8 +55,18 @@ export interface Container {
   readonly planStatus: PlanStatusReader;
   /** What the plan screen reads. */
   readonly views: PlanViewStore;
-  /** True when card holds are pretended (development only), so the screen says so. */
-  readonly demoHolds: boolean;
+  /** How money is handled, and what the card form and Stripe's webhook need when it is real. */
+  readonly payments: {
+    readonly mode: PaymentsMode;
+    /** True when booking is only pretended, so the screen says so. */
+    readonly demoBooking: boolean;
+    /** Null unless holds are real. */
+    readonly holds: HoldService | null;
+    readonly holdStore: HoldStore;
+    /** Does again what failed to move money. Null unless holds are real. */
+    readonly retrier: EffectRetrier | null;
+    readonly webhook: { readonly secret: string | null; readonly verify: (body: string, signature: string, secret: string) => StripeEventLike } | null;
+  };
   readonly offers: OfferSource;
   readonly cronSecret: string | null;
 }
@@ -58,6 +79,10 @@ function build(): Container {
   // Asking to pretend card holds in production stops the server, rather than letting people "pay" without paying.
   const simulation = resolveHoldSimulation(env.value.simulateHolds, process.env.NODE_ENV);
   if (!simulation.ok) throw new Error(simulation.error.message);
+
+  // The same for pretending a booking succeeded, which would charge people for a trip that was never booked.
+  const bookingSimulation = resolveBookingSimulation(env.value.simulateBooking, process.env.NODE_ENV);
+  if (!bookingSimulation.ok) throw new Error(bookingSimulation.error.message);
 
   const { db } = connectDatabase(env.value.databaseUrl, MAX_CONNECTIONS);
   const groups = new PostgresGroupRepository(db);
@@ -83,18 +108,46 @@ function build(): Container {
 
   const views = new PostgresPlanViewStore(db);
 
-  // What follows a change to a plan: it is written down, the group is told in the chat, and in development the card hold can be pretended.
+  const mode = resolvePaymentsMode({ simulateHolds: simulation.value, stripeSecretKey: env.value.stripeSecretKey });
+
+  // What follows a change to a plan: it is written down, the group is told in the chat, and the money moves:
+  // for real on Stripe when there is a key, or pretended in development when asked for.
   const runners: EffectRunner[] = [
     new PostgresEffectRecorder(db),
     new ChatEffectRunner({
       groupIdOf: (planId) => views.groupIdOf(planId),
       memberNames: (groupId) => groups.memberNames(groupId),
       messages,
+      demoBooking: bookingSimulation.value,
     }),
   ];
   const effects = new CompositeEffectRunner(runners);
-  // The simulated hold passes on what the last hold sets in motion, so it needs the whole set, itself included.
-  if (simulation.value) runners.push(new SimulatedHoldRunner(planRepository, () => effects, agent.clock));
+  // Both of these pass on what the last hold sets in motion (booking), so they need the whole set, themselves included.
+  if (mode === "demo") runners.push(new SimulatedHoldRunner(planRepository, () => effects, agent.clock));
+  if (bookingSimulation.value) runners.push(new SimulatedBookingRunner(planRepository, () => effects, agent.clock));
+
+  const holdStore = new PostgresHoldStore(db);
+  let holds: HoldService | null = null;
+  let retrier: EffectRetrier | null = null;
+  let webhook: Container["payments"]["webhook"] = null;
+  if (mode === "stripe" && env.value.stripeSecretKey) {
+    const stripe = createStripeClient(env.value.stripeSecretKey);
+    holds = new HoldService({ provider: new StripePaymentProvider(stripe), store: holdStore, plans: planRepository, effects: () => effects, clock: agent.clock });
+    const log = new PostgresEffectLog(db);
+    const paymentRunner = new PaymentEffectRunner(holds, log);
+    runners.push(paymentRunner);
+    retrier = new EffectRetrier({
+      log,
+      runner: paymentRunner,
+      clock: agent.clock,
+      onGaveUp: async (planId, effect) => {
+        const line = giveUpLine(effect);
+        const group = await views.groupIdOf(planId);
+        if (line && group.ok && group.value) await messages.postSystem(group.value, line);
+      },
+    });
+    webhook = { secret: env.value.stripeWebhookSecret, verify: (body, signature, secret) => stripe.webhooks.constructEvent(body, signature, secret) as unknown as StripeEventLike };
+  }
 
   return {
     groups,
@@ -104,7 +157,7 @@ function build(): Container {
     plans: new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects }),
     planStatus: new PostgresPlanStatusReader(db),
     views,
-    demoHolds: simulation.value,
+    payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, webhook },
     offers,
     cronSecret: env.value.cronSecret,
   };

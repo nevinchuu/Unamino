@@ -36,7 +36,7 @@ function raw(overrides: Partial<PlanViewRaw> = {}): PlanViewRaw {
   };
 }
 
-const view = (overrides: Partial<PlanViewRaw> = {}, viewer = "ana") => buildPlanView(raw(overrides), viewer, { demoHolds: false });
+const view = (overrides: Partial<PlanViewRaw> = {}, viewer = "ana") => buildPlanView(raw(overrides), viewer, { payments: "none" });
 
 describe("the plan as the screen shows it", () => {
   it("describes the trip, the status and the deadline", () => {
@@ -66,8 +66,27 @@ describe("the plan as the screen shows it", () => {
     expect(view().ideas).toEqual([{ id: "i1", when: "Sat 12 Dec, 10:00 to 12:00", category: "market", name: "Chatuchak Weekend Market", address: "Kamphaeng Phet 2 Rd, Bangkok", mapsUrl: "https://maps.example/p1", why: "Ana and Ben both like markets" }]);
   });
 
-  it("says when card holds are only pretended", () => {
-    expect(buildPlanView(raw(), "ana", { demoHolds: true }).demoHolds).toBe(true);
+  it("says how money is handled, so the screen can show a card form, a demo note, or nothing", () => {
+    for (const payments of ["stripe", "demo", "none"] as const) expect(buildPlanView(raw(), "ana", { payments }).payments).toBe(payments);
+  });
+
+  describe("whether a person still has to add their card", () => {
+    const cardNeeded = (status: PlanStatus, overrides: Partial<ViewMember>, payments: "stripe" | "demo" | "none" = "stripe") =>
+      buildPlanView(raw({ status, members: [member("ana", "Ana", { planAgreement: "agreed", approval: "approved", approvedMinor: 30_000, ...overrides }), member("ben", "Ben")] }), "ana", { payments }).me.cardNeeded;
+
+    it("is true after approving, while the plan waits for holds, until the card is on the hold", () => {
+      expect(cardNeeded("approving", {})).toBe(true);
+      expect(cardNeeded("approving", { holdPlaced: true })).toBe(false);
+    });
+
+    it("is false before approving, once the plan has moved on, and when no real card is involved", () => {
+      expect(cardNeeded("approving", { approval: "pending", approvedMinor: null })).toBe(false);
+      expect(cardNeeded("reviewing", {})).toBe(false);
+      expect(cardNeeded("held", {})).toBe(false);
+      expect(cardNeeded("expired", {})).toBe(false);
+      expect(cardNeeded("approving", {}, "demo")).toBe(false);
+      expect(cardNeeded("approving", {}, "none")).toBe(false);
+    });
   });
 });
 

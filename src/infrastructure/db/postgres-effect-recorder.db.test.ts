@@ -48,10 +48,12 @@ describe.skipIf(!ENABLED)("PostgresEffectRecorder on the real database", () => {
 
   const rows = () => handle.db.select().from(effectLog).where(eq(effectLog.planId, planId)).orderBy(asc(effectLog.effectKey));
 
-  it("records each effect as a pending row with its details", async () => {
+  it("records work still to be done as pending, and a message to the group as done, each with its details", async () => {
     expect(await recorder.run(planId, 3, EFFECTS)).toEqual({ ok: true, value: undefined });
     const stored = await rows();
-    expect(stored.map((row) => [row.effectKey, row.type, row.status])).toEqual([[`${planId}:3:0`, "request_review", "pending"], [`${planId}:3:1`, "place_hold", "pending"]]);
+    expect(stored.map((row) => [row.effectKey, row.type, row.status])).toEqual([[`${planId}:3:0`, "request_review", "done"], [`${planId}:3:1`, "place_hold", "pending"]]);
+    expect(stored[0].completedAt).not.toBeNull();
+    expect(stored[1].completedAt).toBeNull();
     expect(stored[1].payload).toMatchObject({ type: "place_hold", memberId: "ana", amountMinor: 30_000 });
   }, 30_000);
 

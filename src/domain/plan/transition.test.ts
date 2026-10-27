@@ -299,10 +299,17 @@ describe("the cap: charged is never more than approved", () => {
     ]);
   });
 
-  it("does not release a hold that was never placed", () => {
+  it("lets go of the hold of someone who approved but never added their card, when their price passes their cap", () => {
+    // The hold is made when they approve, so it exists even though no card is on it yet, and a new amount needs a new one.
     const approvedOnly = run(planOf(), { type: "member_approved", at: minutes(1), memberId: "ana", amountMinor: 20000, expiresAt: DEADLINE }).plan;
     const { effects } = run(approvedOnly, { type: "price_rechecked", at: minutes(2), memberId: "ana", currentMinor: 25000 });
-    expect(effects).toEqual([{ type: "request_reapproval", memberId: "ana", newAmountMinor: 25000 }]);
+    expect(effects).toEqual([{ type: "release_holds", memberIds: ["ana"] }, { type: "request_reapproval", memberId: "ana", newAmountMinor: 25000 }]);
+  });
+
+  it("lets go of the holds of everyone who approved when the plan ends, card added or not, and of nobody who has not", () => {
+    const approvedOnly = run(planOf(), { type: "member_approved", at: minutes(1), memberId: "ana", amountMinor: 20000, expiresAt: DEADLINE }).plan;
+    const { effects } = run(approvedOnly, { type: "member_declined", at: minutes(2), memberId: "ben" });
+    expect(effects).toEqual([{ type: "release_holds", memberIds: ["ana"] }]);
   });
 
   it("lets the member approve the higher amount and books again once they are held", () => {
