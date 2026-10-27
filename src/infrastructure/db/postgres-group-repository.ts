@@ -120,6 +120,11 @@ export class PostgresGroupRepository implements GroupRepository {
     }
   }
 
+  async memberNames(groupId: string): Promise<ReadonlyMap<string, string>> {
+    const rows = await this.db.select({ id: members.id, displayName: members.displayName }).from(members).where(eq(members.groupId, groupId));
+    return new Map(rows.map((row) => [row.id, row.displayName]));
+  }
+
   async joinedMembers(groupId: string): Promise<readonly Member[]> {
     const rows = await this.db.select().from(members).where(and(eq(members.groupId, groupId), eq(members.status, "joined"))).orderBy(asc(members.joinedAt), asc(members.id));
     return rows.map(toMember);

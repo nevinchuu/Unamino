@@ -145,6 +145,10 @@ export class FakeRuns implements AgentRunRepository {
     this.finished.push({ runId, outcome });
     this.running = null;
   }
+
+  async isRunning(): Promise<boolean> {
+    return this.running !== null;
+  }
 }
 
 export class FakeBriefs implements BriefRepository {
@@ -192,7 +196,7 @@ export class FakePlans implements PlanStore, PlanRepository {
   async latest(): Promise<PlanSummary | null> {
     const record = this.records.at(-1);
     if (!record) return null;
-    return { id: record.id, status: this.summaryStatusOverride ?? record.snapshot.status, inputsHash: record.input.inputsHash, headcount: record.input.headcount, agreedCount: record.snapshot.members.filter((m) => m.planAgreement === "agreed").length };
+    return { id: record.id, title: record.input.title, status: this.summaryStatusOverride ?? record.snapshot.status, inputsHash: record.input.inputsHash, headcount: record.input.headcount, agreedCount: record.snapshot.members.filter((m) => m.planAgreement === "agreed").length };
   }
 
   async create(plan: NewPlan): Promise<Result<string, StoreError>> {

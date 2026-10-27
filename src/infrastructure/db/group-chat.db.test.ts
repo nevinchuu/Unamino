@@ -150,6 +150,19 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
       expect(row.leftAt).not.toBeNull();
     }, 30_000);
 
+    it("keeps the names of people who left, for the messages they wrote", async () => {
+      const { group, organiser, joinToken } = await newGroup();
+      const ana = await groupRepo.joinWithLink(joinToken, ME);
+      if (!ana.ok) throw new Error(ana.error.message);
+      expect((await groupRepo.leave(ana.value.member.id)).ok).toBe(true);
+
+      const names = await groupRepo.memberNames(group.id);
+      expect(names.get(organiser.id)).toBe("Nevin");
+      expect(names.get(ana.value.member.id)).toBe("Ana");
+      expect(names.size).toBe(2);
+      expect((await groupRepo.memberNames((await newGroup()).group.id)).has(ana.value.member.id)).toBe(false);
+    }, 30_000);
+
     it("does not let the organiser leave their own group", async () => {
       const { organiser } = await newGroup();
       const result = await groupRepo.leave(organiser.id);

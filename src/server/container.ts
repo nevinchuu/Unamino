@@ -20,6 +20,7 @@ import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup
 import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
 import { MuseHttp } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
+import type { ChatDeps } from "./chat";
 import { readServerEnv } from "./env";
 import { GROUP_CURRENCY } from "./group-currency";
 
@@ -32,6 +33,8 @@ export interface Container {
   readonly groups: GroupRepository;
   readonly messages: MessageRepository;
   readonly agent: AgentDeps;
+  /** What the chat screen and its polling read. */
+  readonly chat: ChatDeps;
   readonly plans: PlanService;
   readonly planStatus: PlanStatusReader;
   readonly offers: OfferSource;
@@ -69,6 +72,7 @@ function build(): Container {
     groups,
     messages,
     agent,
+    chat: { groups, messages, runs: agent.runs, plans: agent.plans, clock: agent.clock },
     plans: new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects: new PostgresEffectRecorder(db) }),
     planStatus: new PostgresPlanStatusReader(db),
     offers,

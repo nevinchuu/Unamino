@@ -15,22 +15,36 @@ function replaceIds(text: string, replacements: ReadonlyMap<string, string>): st
   return result;
 }
 
+/** A stand-in on its own, such as m3 or m3's, and not inside a longer word or id. */
+const STAND_IN = /(?<![\w-])m\d+(?![\w-])/g;
+
+export interface Person {
+  readonly id: string;
+  readonly displayName: string;
+}
+
 /**
  * Shows the model short stand-ins (m1, m2, ...) instead of real member ids, and turns its answers back. Real ids
  * are long and meaningless to the model, so this saves tokens and keeps them out of prompts, and a name the
- * model never saw cannot leak out of it.
+ * model never saw cannot leak out of it. The model also uses the stand-ins in its own sentences ("a room for
+ * m3"), so every piece of its text that reaches the group is turned into the person's name.
  */
 export class AliasingPlanner implements Planner {
   private readonly toAlias: ReadonlyMap<string, string>;
   private readonly fromAlias: ReadonlyMap<string, string>;
+  private readonly nameOfAlias: ReadonlyMap<string, string>;
 
   constructor(
     private readonly inner: Planner,
-    memberIds: readonly string[],
+    people: readonly Person[],
   ) {
-    this.toAlias = new Map(memberIds.map((id, index) => [id, `m${index + 1}`]));
+    this.toAlias = new Map(people.map((person, index) => [person.id, `m${index + 1}`]));
     this.fromAlias = new Map([...this.toAlias].map(([id, alias]) => [alias, id]));
+    this.nameOfAlias = new Map(people.map((person, index) => [`m${index + 1}`, person.displayName]));
   }
+
+  /** Names for the stand-ins in a sentence. One that is not a real stand-in (m9 in a group of four) is left as it was written. */
+  private named = (text: string): string => text.replace(STAND_IN, (standIn) => this.nameOfAlias.get(standIn) ?? standIn);
 
   private alias = (id: string): string => this.toAlias.get(id) ?? id;
   private real = (alias: string): string => this.fromAlias.get(alias) ?? alias;
@@ -43,8 +57,10 @@ export class AliasingPlanner implements Planner {
     return ok(Object.fromEntries(Object.entries(result.value).filter(([alias]) => this.fromAlias.has(alias)).map(([alias, value]) => [this.real(alias), value])));
   }
 
-  extractTripBrief(input: ExtractTripBriefInput): Promise<Result<TripBriefOutput, PlannerError>> {
-    return this.inner.extractTripBrief({ ...input, memberIds: input.memberIds.map(this.alias), messages: input.messages.map((m) => ({ ...m, memberId: this.alias(m.memberId) })) });
+  async extractTripBrief(input: ExtractTripBriefInput): Promise<Result<TripBriefOutput, PlannerError>> {
+    const result = await this.inner.extractTripBrief({ ...input, memberIds: input.memberIds.map(this.alias), messages: input.messages.map((m) => ({ ...m, memberId: this.alias(m.memberId) })) });
+    // The questions are posted to the group as they are.
+    return result.ok ? ok({ ...result.value, questions: result.value.questions.map(this.named) }) : result;
   }
 
   async proposePlan(input: ProposePlanInput): Promise<Result<PlannerOutput, PlannerError>> {
@@ -55,20 +71,24 @@ export class AliasingPlanner implements Planner {
       feedback: input.feedback.map((line) => replaceIds(line, this.toAlias)),
     });
     if (!result.ok) return result;
+    const plan = result.value;
     return ok({
-      ...result.value,
-      picks: result.value.picks.map((pick) => ({ ...pick, members: pick.members.map((m) => ({ ...m, memberId: this.real(m.memberId) })) })),
-      compromises: result.value.compromises?.map((c) => ({ ...c, memberId: this.real(c.memberId) })),
+      ...plan,
+      title: this.named(plan.title),
+      ...(plan.summary !== undefined && { summary: this.named(plan.summary) }),
+      picks: plan.picks.map((pick) => ({ ...pick, reason: this.named(pick.reason), members: pick.members.map((m) => ({ memberId: this.real(m.memberId), note: this.named(m.note) })) })),
+      compromises: plan.compromises?.map((c) => ({ memberId: this.real(c.memberId), note: this.named(c.note) })),
     });
   }
 
-  suggestFreeTime(input: SuggestFreeTimeInput): Promise<Result<SuggestionOutput, PlannerError>> {
-    return this.inner.suggestFreeTime({
+  async suggestFreeTime(input: SuggestFreeTimeInput): Promise<Result<SuggestionOutput, PlannerError>> {
+    const result = await this.inner.suggestFreeTime({
       ...input,
       memberIds: input.memberIds.map(this.alias),
       constraints: this.aliasConstraints(input.constraints),
       feedback: input.feedback.map((line) => replaceIds(line, this.toAlias)),
     });
+    return result.ok ? ok({ suggestions: result.value.suggestions.map((suggestion) => ({ ...suggestion, why: this.named(suggestion.why) })) }) : result;
   }
 }
 

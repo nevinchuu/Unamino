@@ -13,13 +13,14 @@ import { BANGKOK_TRIP } from "./test-support";
 const ANA = "3f2c9a1e-7b44-4c0e-9d11-0a5b6c7d8e9f";
 const BEN = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
 const MEMBER_IDS = [ANA, BEN];
+const PEOPLE = [{ id: ANA, displayName: "Ana" }, { id: BEN, displayName: "Ben" }];
 
 describe("showing the model stand-ins for member ids", () => {
   const scripted = new ScriptedPlanner({
     constraints: ok({ m1: { ownRoom: true }, m2: { budgetCap: { amountMinor: 35000, currency: "USD" } }, m9: { ownRoom: true } }),
     plans: [ok({ title: "t", picks: [{ offerId: "o1", reason: "r", members: [{ memberId: "m1", note: "n" }, { memberId: "m2", note: "n" }] }], compromises: [{ memberId: "m2", note: "c" }] })],
   });
-  const planner: Planner = new AliasingPlanner(scripted, MEMBER_IDS);
+  const planner: Planner = new AliasingPlanner(scripted, PEOPLE);
 
   it("turns real ids into m1, m2 in what the model is asked, and back in what it answers", async () => {
     const constraints = await planner.extractConstraints({ memberIds: MEMBER_IDS, messages: [{ memberId: BEN, text: "hello" }] });
@@ -49,6 +50,58 @@ describe("showing the model stand-ins for member ids", () => {
   it("passes the trip brief through with aliased messages and no ids in its answer to map", async () => {
     await planner.extractTripBrief({ memberIds: MEMBER_IDS, messages: [{ memberId: ANA, text: "Bangkok please" }], today: "2026-10-27" });
     expect(scripted.briefCalls[0].messages).toEqual([{ memberId: "m1", text: "Bangkok please" }]);
+  });
+
+  describe("naming people in what the model writes", () => {
+    const sentences = {
+      constraints: ok({}),
+      tripBriefs: [ok({ fields: {}, questions: ["Which airport can m1 fly from?", "Does m2's budget include the hotel?"] })],
+      plans: [
+        ok({
+          title: "Bangkok for m1 and m2",
+          summary: "A single room for m2, shared for m1",
+          picks: [{ offerId: "o1", reason: "Fits m1's flight time", members: [{ memberId: "m1", note: "after 6pm, as m1 asked" }, { memberId: "m2", note: "m2 has an own room" }] }],
+          compromises: [{ memberId: "m2", note: "Over m2's cap by $10" }],
+        }),
+      ],
+      suggestions: [ok({ suggestions: [{ gapId: "g1", venueName: "Chatuchak Market", category: "market", startTime: "10:00", durationMinutes: 120, why: "m1 and m2 both like markets" }] })],
+    };
+    const speaker = () => new AliasingPlanner(new ScriptedPlanner(sentences), PEOPLE);
+
+    it("puts names in the questions the group will read", async () => {
+      const brief = await speaker().extractTripBrief({ memberIds: MEMBER_IDS, messages: [], today: "2026-10-27" });
+      expect(brief.ok && brief.value.questions).toEqual(["Which airport can Ana fly from?", "Does Ben's budget include the hotel?"]);
+    });
+
+    it("puts names in the plan title, summary, reasons, notes and compromises", async () => {
+      const result = await speaker().proposePlan({ memberIds: MEMBER_IDS, constraints: {}, offers: [], feedback: [] });
+      if (!result.ok) throw new Error("expected a plan");
+      expect(result.value.title).toBe("Bangkok for Ana and Ben");
+      expect(result.value.summary).toBe("A single room for Ben, shared for Ana");
+      expect(result.value.picks[0].reason).toBe("Fits Ana's flight time");
+      expect(result.value.picks[0].members.map((m) => m.note)).toEqual(["after 6pm, as Ana asked", "Ben has an own room"]);
+      expect(result.value.compromises?.[0].note).toBe("Over Ben's cap by $10");
+      expect(JSON.stringify(result.value)).not.toMatch(/\bm\d\b/);
+    });
+
+    it("puts names in the free-time reasons", async () => {
+      const result = await speaker().suggestFreeTime({ city: "Bangkok", memberIds: MEMBER_IDS, constraints: {}, gaps: [], feedback: [] });
+      expect(result.ok && result.value.suggestions[0].why).toBe("Ana and Ben both like markets");
+    });
+
+    // A real "m2" in the model's text cannot be told from a stand-in, so it is read as one. Anything that is not a stand-in stays.
+    it("leaves a stand-in that is nobody, and words that only look like one, alone", async () => {
+      const odd = new AliasingPlanner(new ScriptedPlanner({ constraints: ok({}), plans: [], tripBriefs: [ok({ fields: {}, questions: ["Is m9 coming? The room is 20 m3 and room-m1 is booked, m1."] })] }), PEOPLE);
+      const brief = await odd.extractTripBrief({ memberIds: MEMBER_IDS, messages: [], today: "2026-10-27" });
+      expect(brief.ok && brief.value.questions[0]).toBe("Is m9 coming? The room is 20 m3 and room-m1 is booked, Ana.");
+    });
+
+    it("replaces in one pass, so a name that looks like a stand-in is not replaced again", async () => {
+      const tricky = [{ id: ANA, displayName: "m2" }, { id: BEN, displayName: "Ben" }];
+      const trickyPlanner = new AliasingPlanner(new ScriptedPlanner({ constraints: ok({}), plans: [], tripBriefs: [ok({ fields: {}, questions: ["m1 and m2"] })] }), tricky);
+      const brief = await trickyPlanner.extractTripBrief({ memberIds: MEMBER_IDS, messages: [], today: "2026-10-27" });
+      expect(brief.ok && brief.value.questions[0]).toBe("m2 and Ben");
+    });
   });
 
   it("does not touch a short id that happens to sit inside a longer word", () => {

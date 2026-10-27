@@ -1,4 +1,4 @@
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, gt, lt } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
 import type { AgentRunRepository, RunOutcome, StartedRun, StoreError } from "@/domain/agent/ports";
 import type { Database } from "./client";
@@ -37,6 +37,15 @@ export class PostgresRunRepository implements AgentRunRepository {
       if (isUniqueViolation(error)) return ok({ status: "duplicate" });
       return unavailable();
     }
+  }
+
+  async isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: agentRuns.id })
+      .from(agentRuns)
+      .where(and(eq(agentRuns.groupId, groupId), eq(agentRuns.status, "running"), gt(agentRuns.startedAt, new Date(now.getTime() - staleAfterMs))))
+      .limit(1);
+    return row !== undefined;
   }
 
   async finish(runId: string, outcome: RunOutcome, now: Date): Promise<void> {

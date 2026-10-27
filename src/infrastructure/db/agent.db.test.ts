@@ -121,6 +121,25 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       expect(third.ok && third.value.status).toBe("started");
     }, 60_000);
 
+    it("says whether the agent is working for a group, and stops saying so when the run ends or goes stale", async () => {
+      const { groupId, people } = await newGroup();
+      const other = await newGroup();
+      const message = await say(groupId, people[0].id, "@agent go");
+      const start = new Date("2026-10-27T00:00:00Z");
+      expect(await runRepo.isRunning(groupId, start, 300_000)).toBe(false);
+
+      const started = await runRepo.start({ groupId, triggerMessageId: message.id, requestedByMemberId: null, now: start, staleAfterMs: 300_000 });
+      if (!started.ok || started.value.status !== "started") throw new Error("expected a started run");
+      expect(await runRepo.isRunning(groupId, new Date(start.getTime() + 60_000), 300_000)).toBe(true);
+      // Another group's run is not this group's.
+      expect(await runRepo.isRunning(other.groupId, new Date(start.getTime() + 60_000), 300_000)).toBe(false);
+      // A run that has gone on longer than it should is treated as dead, the same rule that frees the group.
+      expect(await runRepo.isRunning(groupId, new Date(start.getTime() + 301_000), 300_000)).toBe(false);
+
+      await runRepo.finish(started.value.run.id, { status: "done", usage: { calls: 0, promptTokens: 0, completionTokens: 0, reasoningTokens: 0 } }, start);
+      expect(await runRepo.isRunning(groupId, new Date(start.getTime() + 60_000), 300_000)).toBe(false);
+    }, 60_000);
+
     it("lets only one of two simultaneous calls start", async () => {
       const { groupId, people } = await newGroup();
       const [a, b] = await Promise.all([say(groupId, people[0].id, "@agent one"), say(groupId, people[1].id, "@agent two")]);
@@ -248,7 +267,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       });
       if (!created.ok) throw new Error(created.error.message);
 
-      expect(await planStore.latest(groupId)).toEqual({ id: created.value, status: "draft", inputsHash: "hash-1", headcount: 4, agreedCount: 0 });
+      expect(await planStore.latest(groupId)).toEqual({ id: created.value, title: "Bangkok weekend", status: "draft", inputsHash: "hash-1", headcount: 4, agreedCount: 0 });
       expect(await handle.db.select().from(planMembers).where(eq(planMembers.planId, created.value))).toHaveLength(4);
       const picks = await handle.db.select().from(planPicks).where(eq(planPicks.planId, created.value));
       expect(picks.map((p) => p.position).sort()).toEqual([0, 1]);

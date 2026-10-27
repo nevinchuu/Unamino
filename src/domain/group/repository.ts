@@ -31,6 +31,8 @@ export interface GroupRepository {
   /** Who is acting? Only members who are currently in the group are recognised. */
   authenticate(memberToken: string): Promise<Result<Member, GroupError>>;
   find(groupId: string): Promise<Result<Group, GroupError>>;
+  /** Everyone who was ever in the group, by id, so old messages keep the name of someone who has since left. */
+  memberNames(groupId: string): Promise<ReadonlyMap<string, string>>;
   /** The people in the group right now, in the order they joined. This is the headcount for every search. */
   joinedMembers(groupId: string): Promise<readonly Member[]>;
   leave(memberId: string): Promise<Result<void, GroupError>>;

@@ -75,7 +75,7 @@ export function createUsageMeter(): UsageMeter {
  * Called when a message that calls the agent has been posted. Starts a run unless the group already has one going,
  * in which case the person is told so instead of a second run starting. The caller then runs it in the background.
  */
-export async function startAgentRun(deps: AgentDeps, message: { readonly id: string; readonly groupId: string; readonly memberId: string | null }): Promise<Result<StartedRun, StoreError>> {
+export async function startAgentRun(deps: Pick<AgentDeps, "runs" | "messages" | "clock" | "staleRunMs">, message: { readonly id: string; readonly groupId: string; readonly memberId: string | null }): Promise<Result<StartedRun, StoreError>> {
   const started = await deps.runs.start({ groupId: message.groupId, triggerMessageId: message.id, requestedByMemberId: message.memberId, now: deps.clock(), staleAfterMs: deps.staleRunMs ?? DEFAULT_STALE_RUN_MS });
   if (started.ok && started.value.status === "busy") await deps.messages.postAgent(message.groupId, MESSAGES.busy, { replyToMessageId: message.id });
   return started;
@@ -122,7 +122,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
   if (members.length === 0) return failed("no_members");
 
   const memberIds = members.map((member) => member.id);
-  const ctx: Context = { deps, run, group: group.value, members, now, planner: new AliasingPlanner(deps.makePlanner(meter), memberIds) };
+  const ctx: Context = { deps, run, group: group.value, members, now, planner: new AliasingPlanner(deps.makePlanner(meter), members) };
 
   const chat = (await deps.messages.recent(run.groupId, CHAT_WINDOW)).filter((message) => message.kind === "human" && message.memberId !== null).map((message) => ({ memberId: message.memberId as string, text: message.body }));
   const latestBrief = await deps.briefs.latest(run.groupId);

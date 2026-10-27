@@ -15,7 +15,7 @@ export class PostgresPlanStore implements PlanStore {
     const [plan] = await this.db.select().from(plans).where(eq(plans.groupId, groupId)).orderBy(desc(plans.createdAt), desc(plans.id)).limit(1);
     if (!plan) return null;
     const [{ agreed }] = await this.db.select({ agreed: count() }).from(planMembers).where(and(eq(planMembers.planId, plan.id), eq(planMembers.planAgreement, "agreed")));
-    return { id: plan.id, status: plan.status, inputsHash: plan.inputsHash, headcount: plan.headcount, agreedCount: agreed };
+    return { id: plan.id, title: plan.title, status: plan.status, inputsHash: plan.inputsHash, headcount: plan.headcount, agreedCount: agreed };
   }
 
   async create(plan: NewPlan): Promise<Result<string, StoreError>> {

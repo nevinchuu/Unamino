@@ -46,6 +46,8 @@ export interface AgentRunRepository {
   /** Starts a run unless the group already has one going. A run left going for longer than `staleAfterMs` is written off first. */
   start(input: { groupId: string; triggerMessageId: string; requestedByMemberId: string | null; now: Date; staleAfterMs: number }): Promise<Result<StartedRun, StoreError>>;
   finish(runId: string, outcome: RunOutcome, now: Date): Promise<void>;
+  /** Is the agent working for this group right now? A run left going for longer than `staleAfterMs` no longer counts. */
+  isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean>;
 }
 
 export interface StoredBrief {
@@ -74,6 +76,7 @@ export interface SearchStore {
 
 export interface PlanSummary {
   readonly id: string;
+  readonly title: string;
   readonly status: PlanStatus;
   readonly inputsHash: string;
   readonly headcount: number;
