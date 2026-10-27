@@ -228,3 +228,35 @@ describe("CompositeOfferSource", () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe("excluded hotel charges", () => {
+  const withFees = (fees: unknown[]) => {
+    const body = structuredClone(hotelsSingleRoom);
+    body.data[0].roomTypes[0].rates[0].retailRate.taxesAndFees = fees as never;
+    return body;
+  };
+
+  it("keeps charges liteAPI says are not in the price, as minor units", async () => {
+    const { source } = sourceWith(() =>
+      json(withFees([
+        { included: true, description: "sales tax", amount: 28.68, currency: "USD" },
+        { included: false, description: "City tax ", amount: 9, currency: "USD" },
+      ])),
+    );
+    const result = await source.search(hotelQuery);
+    const lebua = result.ok ? result.value[0] : null;
+    expect(lebua?.kind === "hotel" && lebua.excludedCharges).toEqual([{ description: "City tax", amountMinor: 900, currency: "USD" }]);
+  });
+
+  it("has none when everything is included, as in the real sandbox responses", async () => {
+    const { source } = sourceWith(() => json(hotelsSingleRoom));
+    const result = await source.search(hotelQuery);
+    expect(result.ok && result.value.every((offer) => offer.kind === "hotel" && offer.excludedCharges?.length === 0)).toBe(true);
+  });
+
+  it("skips a charge it cannot price", async () => {
+    const { source } = sourceWith(() => json(withFees([{ included: false, description: "Odd", amount: 0, currency: "USD" }])));
+    const result = await source.search(hotelQuery);
+    expect(result.ok && result.value[0].kind === "hotel" && result.value[0].excludedCharges).toEqual([]);
+  });
+});

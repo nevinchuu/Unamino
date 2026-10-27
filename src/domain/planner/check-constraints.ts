@@ -1,4 +1,5 @@
 import type { ConstraintSet, MemberConstraints } from "@/domain/constraints/schema";
+import { clockTime } from "@/domain/offers/local-time";
 import type { FlightOffer } from "@/domain/offers/schema";
 import type { MemberShare } from "@/domain/split/types";
 import { formatMinor } from "@/lib/format-money";
@@ -15,12 +16,6 @@ export interface ConstraintViolation {
 }
 
 type TimeWindow = NonNullable<MemberConstraints["outboundDeparture"]>;
-
-/**
- * Both flight sources write departure times as local time at the departure airport
- * (with or without an offset), so the clock reading is the text after the "T".
- */
-const clockTime = (dateTime: string): string | null => /T(\d{2}:\d{2})/.exec(dateTime)?.[1] ?? null;
 
 /** Inclusive at both ends. A window whose start is after its end runs overnight, e.g. 22:00 to 02:00. */
 function isInWindow(time: string, { after, before }: TimeWindow): boolean {

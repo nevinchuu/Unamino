@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { toMinorUnits } from "@/domain/money/currency";
 import type { HotelQuery } from "@/domain/offers/offer-source";
-import { offerSchema, type HotelOffer } from "@/domain/offers/schema";
+import { offerSchema, type ExcludedCharge, type HotelOffer } from "@/domain/offers/schema";
 
 const MS_PER_MINUTE = 60_000;
 const MIN_STARS = 1;
@@ -12,6 +12,13 @@ const money = z.object({ amount: z.number(), currency: z.string() });
 
 const rateSchema = z.object({
   name: z.string(),
+  retailRate: z
+    .object({
+      taxesAndFees: z
+        .array(z.object({ included: z.boolean(), description: z.string(), amount: z.number(), currency: z.string() }))
+        .optional(),
+    })
+    .optional(),
   cancellationPolicies: z
     .object({
       refundableTag: z.string().optional(),
@@ -73,6 +80,16 @@ function freeCancellationUntil(rate: z.infer<typeof rateSchema>): string | undef
   return times.length > 0 ? new Date(Math.min(...times)).toISOString() : undefined;
 }
 
+/** Charges the hotel adds on top of the price. Anything liteAPI marks as included is already in the total. */
+function excludedCharges(rate: z.infer<typeof rateSchema>): ExcludedCharge[] {
+  const charges: ExcludedCharge[] = [];
+  for (const fee of rate.retailRate?.taxesAndFees ?? []) {
+    const amountMinor = fee.included ? null : toMinorUnits(fee.amount, fee.currency);
+    if (amountMinor !== null) charges.push({ description: fee.description.trim() || "Fee", amountMinor, currency: fee.currency });
+  }
+  return charges;
+}
+
 /** Turns a validated liteAPI hotel response into offers. A room that cannot be priced or mapped is left out. */
 export function mapHotelOffers(
   response: z.infer<typeof hotelRatesResponseSchema>,
@@ -104,6 +121,7 @@ export function mapHotelOffers(
         stars: stars !== undefined && stars >= MIN_STARS && stars <= MAX_STARS ? Math.round(stars) : undefined,
         roomName: roomType.rates[0].name.trim() || "Room",
         freeCancellationUntil: freeCancellationUntil(roomType.rates[0]),
+        excludedCharges: excludedCharges(roomType.rates[0]),
         expiresAt,
       };
       const checked = offerSchema.safeParse(candidate);

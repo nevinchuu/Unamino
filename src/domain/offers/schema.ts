@@ -29,6 +29,12 @@ const baseFields = {
   guests: positiveInteger,
 };
 
+const excludedChargeSchema = z.object({
+  description: z.string().min(1),
+  amountMinor: positiveInteger,
+  currency: currencyCode,
+});
+
 const hotelFields = {
   ...baseFields,
   kind: z.literal("hotel"),
@@ -37,6 +43,8 @@ const hotelFields = {
   stars: z.number().int().min(1).max(5).optional(),
   roomName: z.string().min(1),
   freeCancellationUntil: instant.optional(),
+  /** Charges the hotel collects on top of the price (for example a city tax paid at the desk). Not in `totalMinor`. */
+  excludedCharges: z.array(excludedChargeSchema).optional(),
 };
 
 const flightLegSchema = z.object({
@@ -82,6 +90,7 @@ export const fixtureOfferSchema = z.discriminatedUnion("kind", [
 
 export type Offer = z.infer<typeof offerSchema>;
 export type FixtureOffer = z.infer<typeof fixtureOfferSchema>;
+export type ExcludedCharge = z.infer<typeof excludedChargeSchema>;
 export type HotelOffer = Extract<Offer, { kind: "hotel" }>;
 export type FlightOffer = Extract<Offer, { kind: "flight" }>;
 export type ActivityOffer = Extract<Offer, { kind: "activity" }>;
