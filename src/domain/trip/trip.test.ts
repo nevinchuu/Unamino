@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { err, ok } from "@/lib/result";
 import type { OfferQuery, OfferSource } from "@/domain/offers/offer-source";
 import { BANGKOK_OFFERS } from "@/domain/planner/test-support";
-import { assessTripBrief, mergeTripFields, type CompleteTrip } from "./brief";
-import { parseTripBriefText, tripFieldsSchema } from "./brief-schema";
+import { assessTripBrief, type CompleteTrip } from "./brief";
+import { tripFieldsSchema } from "./brief-schema";
 import { MAX_ROOM_SIZE, tripToQueries } from "./queries";
 import { searchForTrip } from "./search";
 
@@ -18,29 +18,22 @@ const BANGKOK = {
 };
 const TRIP: CompleteTrip = BANGKOK;
 
-describe("the trip fields the model returns", () => {
-  it("accepts a partial reading, because most chats start without everything", () => {
-    const parsed = parseTripBriefText('{"fields":{"destinationCity":"Bangkok"},"questions":["What dates?"]}');
-    expect(parsed.ok && parsed.value.fields).toEqual({ destinationCity: "Bangkok" });
-  });
-
-  it("treats null as not mentioned, which models often write instead of leaving a field out", () => {
-    const parsed = parseTripBriefText('{"fields":{"destinationCity":"Bangkok","departDate":null,"originAirport":null},"questions":[]}');
-    expect(parsed.ok && parsed.value.fields.departDate).toBeUndefined();
-    expect(parsed.ok && parsed.value.fields.destinationCity).toBe("Bangkok");
-  });
-
-  it("rejects anything that is not a field, a malformed code or date, and too many questions", () => {
-    expect(parseTripBriefText('{"fields":{"price":100},"questions":[]}').ok).toBe(false);
-    expect(parseTripBriefText('{"fields":{"originAirport":"Singapore"},"questions":[]}').ok).toBe(false);
-    expect(parseTripBriefText('{"fields":{"destinationCountry":"Thailand"},"questions":[]}').ok).toBe(false);
-    expect(parseTripBriefText('{"fields":{"departDate":"next Friday"},"questions":[]}').ok).toBe(false);
-    expect(parseTripBriefText('{"fields":{},"questions":["a","b","c","d"]}').ok).toBe(false);
-  });
-
-  it("accepts code fences around the JSON", () => {
-    expect(parseTripBriefText('```json\n{"fields":{},"questions":[]}\n```').ok).toBe(true);
+describe("the trip fields", () => {
+  it("accepts a partial trip, because the group may not have settled everything", () => {
+    expect(tripFieldsSchema.safeParse({ destinationCity: "Bangkok" }).success).toBe(true);
     expect(tripFieldsSchema.safeParse({}).success).toBe(true);
+  });
+
+  it("treats null as not mentioned", () => {
+    const parsed = tripFieldsSchema.safeParse({ destinationCity: "Bangkok", departDate: null });
+    expect(parsed.success && parsed.data.departDate).toBeUndefined();
+  });
+
+  it("rejects anything that is not a field, and a malformed code or date", () => {
+    expect(tripFieldsSchema.safeParse({ price: 100 }).success).toBe(false);
+    expect(tripFieldsSchema.safeParse({ originAirport: "Singapore" }).success).toBe(false);
+    expect(tripFieldsSchema.safeParse({ destinationCountry: "Thailand" }).success).toBe(false);
+    expect(tripFieldsSchema.safeParse({ departDate: "next Friday" }).success).toBe(false);
   });
 });
 
@@ -99,24 +92,6 @@ describe("assessing a trip", () => {
     });
     expect(result.status === "incomplete" && result.questions).toHaveLength(3);
     expect(result.status === "incomplete" && result.questions[0]).toContain("has already passed");
-  });
-});
-
-describe("merging what the group says over time", () => {
-  it("keeps what was settled when a later message mentions only one thing", () => {
-    expect(mergeTripFields(BANGKOK, { departDate: "2026-12-18", returnDate: "2026-12-20" })).toEqual({ ...BANGKOK, departDate: "2026-12-18", returnDate: "2026-12-20" });
-  });
-
-  it("moves the destination as one unit, so an old airport never survives a new city", () => {
-    const merged = mergeTripFields(BANGKOK, { destinationCity: "Phuket", destinationCountry: "TH", destinationAirport: "HKT" });
-    expect(merged).toMatchObject({ destinationCity: "Phuket", destinationAirport: "HKT", originAirport: "SIN" });
-    const half = mergeTripFields(BANGKOK, { destinationCity: "Chiang Mai" });
-    expect(half.destinationCity).toBe("Chiang Mai");
-    expect(half.destinationAirport).toBeUndefined();
-  });
-
-  it("starts from nothing", () => {
-    expect(mergeTripFields(undefined, { originAirport: "SIN" })).toMatchObject({ originAirport: "SIN", destinationCity: undefined });
   });
 });
 

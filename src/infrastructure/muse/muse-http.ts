@@ -33,6 +33,30 @@ export interface MuseConfig {
   readonly fetchImpl?: typeof fetch;
   /** Called once per request that reached Muse, including a truncated attempt, so cost can be logged. */
   readonly onUsage?: (usage: MuseUsage, model: string) => void;
+  /** Called once per attempt with exactly what was sent and what came back, for a developer's trace. Never gets the key. */
+  readonly onTrace?: (call: MuseCall) => void;
+}
+
+/** One request to Muse and its raw outcome. `raw` is the whole response body, so any field the service adds shows up. */
+export interface MuseCall {
+  readonly task: string;
+  readonly maxTokens: number;
+  readonly system: string;
+  readonly user: string;
+  readonly status: number | null;
+  readonly durationMs: number;
+  readonly raw: unknown;
+  readonly problem: string | null;
+}
+
+/** The task name the prompt put in its user message, or "unknown". */
+function taskOf(user: string): string {
+  try {
+    const task = (JSON.parse(user) as { task?: unknown }).task;
+    return typeof task === "string" ? task : "unknown";
+  } catch {
+    return "unknown";
+  }
 }
 
 export interface CompletionRequest {
@@ -85,6 +109,47 @@ const responseSchema = z.object({
 
 type ParsedResponse = z.infer<typeof responseSchema>;
 
+const turnResponseSchema = z.object({
+  model: z.string().optional(),
+  choices: z
+    .array(
+      z.object({
+        finish_reason: z.string().nullable().optional(),
+        message: z.object({
+          content: z.string().nullable().optional(),
+          refusal: z.string().nullable().optional(),
+          tool_calls: z.array(z.object({ id: z.string(), function: z.object({ name: z.string(), arguments: z.string() }) })).nullish(),
+        }),
+      }),
+    )
+    .min(1),
+  usage: responseSchema.shape.usage,
+});
+
+/** A message in a conversation, in the shape the API takes. */
+export type ConversationMessage =
+  | { readonly role: "user"; readonly content: string }
+  | { readonly role: "assistant"; readonly content: string | null; readonly tool_calls?: readonly { readonly id: string; readonly type: "function"; readonly function: { readonly name: string; readonly arguments: string } }[] }
+  | { readonly role: "tool"; readonly tool_call_id: string; readonly content: string };
+
+export interface ConversationTool {
+  readonly type: "function";
+  readonly function: { readonly name: string; readonly description: string; readonly parameters: Record<string, unknown> };
+}
+
+export interface ConversationRequest {
+  readonly system: string;
+  readonly messages: readonly ConversationMessage[];
+  readonly tools: readonly ConversationTool[];
+  readonly maxTokens: number;
+}
+
+/** What the model said, and the tools it asked to use. `arguments` is the raw JSON text the model wrote. */
+export interface ConversationTurn {
+  readonly text: string | null;
+  readonly toolCalls: readonly { readonly id: string; readonly name: string; readonly arguments: string }[];
+}
+
 const errorBodySchema = z.object({ error: z.object({ message: z.string().optional() }).optional() });
 
 /** The service's own explanation of a refused request, shortened and with our key blanked out in case it echoes it. */
@@ -129,21 +194,39 @@ export class MuseHttp {
   }
 
   private async attempt(request: CompletionRequest, maxTokens: number): Promise<Result<Completion, MuseError>> {
+    const payload = {
+      model: this.model,
+      messages: [
+        { role: "system", content: request.system },
+        { role: "user", content: request.user },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: maxTokens,
+      reasoning_effort: this.reasoningEffort,
+    };
+    return this.traced(taskOf(request.user), request.system, request.user, maxTokens, payload, (body) => this.readCompletion(body));
+  }
+
+  /** Sends one payload, reports it to the trace, and reads the answer with `read`. */
+  private async traced<T>(task: string, system: string, user: string, maxTokens: number, payload: unknown, read: (body: unknown) => Result<T, MuseError>): Promise<Result<T, MuseError>> {
+    const startedAt = Date.now();
+    let status: number | null = null;
+    let raw: unknown = null;
+    const result = await this.post(payload, (code, body) => {
+      status = code;
+      raw = body;
+    }, read);
+    this.config.onTrace?.({ task, maxTokens, system, user, status, durationMs: Date.now() - startedAt, raw, problem: result.ok ? null : `${result.error.code}: ${result.error.message}` });
+    return result;
+  }
+
+  private async post<T>(payload: unknown, seen: (status: number, raw: unknown) => void, read: (body: unknown) => Result<T, MuseError>): Promise<Result<T, MuseError>> {
     let response: Response;
     try {
       response = await this.fetchImpl(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { authorization: `Bearer ${this.config.apiKey}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            { role: "system", content: request.system },
-            { role: "user", content: request.user },
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: maxTokens,
-          reasoning_effort: this.reasoningEffort,
-        }),
+        body: JSON.stringify(payload),
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch {
@@ -158,8 +241,46 @@ export class MuseHttp {
         ? fail("invalid_response", "Muse returned a response that is not JSON")
         : fail("unavailable", `Muse returned an error (${response.status})`);
     }
+    seen(response.status, body);
     if (!response.ok) return this.failureFor(response.status, body);
-    return this.readCompletion(body);
+    return read(body);
+  }
+
+  /**
+   * A free-form turn: the model may answer in plain text, ask to use tools, or both. No JSON mode. Gets the same
+   * one retry with a bigger budget when it runs out of tokens (its thinking shares the budget).
+   */
+  async converse(request: ConversationRequest): Promise<Result<ConversationTurn, MuseError>> {
+    const first = await this.converseOnce(request, request.maxTokens);
+    if (first.ok || first.error.code !== "truncated") return first;
+    const biggerBudget = Math.min(request.maxTokens * TRUNCATION_RETRY_FACTOR, MAX_TOKEN_CEILING);
+    return biggerBudget <= request.maxTokens ? first : this.converseOnce(request, biggerBudget);
+  }
+
+  private converseOnce(request: ConversationRequest, maxTokens: number): Promise<Result<ConversationTurn, MuseError>> {
+    const payload = {
+      model: this.model,
+      messages: [{ role: "system", content: request.system }, ...request.messages],
+      ...(request.tools.length > 0 && { tools: request.tools, tool_choice: "auto" }),
+      max_tokens: maxTokens,
+      reasoning_effort: this.reasoningEffort,
+    };
+    // The trace shows the whole conversation so far, since each turn is judged by everything before it.
+    return this.traced("converse", request.system, JSON.stringify(request.messages), maxTokens, payload, (body) => this.readTurn(body));
+  }
+
+  private readTurn(body: unknown): Result<ConversationTurn, MuseError> {
+    const parsed = turnResponseSchema.safeParse(body);
+    if (!parsed.success) return fail("invalid_response", "Muse response did not match the expected shape");
+    this.config.onUsage?.(toUsage(parsed.data), parsed.data.model ?? this.model);
+
+    const [choice] = parsed.data.choices;
+    if (choice.finish_reason === "length") return fail("truncated", "Muse ran out of tokens before finishing its answer");
+    if (choice.message.refusal) return fail("refused", "Muse declined to answer");
+    const toolCalls = (choice.message.tool_calls ?? []).map((call) => ({ id: call.id, name: call.function.name, arguments: call.function.arguments }));
+    const text = choice.message.content?.trim() || null;
+    if (text === null && toolCalls.length === 0) return fail("invalid_response", "Muse returned no answer");
+    return ok({ text, toolCalls });
   }
 
   private failureFor(status: number, body: unknown): Result<never, MuseError> {

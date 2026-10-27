@@ -19,6 +19,7 @@ import { LiteApiOfferSource } from "./liteapi/liteapi-offer-source";
 import { museConfigFromEnv } from "./muse/muse-config";
 import { MuseHttp, type Completion, type CompletionRequest, type MuseError } from "./muse/muse-http";
 import type { Result } from "@/lib/result";
+import { MuseChatModel } from "./muse/muse-chat-model";
 import { MusePlanner, type CompletionClient } from "./muse/muse-planner";
 
 /**
@@ -86,6 +87,7 @@ describe.skipIf(!LIVE)("the agent end to end on real services", () => {
         };
         return new MusePlanner(client);
       },
+      makeChatModel: (meter) => new MuseChatModel(new MuseHttp({ ...museConfig.value, onUsage: (usage) => meter.add(usage) })),
       clock: () => new Date(),
     };
 
@@ -115,7 +117,7 @@ describe.skipIf(!LIVE)("the agent end to end on real services", () => {
     await say(people[1], "I can only fly after 6pm on Friday");
     await say(people[2], "Max $350 for me");
     await say(people[3], "I'd like my own room. Not into cooking classes");
-    await call(people[0], "@agent plan Bangkok for us, leaving Fri 11 Dec and back Sun 13 Dec. We all fly from Singapore");
+    await call(people[0], "@trippy plan Bangkok for us, leaving Fri 11 Dec and back Sun 13 Dec. We all fly from Singapore");
 
     const first = await planStore.latest(groupId);
     const firstMessage = await lastAgentMessage();
@@ -127,7 +129,7 @@ describe.skipIf(!LIVE)("the agent end to end on real services", () => {
     // A fifth person joins and someone asks the agent to fit them in.
     const ravi = await groupRepo.joinWithLink(created.value.joinToken, { displayName: "Ravi", currency: "USD" });
     if (!ravi.ok) throw new Error(ravi.error.message);
-    await call(people[1], "@agent Ravi just joined, can you fit him in too?");
+    await call(people[1], "@trippy Ravi just joined, can you fit him in too?");
 
     const second = await planStore.latest(groupId);
     const secondMessage = await lastAgentMessage();

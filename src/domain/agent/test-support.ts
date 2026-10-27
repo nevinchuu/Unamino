@@ -8,11 +8,11 @@ import type { PlanRepository, RepositoryError, StoredPlan } from "@/domain/plan/
 import type { PlanStatus } from "@/domain/plan/statuses";
 import type { MemberSnapshot, PlanSnapshot } from "@/domain/plan/types";
 import type { PlannerError } from "@/domain/planner/errors";
-import type { ExtractConstraintsInput, ExtractTripBriefInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
+import type { ExtractConstraintsInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
 import type { PlannerOutput } from "@/domain/planner/schema";
+import type { ChatModel, ModelRequest, ModelTurn } from "./loop/model";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
-import type { TripBriefOutput } from "@/domain/trip/brief-schema";
 import type { SearchRecord } from "@/domain/trip/search";
 import type { AgentRun, AgentRunRepository, BriefRepository, ConstraintRepository, NewPlan, PlanStore, PlanSummary, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
 import { StaticFxRates } from "./static-fx";
@@ -45,7 +45,6 @@ export const constraintsAs = (set: ConstraintSet, ids: readonly string[]): Const
 // ---- the model ----
 
 export interface PlannerBehaviour {
-  brief?: (input: ExtractTripBriefInput) => Result<TripBriefOutput, PlannerError>;
   constraints?: (input: ExtractConstraintsInput) => Result<ConstraintSet, PlannerError>;
   plan?: (input: ProposePlanInput) => Result<PlannerOutput, PlannerError>;
   suggest?: (input: SuggestFreeTimeInput) => Result<SuggestionOutput, PlannerError>;
@@ -53,7 +52,6 @@ export interface PlannerBehaviour {
 
 /** A planner that answers from functions and records every question it was asked, as the model would see them. */
 export class RecordingPlanner implements Planner {
-  readonly briefCalls: ExtractTripBriefInput[] = [];
   readonly constraintCalls: ExtractConstraintsInput[] = [];
   readonly planCalls: ProposePlanInput[] = [];
   readonly suggestCalls: SuggestFreeTimeInput[] = [];
@@ -65,12 +63,6 @@ export class RecordingPlanner implements Planner {
 
   private bill(): void {
     this.meter.add({ promptTokens: 10, completionTokens: 20, reasoningTokens: 5 });
-  }
-
-  async extractTripBrief(input: ExtractTripBriefInput): Promise<Result<TripBriefOutput, PlannerError>> {
-    this.briefCalls.push(input);
-    this.bill();
-    return this.behaviour.brief ? this.behaviour.brief(input) : ok({ fields: BANGKOK_TRIP, questions: [] });
   }
 
   async extractConstraints(input: ExtractConstraintsInput): Promise<Result<ConstraintSet, PlannerError>> {
@@ -92,6 +84,76 @@ export class RecordingPlanner implements Planner {
   }
 }
 
+// ---- the conversational model ----
+
+export type ChatStep = ModelTurn | Result<ModelTurn, PlannerError> | ((request: ModelRequest) => ModelTurn | Result<ModelTurn, PlannerError>);
+
+const isResult = (value: ModelTurn | Result<ModelTurn, PlannerError>): value is Result<ModelTurn, PlannerError> => "ok" in value;
+
+/** A chat model that follows a script: one step per turn, repeating the last. It records every request it was sent. */
+export class ScriptedChatModel implements ChatModel {
+  readonly requests: ModelRequest[] = [];
+
+  constructor(
+    private readonly steps: readonly ChatStep[],
+    private readonly meter: UsageMeter,
+  ) {}
+
+  async turn(request: ModelRequest): Promise<Result<ModelTurn, PlannerError>> {
+    // The loop keeps adding to its message list, so what this turn was sent is copied.
+    this.requests.push({ ...request, messages: [...request.messages] });
+    this.meter.add({ promptTokens: 10, completionTokens: 20, reasoningTokens: 5 });
+    const step = this.steps[Math.min(this.requests.length, this.steps.length) - 1];
+    if (step === undefined) return err({ code: "planner_unavailable", message: "The scripted model has no steps" });
+    const answer = typeof step === "function" ? step(request) : step;
+    return isResult(answer) ? answer : ok(answer);
+  }
+}
+
+/** A turn that only talks. */
+export const says = (text: string): ModelTurn => ({ text, toolCalls: [] });
+
+/** A turn that uses a tool, optionally saying something to the group first. */
+export const calls = (name: string, args: unknown, text: string | null = null, id = `call-${name}`): ModelTurn => ({ text, toolCalls: [{ id, name, arguments: JSON.stringify(args) }] });
+
+/** The JSON the last tool answered with, for a step that needs to pick from the search results. */
+export function lastToolResult(request: ModelRequest): Record<string, unknown> {
+  const message = [...request.messages].reverse().find((m) => m.role === "tool");
+  return message && message.role === "tool" ? (JSON.parse(message.content) as Record<string, unknown>) : {};
+}
+
+export interface SearchResult {
+  flights: { id: string; route: string; legs: string[] }[];
+  hotels: { id: string; roomIsFor: number }[];
+}
+
+export const pickMember = (alias: string) => ({ memberId: alias, note: "Works for them" });
+
+/** The model's choice from whatever the search showed: the evening flight, a triple for three and a single for one. */
+export function proposeFrom(request: ModelRequest, people: readonly string[] = ["nevin", "ana", "ben", "jia"], flightAt = "20:10"): ReturnType<typeof calls> {
+  const found = lastToolResult(request) as unknown as SearchResult;
+  const everyone = people.map((_, index) => `m${index + 1}`);
+  const flight = found.flights.find((f) => f.legs.some((leg) => leg.includes(flightAt))) as { id: string };
+  const singles = found.hotels.filter((hotel) => hotel.roomIsFor === 1);
+  const picks =
+    people.length === 4
+      ? [
+          { offerId: flight.id, reason: "Leaves after 6pm", members: everyone.map(pickMember) },
+          { offerId: (found.hotels.find((h) => h.roomIsFor === 3) as { id: string }).id, reason: "Shared room for three", members: everyone.slice(0, 3).map(pickMember) },
+          { offerId: singles[0].id, reason: "Jia's own room", members: [pickMember("m4")] },
+        ]
+      : [
+          { offerId: flight.id, reason: "One flight for all five", members: everyone.map(pickMember) },
+          { offerId: (found.hotels.find((h) => h.roomIsFor === 3) as { id: string }).id, reason: "Shared room for three", members: everyone.slice(0, 3).map(pickMember) },
+          { offerId: singles[0].id, reason: "Jia's own room", members: [pickMember("m4")] },
+          { offerId: singles[1].id, reason: "Ravi's own room", members: [pickMember("m5")] },
+        ];
+  return calls("propose_plan", { title: "Bangkok weekend", picks });
+}
+
+export const search = (text: string | null = "Checking flights and hotels...") => calls("search_trip", BANGKOK_TRIP, text);
+export const planTurns = (final: string): ChatStep[] => [search(), (request) => proposeFrom(request), says(final)];
+
 // ---- storage in memory ----
 
 export class FakeGroups {
@@ -112,7 +174,7 @@ export class FakeMessages implements MessageRepository {
   }
 
   human(memberId: string, body: string): Message {
-    return this.push("human", GROUP.id, body, { memberId, mentionsAgent: /@agent/i.test(body) });
+    return this.push("human", GROUP.id, body, { memberId, mentionsAgent: /@trippy/i.test(body) });
   }
 
   async post() { return err({ code: "unavailable" as const, message: "not used" }); }
@@ -264,6 +326,10 @@ export interface World {
   readonly source: FakeOfferSource;
   readonly planners: RecordingPlanner[];
   readonly planner: () => RecordingPlanner;
+  /** What the model does on each turn of the next run. */
+  readonly script: (...steps: ChatStep[]) => void;
+  readonly models: ScriptedChatModel[];
+  readonly model: () => ScriptedChatModel;
 }
 
 /** A group of four, empty storage, and a model that gives the answers the wireframe trip expects unless told otherwise. */
@@ -277,12 +343,15 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
   const plans = new FakePlans();
   const source = new FakeOfferSource();
   const planners: RecordingPlanner[] = [];
+  const models: ScriptedChatModel[] = [];
+  let steps: ChatStep[] = [];
   const deps: AgentDeps = {
     groups, messages, runs, briefs, constraints, searches, plans, planRepository: plans, offers: source, venues: null,
     fx: new StaticFxRates(),
     makePlanner: (meter) => { const planner = new RecordingPlanner(behaviour, meter); planners.push(planner); return planner; },
+    makeChatModel: (meter) => { const model = new ScriptedChatModel(steps, meter); models.push(model); return model; },
     clock: () => NOW,
     searchOptions: { retryDelayMs: 0 },
   };
-  return { deps, groups, messages, runs, briefs, constraints, searches, plans, source, planners, planner: () => planners[planners.length - 1] };
+  return { deps, groups, messages, runs, briefs, constraints, searches, plans, source, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
 }

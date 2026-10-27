@@ -3,7 +3,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createUsageMeter, runAgent, startAgentRun, type AgentDeps } from "@/domain/agent/run-agent";
 import { StaticFxRates } from "@/domain/agent/static-fx";
-import { FakeOfferSource, NOW, RecordingPlanner, type PlannerBehaviour } from "@/domain/agent/test-support";
+import { FakeOfferSource, NOW, RecordingPlanner, ScriptedChatModel, planTurns, proposeFrom, says, search, type ChatStep, type PlannerBehaviour } from "@/domain/agent/test-support";
 import type { Member } from "@/domain/group/types";
 import type { FlightOffer, HotelOffer, Offer } from "@/domain/offers/schema";
 import { BANGKOK_OFFERS, pick } from "@/domain/planner/test-support";
@@ -104,7 +104,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
   describe("runs", () => {
     it("starts a run, refuses a second one in the same group, and allows another once the first finishes", async () => {
       const { groupId, people } = await newGroup();
-      const [a, b, c] = await Promise.all([1, 2, 3].map((n) => say(groupId, people[0].id, `@agent try ${n}`)));
+      const [a, b, c] = await Promise.all([1, 2, 3].map((n) => say(groupId, people[0].id, `@trippy try ${n}`)));
       const now = new Date();
       const first = await runRepo.start({ groupId, triggerMessageId: a.id, requestedByMemberId: people[0].id, now, staleAfterMs: 300_000 });
       const second = await runRepo.start({ groupId, triggerMessageId: b.id, requestedByMemberId: people[0].id, now, staleAfterMs: 300_000 });
@@ -124,7 +124,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
     it("says whether the agent is working for a group, and stops saying so when the run ends or goes stale", async () => {
       const { groupId, people } = await newGroup();
       const other = await newGroup();
-      const message = await say(groupId, people[0].id, "@agent go");
+      const message = await say(groupId, people[0].id, "@trippy go");
       const start = new Date("2026-10-27T00:00:00Z");
       expect(await runRepo.isRunning(groupId, start, 300_000)).toBe(false);
 
@@ -142,7 +142,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
 
     it("lets only one of two simultaneous calls start", async () => {
       const { groupId, people } = await newGroup();
-      const [a, b] = await Promise.all([say(groupId, people[0].id, "@agent one"), say(groupId, people[1].id, "@agent two")]);
+      const [a, b] = await Promise.all([say(groupId, people[0].id, "@trippy one"), say(groupId, people[1].id, "@trippy two")]);
       const now = new Date();
       const results = await Promise.all([a, b].map((m) => runRepo.start({ groupId, triggerMessageId: m.id, requestedByMemberId: null, now, staleAfterMs: 300_000 })));
       const statuses = results.map((r) => (r.ok ? r.value.status : "error")).sort();
@@ -151,7 +151,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
 
     it("handles each message once", async () => {
       const { groupId, people } = await newGroup();
-      const message = await say(groupId, people[0].id, "@agent go");
+      const message = await say(groupId, people[0].id, "@trippy go");
       const now = new Date();
       const first = await runRepo.start({ groupId, triggerMessageId: message.id, requestedByMemberId: null, now, staleAfterMs: 300_000 });
       if (!first.ok || first.value.status !== "started") throw new Error("expected a started run");
@@ -162,7 +162,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
 
     it("writes off a run that never finished, so it cannot block the group for good", async () => {
       const { groupId, people } = await newGroup();
-      const [a, b] = await Promise.all([say(groupId, people[0].id, "@agent first"), say(groupId, people[0].id, "@agent second")]);
+      const [a, b] = await Promise.all([say(groupId, people[0].id, "@trippy first"), say(groupId, people[0].id, "@trippy second")]);
       const start = new Date("2026-10-27T00:00:00Z");
       const stuck = await runRepo.start({ groupId, triggerMessageId: a.id, requestedByMemberId: null, now: start, staleAfterMs: 300_000 });
       if (!stuck.ok || stuck.value.status !== "started") throw new Error("expected a started run");
@@ -170,7 +170,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       const soon = await runRepo.start({ groupId, triggerMessageId: b.id, requestedByMemberId: null, now: new Date(start.getTime() + 60_000), staleAfterMs: 300_000 });
       expect(soon.ok && soon.value.status).toBe("busy");
 
-      const c = await say(groupId, people[0].id, "@agent third");
+      const c = await say(groupId, people[0].id, "@trippy third");
       const later = await runRepo.start({ groupId, triggerMessageId: c.id, requestedByMemberId: null, now: new Date(start.getTime() + 301_000), staleAfterMs: 300_000 });
       expect(later.ok && later.value.status).toBe("started");
       const [old] = await handle.db.select().from(agentRuns).where(eq(agentRuns.id, stuck.value.run.id));
@@ -181,7 +181,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
   describe("briefs and constraints", () => {
     it("keeps every version of the brief and returns the newest, with unknown fields left unknown", async () => {
       const { groupId, people } = await newGroup();
-      const message = await say(groupId, people[0].id, "@agent plan");
+      const message = await say(groupId, people[0].id, "@trippy plan");
       const started = await runRepo.start({ groupId, triggerMessageId: message.id, requestedByMemberId: null, now: new Date(), staleAfterMs: 300_000 });
       if (!started.ok || started.value.status !== "started") throw new Error("expected a started run");
       const runId = started.value.run.id;
@@ -200,7 +200,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
 
     it("gives two simultaneous saves different version numbers instead of failing", async () => {
       const { groupId, people } = await newGroup();
-      const message = await say(groupId, people[0].id, "@agent plan");
+      const message = await say(groupId, people[0].id, "@trippy plan");
       const started = await runRepo.start({ groupId, triggerMessageId: message.id, requestedByMemberId: null, now: new Date(), staleAfterMs: 300_000 });
       if (!started.ok || started.value.status !== "started") throw new Error("expected a started run");
       const save = () => briefRepo.save({ groupId, fields: TRIP, headcount: 4, openQuestions: [], runId: started.value.status === "started" ? started.value.run.id : "" });
@@ -224,7 +224,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
 
   describe("searches and plans", () => {
     async function brief(groupId: string, memberId: string) {
-      const message = await say(groupId, memberId, "@agent plan");
+      const message = await say(groupId, memberId, "@trippy plan");
       const started = await runRepo.start({ groupId, triggerMessageId: message.id, requestedByMemberId: null, now: new Date(), staleAfterMs: 300_000 });
       if (!started.ok || started.value.status !== "started") throw new Error("expected a started run");
       const saved = await briefRepo.save({ groupId, fields: TRIP, headcount: 4, openQuestions: [], runId: started.value.run.id });
@@ -304,12 +304,18 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
   });
 
   describe("the whole agent run", () => {
+    /** What the model does on each turn of the next run. */
+    let steps: ChatStep[] = [];
+    const script = (...next: ChatStep[]): void => { steps = next; };
+    const FIVE_PEOPLE_IDS = ["a", "b", "c", "d", "e"];
+
     function depsFor(source: FakeOfferSource): { deps: AgentDeps; planners: RecordingPlanner[] } {
       const planners: RecordingPlanner[] = [];
       const deps: AgentDeps = {
         groups: groupRepo, messages: messageRepo, runs: runRepo, briefs: briefRepo, constraints: constraintRepo, searches: searchStore, plans: planStore, planRepository: planRepo,
         offers: source, venues: null, fx: new StaticFxRates(), clock: () => NOW,
         makePlanner: (meter) => { const planner = new RecordingPlanner(behaviour, meter); planners.push(planner); return planner; },
+        makeChatModel: (meter) => new ScriptedChatModel(steps, meter),
       };
       return { deps, planners };
     }
@@ -333,22 +339,24 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       const { deps } = depsFor(source);
 
       // 1. The first call makes a plan for four.
-      await callAgent(deps, groupId, people[0].id, "@agent plan Bangkok, leaving Fri 11 Dec and back Sun 13 Dec, from Singapore");
+      script(...planTurns("Found a Bangkok plan for the four of you: $1,340.00 total (sandbox price)."));
+      await callAgent(deps, groupId, people[0].id, "@trippy plan Bangkok, leaving Fri 11 Dec and back Sun 13 Dec, from Singapore");
       const first = await planStore.latest(groupId);
       if (!first) throw new Error("expected a plan");
       expect(first).toMatchObject({ status: "reviewing", headcount: 4, agreedCount: 0 });
       const announcement = await agentReply(groupId);
       expect(announcement).toMatchObject({ kind: "agent", planId: first.id });
-      expect(announcement.body).toContain("Here is a plan for Bangkok, Fri 11 Dec to Sun 13 Dec, for 4 people");
-      expect(announcement.body).toContain("Nevin: $320.00");
+      expect(announcement.body).toContain("Found a Bangkok plan for the four of you");
       expect(await handle.db.select().from(planPicks).where(eq(planPicks.planId, first.id))).toHaveLength(3);
       expect((await handle.db.select().from(offersTable).innerJoin(offerSearches, eq(offerSearches.id, offersTable.searchId)).innerJoin(tripBriefs, eq(tripBriefs.id, offerSearches.briefId)).where(eq(tripBriefs.groupId, groupId))).length).toBeGreaterThan(0);
       const [run] = await handle.db.select().from(agentRuns).where(and(eq(agentRuns.groupId, groupId), eq(agentRuns.status, "done")));
-      expect(run).toMatchObject({ promptTokens: 30, completionTokens: 60, reasoningTokens: 15 });
+      // three turns of the model and the reading of everyone's limits
+      expect(run).toMatchObject({ promptTokens: 40, completionTokens: 80, reasoningTokens: 20 });
 
       // 2. Calling again with nothing changed leaves the plan alone.
-      await callAgent(deps, groupId, people[1].id, "@agent status?");
-      expect((await agentReply(groupId)).body).toContain("Nothing has changed since I made the plan");
+      script(search(), (request) => proposeFrom(request), says("Nothing has changed, the plan stands."));
+      await callAgent(deps, groupId, people[1].id, "@trippy status?");
+      expect((await agentReply(groupId)).body).toContain("the plan stands");
       expect((await planStore.latest(groupId))?.id).toBe(first.id);
 
       // 3. Someone agrees to the plan, then a friend joins and is fitted in.
@@ -358,7 +366,8 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       const ravi = await groupRepo.joinWithLink(joinToken, { displayName: "Ravi", currency: "USD" });
       if (!ravi.ok) throw new Error(ravi.error.message);
       source.offers = OFFERS_FOR_FIVE;
-      await callAgent(deps, groupId, people[1].id, "@agent Ravi joined, please fit him in");
+      script(search(), (request) => proposeFrom(request, FIVE_PEOPLE_IDS), says("Ravi is in! Updated the plan for five."));
+      await callAgent(deps, groupId, people[1].id, "@trippy Ravi joined, please fit him in");
 
       const second = await planStore.latest(groupId);
       if (!second) throw new Error("expected a second plan");
@@ -370,9 +379,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       expect(newRow.recreatedFromPlanId).toBe(first.id);
       expect(await handle.db.select().from(planMembers).where(eq(planMembers.planId, second.id))).toHaveLength(5);
       const updated = await agentReply(groupId);
-      expect(updated.body).toContain("Here is an updated plan");
-      expect(updated.body).toContain("for 5 people");
-      expect(updated.body).toContain("Ravi: $380.00");
+      expect(updated.body).toContain("Ravi is in!");
       expect(updated.planId).toBe(second.id);
     }, 180_000);
 
@@ -381,14 +388,16 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       await say(groupId, people[1].id, "I can only fly after 6pm on Friday");
       const source = new FakeOfferSource();
       const { deps } = depsFor(source);
-      await callAgent(deps, groupId, people[0].id, "@agent plan Bangkok, leaving Fri 11 Dec and back Sun 13 Dec, from Singapore");
+      script(...planTurns("Plan is up."));
+      await callAgent(deps, groupId, people[0].id, "@trippy plan Bangkok, leaving Fri 11 Dec and back Sun 13 Dec, from Singapore");
       const plan = await planStore.latest(groupId);
       if (!plan) throw new Error("expected a plan");
       await handle.db.update(plans).set({ status: "booking" }).where(eq(plans.id, plan.id));
 
       await groupRepo.joinWithLink(joinToken, { displayName: "Ravi", currency: "USD" });
       source.offers = OFFERS_FOR_FIVE;
-      await callAgent(deps, groupId, people[1].id, "@agent fit Ravi in");
+      script(search(), (request) => proposeFrom(request, FIVE_PEOPLE_IDS), says("Booking has already started, so the plan cannot change."));
+      await callAgent(deps, groupId, people[1].id, "@trippy fit Ravi in");
 
       expect((await agentReply(groupId)).body).toContain("Booking has already started");
       expect(await handle.db.select().from(plans).where(eq(plans.groupId, groupId))).toHaveLength(1);
@@ -399,7 +408,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       const { groupId, people } = await newGroup();
       const source = new FakeOfferSource();
       const { deps } = depsFor(source);
-      const [a, b] = await Promise.all([say(groupId, people[0].id, "@agent plan Bangkok, 11 to 13 Dec, from Singapore"), say(groupId, people[1].id, "@agent hello?")]);
+      const [a, b] = await Promise.all([say(groupId, people[0].id, "@trippy plan Bangkok, 11 to 13 Dec, from Singapore"), say(groupId, people[1].id, "@trippy hello?")]);
       const results = await Promise.all([startAgentRun(deps, { id: a.id, groupId, memberId: people[0].id }), startAgentRun(deps, { id: b.id, groupId, memberId: people[1].id })]);
       const statuses = results.map((r) => (r.ok ? r.value.status : "error")).sort();
       expect(statuses).toEqual(["busy", "started"]);
@@ -415,7 +424,7 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
     it("never stores a made-up run id: the run closes even when nothing can be planned", async () => {
       const { groupId, people } = await newGroup();
       const { deps } = depsFor(new FakeOfferSource());
-      const message = await say(groupId, people[0].id, `@agent ${randomUUID().slice(0, 8)} where?`);
+      const message = await say(groupId, people[0].id, `@trippy ${randomUUID().slice(0, 8)} where?`);
       const started = await startAgentRun(deps, { id: message.id, groupId, memberId: people[0].id });
       if (started.ok && started.value.status === "started") await runAgent(deps, started.value.run);
       const rows = await handle.db.select().from(agentRuns).where(eq(agentRuns.groupId, groupId));

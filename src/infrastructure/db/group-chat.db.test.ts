@@ -200,7 +200,7 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
     it("stores a person's message and marks it as calling the agent only when it does", async () => {
       const { groupId, nevin } = await groupWithAna();
       const plain = await messageRepo.post({ groupId, memberId: nevin.id, body: "sounds good" });
-      const call = await messageRepo.post({ groupId, memberId: nevin.id, body: "@agent plan Bangkok" });
+      const call = await messageRepo.post({ groupId, memberId: nevin.id, body: "@trippy plan Bangkok" });
       expect(plain.ok && plain.value.mentionsAgent).toBe(false);
       expect(call.ok && call.value.mentionsAgent).toBe(true);
       expect(call.ok && call.value.kind).toBe("human");
@@ -216,8 +216,8 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
 
     it("never lets the agent or the system call the agent", async () => {
       const { groupId } = await groupWithAna();
-      const agent = await messageRepo.postAgent(groupId, "@agent loop forever");
-      const system = await messageRepo.postSystem(groupId, "@agent joined");
+      const agent = await messageRepo.postAgent(groupId, "@trippy loop forever");
+      const system = await messageRepo.postSystem(groupId, "@trippy joined");
       expect(agent.ok && agent.value.mentionsAgent).toBe(false);
       expect(system.ok && system.value.mentionsAgent).toBe(false);
     }, 30_000);

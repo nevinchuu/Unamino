@@ -5,7 +5,6 @@ import { prefilterOffers } from "@/domain/planner/prefilter";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, FX, MEMBER_IDS, MEMBERS, NOW } from "@/domain/planner/test-support";
 import { buildSchedule } from "@/domain/schedule/build-schedule";
 import { suggestFreeTime } from "@/domain/schedule/suggest-free-time";
-import { assessTripBrief } from "@/domain/trip/brief";
 import { searchForTrip } from "@/domain/trip/search";
 import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
 import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup";
@@ -23,7 +22,7 @@ const LIVE = process.env.MUSE_LIVE === "1";
 const MEMBER_LIST = [...MEMBER_IDS];
 
 const CHAT = [
-  { memberId: "nevin", text: "@agent plan Bangkok for the 4 of us, Fri 11 to Sun 13 Dec, around $400 each" },
+  { memberId: "nevin", text: "@trippy plan Bangkok for the 4 of us, Fri 11 to Sun 13 Dec, around $400 each" },
   { memberId: "ana", text: "I can only fly after 6pm on Friday" },
   { memberId: "ben", text: "Max $350 for me" },
   { memberId: "jia", text: "I'd like my own room. Not into cooking classes" },
@@ -101,43 +100,16 @@ describe.skipIf(!LIVE)("MusePlanner against the real model", () => {
     expect(result.ok).toBe(true);
   });
 
-  const todayString = new Date().toISOString().slice(0, 10);
-  const tripChat = [
-    { memberId: "nevin", text: "Let's do Bangkok, leaving Fri 11 Dec and back Sun 13 Dec. We all fly from Singapore" },
-    ...CHAT.slice(1),
-  ];
-
-  it("reads where and when from the chat, and the code agrees it is enough to search", { timeout: 180_000 }, async () => {
-    step = "brief";
-    const result = await planner.extractTripBrief({ memberIds: MEMBER_LIST, messages: tripChat, today: todayString });
-    report.brief = result;
-    if (!result.ok) throw new Error(result.error.message);
-    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: result.value.questions, today: todayString });
-    report.briefAssessment = assessment;
-    expect(assessment.status).toBe("complete");
-  });
-
-  it("asks questions instead of guessing when the chat is vague", { timeout: 180_000 }, async () => {
-    step = "vague";
-    const result = await planner.extractTripBrief({ memberIds: MEMBER_LIST, messages: [{ memberId: "nevin", text: "let's go somewhere warm soon!" }, { memberId: "ana", text: "yes please" }], today: todayString });
-    report.vague = result;
-    if (!result.ok) throw new Error(result.error.message);
-    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: result.value.questions, today: todayString });
-    report.vagueAssessment = assessment;
-    expect(assessment.status).toBe("incomplete");
-    expect(assessment.status === "incomplete" && assessment.questions.length).toBeGreaterThan(0);
-  });
-
   it("goes from the chat to real flights and hotels to a plan the code accepts", { timeout: 420_000 }, async () => {
-    const assessment = report.briefAssessment as ReturnType<typeof assessTripBrief> | undefined;
+    const trip = { destinationCity: "Bangkok", destinationCountry: "TH", destinationAirport: "BKK", originAirport: "SIN", departDate: "2026-12-11", returnDate: "2026-12-13" };
     const liteKey = process.env.LITEAPI_KEY;
-    if (!liteKey || assessment?.status !== "complete") {
-      report.pipeline = { skipped: !liteKey ? "no LITEAPI_KEY" : "brief was not complete" };
+    if (!liteKey) {
+      report.pipeline = { skipped: "no LITEAPI_KEY" };
       return;
     }
     step = "pipeline";
     const source = new LiteApiOfferSource({ apiKey: liteKey, currency: "USD", guestNationality: "SG" });
-    const searched = await searchForTrip(source, assessment.trip, MEMBERS.length);
+    const searched = await searchForTrip(source, trip, MEMBERS.length);
     if (!searched.ok) throw new Error(searched.error.message);
 
     const now = new Date();

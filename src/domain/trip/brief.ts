@@ -28,23 +28,6 @@ export type BriefAssessment =
       readonly questions: readonly string[];
     };
 
-/**
- * The new reading wins for anything it found, and what was already known stays if the new reading did not
- * mention it, so "make it the 18th" does not forget the destination. The destination moves as one unit.
- */
-export function mergeTripFields(previous: TripFields | undefined, extracted: TripFields): TripFields {
-  const base: TripFields = previous ?? {};
-  const newDestination = extracted.destinationCity !== undefined || extracted.destinationCountry !== undefined || extracted.destinationAirport !== undefined;
-  return {
-    destinationCity: newDestination ? extracted.destinationCity : base.destinationCity,
-    destinationCountry: newDestination ? extracted.destinationCountry : base.destinationCountry,
-    destinationAirport: newDestination ? extracted.destinationAirport : base.destinationAirport,
-    originAirport: extracted.originAirport ?? base.originAirport,
-    departDate: extracted.departDate ?? base.departDate,
-    returnDate: extracted.returnDate ?? base.returnDate,
-  };
-}
-
 const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / MS_PER_DAY);
 
 function missingFields(fields: TripFields): MissingField[] {

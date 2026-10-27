@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import { ok } from "@/lib/result";
 import type { Planner } from "@/domain/planner/planner";
 import { ScriptedPlanner } from "@/domain/planner/scripted-planner";
-import type { MemberShare } from "@/domain/split/types";
 import { AliasingPlanner, nameMembers } from "./aliasing-planner";
-import { planAnnouncement, questionsMessage, shortDate, statusMessage } from "./announce";
 import { computeInputsHash } from "./inputs-hash";
 import { StaticFxRates } from "./static-fx";
-import { BANGKOK_TRIP } from "./test-support";
 
 // Real ids look like these: long and meaningless.
 const ANA = "3f2c9a1e-7b44-4c0e-9d11-0a5b6c7d8e9f";
@@ -47,15 +44,9 @@ describe("showing the model stand-ins for member ids", () => {
     expect(scripted.suggestCalls[0]).toMatchObject({ memberIds: ["m1", "m2"], constraints: { m2: { ownRoom: false } }, feedback: ["m1 dislikes it"] });
   });
 
-  it("passes the trip brief through with aliased messages and no ids in its answer to map", async () => {
-    await planner.extractTripBrief({ memberIds: MEMBER_IDS, messages: [{ memberId: ANA, text: "Bangkok please" }], today: "2026-10-27" });
-    expect(scripted.briefCalls[0].messages).toEqual([{ memberId: "m1", text: "Bangkok please" }]);
-  });
-
   describe("naming people in what the model writes", () => {
     const sentences = {
       constraints: ok({}),
-      tripBriefs: [ok({ fields: {}, questions: ["Which airport can m1 fly from?", "Does m2's budget include the hotel?"] })],
       plans: [
         ok({
           title: "Bangkok for m1 and m2",
@@ -67,11 +58,6 @@ describe("showing the model stand-ins for member ids", () => {
       suggestions: [ok({ suggestions: [{ gapId: "g1", venueName: "Chatuchak Market", category: "market", startTime: "10:00", durationMinutes: 120, why: "m1 and m2 both like markets" }] })],
     };
     const speaker = () => new AliasingPlanner(new ScriptedPlanner(sentences), PEOPLE);
-
-    it("puts names in the questions the group will read", async () => {
-      const brief = await speaker().extractTripBrief({ memberIds: MEMBER_IDS, messages: [], today: "2026-10-27" });
-      expect(brief.ok && brief.value.questions).toEqual(["Which airport can Ana fly from?", "Does Ben's budget include the hotel?"]);
-    });
 
     it("puts names in the plan title, summary, reasons, notes and compromises", async () => {
       const result = await speaker().proposePlan({ memberIds: MEMBER_IDS, constraints: {}, offers: [], feedback: [] });
@@ -89,18 +75,18 @@ describe("showing the model stand-ins for member ids", () => {
       expect(result.ok && result.value.suggestions[0].why).toBe("Ana and Ben both like markets");
     });
 
+    const withWhy = (why: string, people: typeof PEOPLE) =>
+      new AliasingPlanner(new ScriptedPlanner({ constraints: ok({}), plans: [], suggestions: [ok({ suggestions: [{ gapId: "g1", venueName: "Market", category: "market", startTime: "10:00", durationMinutes: 60, why }] })] }), people).suggestFreeTime({ city: "Bangkok", memberIds: MEMBER_IDS, constraints: {}, gaps: [], feedback: [] });
+
     // A real "m2" in the model's text cannot be told from a stand-in, so it is read as one. Anything that is not a stand-in stays.
     it("leaves a stand-in that is nobody, and words that only look like one, alone", async () => {
-      const odd = new AliasingPlanner(new ScriptedPlanner({ constraints: ok({}), plans: [], tripBriefs: [ok({ fields: {}, questions: ["Is m9 coming? The room is 20 m3 and room-m1 is booked, m1."] })] }), PEOPLE);
-      const brief = await odd.extractTripBrief({ memberIds: MEMBER_IDS, messages: [], today: "2026-10-27" });
-      expect(brief.ok && brief.value.questions[0]).toBe("Is m9 coming? The room is 20 m3 and room-m1 is booked, Ana.");
+      const result = await withWhy("Is m9 coming? The room is 20 m3 and room-m1 is booked, m1.", PEOPLE);
+      expect(result.ok && result.value.suggestions[0].why).toBe("Is m9 coming? The room is 20 m3 and room-m1 is booked, Ana.");
     });
 
     it("replaces in one pass, so a name that looks like a stand-in is not replaced again", async () => {
-      const tricky = [{ id: ANA, displayName: "m2" }, { id: BEN, displayName: "Ben" }];
-      const trickyPlanner = new AliasingPlanner(new ScriptedPlanner({ constraints: ok({}), plans: [], tripBriefs: [ok({ fields: {}, questions: ["m1 and m2"] })] }), tricky);
-      const brief = await trickyPlanner.extractTripBrief({ memberIds: MEMBER_IDS, messages: [], today: "2026-10-27" });
-      expect(brief.ok && brief.value.questions[0]).toBe("m2 and Ben");
+      const result = await withWhy("m1 and m2", [{ id: ANA, displayName: "m2" }, { id: BEN, displayName: "Ben" }]);
+      expect(result.ok && result.value.suggestions[0].why).toBe("m2 and Ben");
     });
   });
 
@@ -111,7 +97,7 @@ describe("showing the model stand-ins for member ids", () => {
 });
 
 describe("the fingerprint of what a plan was built from", () => {
-  const trip = BANGKOK_TRIP;
+  const trip = { destinationCity: "Bangkok", destinationCountry: "TH", destinationAirport: "BKK", originAirport: "SIN", departDate: "2026-12-11", returnDate: "2026-12-13" };
   const base = { trip, memberIds: [ANA, BEN], constraints: { [ANA]: { ownRoom: true } } };
 
   it("is the same for the same inputs, whatever order they come in", () => {
@@ -133,53 +119,6 @@ describe("the fingerprint of what a plan was built from", () => {
 
   it("ignores constraints of people who are not in the plan", () => {
     expect(computeInputsHash({ ...base, constraints: { ...base.constraints, stranger: { ownRoom: true } } })).toBe(computeInputsHash(base));
-  });
-});
-
-describe("what the agent says", () => {
-  const members = [{ id: ANA, displayName: "Ana" }, { id: BEN, displayName: "Ben" }];
-  const shares: MemberShare[] = [
-    { memberId: ANA, currency: "USD", lines: [], baseShareMinor: 32000, shareMinor: 32000, fxRate: 1, fxSource: "x" },
-    { memberId: BEN, currency: "SGD", lines: [], baseShareMinor: 32000, shareMinor: 43200, fxRate: 1.35, fxSource: "x" },
-  ];
-  const input = { trip: BANGKOK_TRIP, members, shares, totalMinor: 64000, currency: "USD", violations: [], replacedAnotherPlan: false };
-
-  it("writes dates the way people say them", () => {
-    expect(shortDate("2026-12-11")).toBe("Fri 11 Dec");
-    expect(shortDate("2027-01-03")).toBe("Sun 3 Jan");
-  });
-
-  it("announces a plan with the total and each person's share in their own currency", () => {
-    const text = planAnnouncement(input);
-    expect(text).toContain("Here is a plan for Bangkok, Fri 11 Dec to Sun 13 Dec, for 2 people. The trip costs $640.00 in total.");
-    expect(text).toContain("• Ana: $320.00");
-    expect(text).toContain("• Ben: SGD");
-    expect(text).not.toContain("Not fully served");
-  });
-
-  it("names the people who are not fully served instead of showing ids", () => {
-    const text = planAnnouncement({ ...input, violations: [{ memberId: ANA, kind: "departure_window", message: `${ANA} wants the outbound flight after 18:00, but it leaves at 13:05` }] });
-    expect(text).toContain("Not fully served:\n• Ana wants the outbound flight after 18:00");
-    expect(text).not.toContain(ANA);
-  });
-
-  it("says when a plan replaces another", () => {
-    const text = planAnnouncement({ ...input, replacedAnotherPlan: true });
-    expect(text).toContain("Here is an updated plan");
-    expect(text).toContain("The earlier plan is cancelled");
-  });
-
-  it("says one question or several, and how to answer", () => {
-    expect(questionsMessage(["Which dates?"])).toBe("I need one more thing before I can plan: Which dates?");
-    expect(questionsMessage(["A?", "B?"])).toBe("I need a bit more information before I can plan:\n1. A?\n2. B?\nReply to this message with the answers.");
-  });
-
-  it("says where the plan stands for every state", () => {
-    expect(statusMessage("reviewing", 1, 4)).toContain("1 of 4 have agreed");
-    expect(statusMessage("approving", 4, 4)).toContain("approve their own amount");
-    expect(statusMessage("held", 4, 4)).toContain("being booked");
-    expect(statusMessage("captured", 4, 4)).toContain("The trip is booked");
-    expect(statusMessage("expired", 0, 4)).toContain("has ended");
   });
 });
 

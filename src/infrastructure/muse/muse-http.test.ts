@@ -3,7 +3,7 @@ import { parseExtractionText } from "@/domain/planner/schema";
 import { BANGKOK_CONSTRAINTS } from "@/domain/planner/test-support";
 import extractOk from "./fixtures/completion-extract-ok.json";
 import truncated from "./fixtures/completion-truncated.json";
-import { MuseHttp, type MuseUsage } from "./muse-http";
+import { MuseHttp, type MuseCall, type MuseUsage } from "./muse-http";
 
 const API_KEY = "muse_test_key_that_must_never_leak";
 const REQUEST = { system: "Reply with JSON.", user: '{"messages":[]}', maxTokens: 1000 };
@@ -220,5 +220,38 @@ describe("failures", () => {
       const result = await muse.complete(REQUEST);
       expect(result.ok ? "" : result.error.message).not.toContain(API_KEY);
     }
+  });
+});
+
+describe("the trace hook", () => {
+  const traced = (responses: readonly (() => Response)[]) => {
+    const seen: MuseCall[] = [];
+    const calls: unknown[] = [];
+    const fetchImpl = (async () => (calls.push(1), responses[Math.min(calls.length, responses.length) - 1]())) as unknown as typeof fetch;
+    return { muse: new MuseHttp({ apiKey: API_KEY, fetchImpl, onTrace: (call) => seen.push(call) }), seen };
+  };
+
+  it("reports what was sent and the whole raw answer, never the key", async () => {
+    const { muse, seen } = traced([() => json(completion('{"ok":true}', "stop", { reasoning_content: "visible thinking" }))]);
+    await muse.complete({ system: "Reply with JSON.", user: '{"task":"extract_trip_brief","data":{}}', maxTokens: 1000 });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ task: "extract_trip_brief", maxTokens: 1000, status: 200, problem: null, system: "Reply with JSON." });
+    expect(JSON.stringify(seen[0].raw)).toContain("visible thinking");
+    expect(JSON.stringify(seen[0])).not.toContain(API_KEY);
+  });
+
+  it("reports each attempt, including a truncated one and its problem", async () => {
+    const { muse, seen } = traced([() => json(truncated), () => json(completion('{"ok":true}'))]);
+    await muse.complete(REQUEST);
+    expect(seen.map((call) => call.problem?.split(":")[0] ?? null)).toEqual(["truncated", null]);
+    expect(seen[1].maxTokens).toBe(2000);
+    expect(seen[0].task).toBe("unknown");
+  });
+
+  it("reports a call that never got an answer", async () => {
+    const fetchImpl = (async () => { throw new Error("offline"); }) as unknown as typeof fetch;
+    const seen: MuseCall[] = [];
+    await new MuseHttp({ apiKey: API_KEY, fetchImpl, onTrace: (call) => seen.push(call) }).complete(REQUEST);
+    expect(seen[0]).toMatchObject({ status: null, raw: null, problem: "unavailable: Muse did not respond in time" });
   });
 });

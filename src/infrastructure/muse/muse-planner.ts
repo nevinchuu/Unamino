@@ -1,13 +1,11 @@
 import { err, ok, type Result } from "@/lib/result";
 import type { ConstraintSet } from "@/domain/constraints/schema";
 import type { PlannerError } from "@/domain/planner/errors";
-import type { ExtractConstraintsInput, ExtractTripBriefInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
+import type { ExtractConstraintsInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
 import { parseExtractionText, parsePlannerText, type PlannerOutput } from "@/domain/planner/schema";
 import { parseSuggestionText, type SuggestionOutput } from "@/domain/schedule/suggestion-schema";
-import { parseTripBriefText, type TripBriefOutput } from "@/domain/trip/brief-schema";
 import type { Completion, CompletionRequest, MuseError } from "./muse-http";
 import { buildExtractConstraintsPrompt } from "./prompts/extract-constraints";
-import { buildExtractTripBriefPrompt } from "./prompts/extract-trip-brief";
 import { buildProposePlanPrompt } from "./prompts/propose-plan";
 import { buildSuggestFreeTimePrompt } from "./prompts/suggest-free-time";
 
@@ -17,7 +15,7 @@ export interface CompletionClient {
 }
 
 /**
- * Reading the chat (constraints, trip brief) has no outer retry loop, so it gets one more try of its own when Muse answers badly.
+ * Reading the chat (constraints) has no outer retry loop, so it gets one more try of its own when Muse answers badly.
  * The plan and the suggestions already have loops that feed back what was wrong.
  */
 const READ_ATTEMPTS = 2;
@@ -50,10 +48,6 @@ export class MusePlanner implements Planner {
     // A member id the model made up cannot belong to anyone, so it is dropped rather than trusted.
     const known = new Set(input.memberIds);
     return ok(Object.fromEntries(Object.entries(answer.value.constraints).filter(([memberId]) => known.has(memberId))));
-  }
-
-  extractTripBrief(input: ExtractTripBriefInput): Promise<Result<TripBriefOutput, PlannerError>> {
-    return this.askWithRetry(buildExtractTripBriefPrompt(input), parseTripBriefText);
   }
 
   proposePlan(input: ProposePlanInput): Promise<Result<PlannerOutput, PlannerError>> {

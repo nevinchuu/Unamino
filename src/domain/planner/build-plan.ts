@@ -11,7 +11,7 @@ import { validatePlan, type ValidatedPlan } from "./validate";
 const DEFAULT_MAX_ATTEMPTS = 3;
 
 export interface BuildPlanInput {
-  readonly planner: Planner;
+  readonly planner: Pick<Planner, "proposePlan">;
   readonly members: readonly MemberInput[];
   readonly constraints: ConstraintSet;
   readonly offers: readonly Offer[];

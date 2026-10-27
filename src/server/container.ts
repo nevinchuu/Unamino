@@ -34,8 +34,10 @@ import { PostgresTravellerStore } from "@/infrastructure/db/postgres-traveller-s
 import { AesGcmCipher } from "@/infrastructure/crypto/aes-gcm-cipher";
 import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup";
 import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
-import { MuseHttp } from "@/infrastructure/muse/muse-http";
+import { MuseHttp, type MuseCall } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
+import { MuseChatModel } from "@/infrastructure/muse/muse-chat-model";
+import { traceSinkFromEnv } from "@/infrastructure/trace/file-trace";
 import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
 import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
 import type { ChatDeps } from "./chat";
@@ -95,6 +97,9 @@ function build(): Container {
   const planRepository = new PostgresPlanRepository(db);
   const offers = new LiteApiOfferSource({ apiKey: env.value.liteApiKey, currency: GROUP_CURRENCY, guestNationality: "SG", timeoutMs: OFFER_TIMEOUT_MS });
 
+  const trace = traceSinkFromEnv(process.env);
+  const onTrace = trace && ((call: MuseCall) => trace({ at: new Date().toISOString(), source: "muse", stage: call.task, data: call }));
+
   const agent: AgentDeps = {
     groups,
     messages,
@@ -107,7 +112,9 @@ function build(): Container {
     offers,
     venues: env.value.placesApiKey ? new GooglePlacesLookup({ apiKey: env.value.placesApiKey }) : null,
     fx: new StaticFxRates(),
-    makePlanner: (meter) => new MusePlanner(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage) })),
+    makePlanner: (meter) => new MusePlanner(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })),
+    makeChatModel: (meter) => new MuseChatModel(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })),
+    trace,
     clock: () => new Date(),
   };
 

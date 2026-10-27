@@ -3,8 +3,6 @@ import { err, ok, type Result } from "@/lib/result";
 import { buildPlan } from "@/domain/planner/build-plan";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, FX, MEMBER_IDS, MEMBERS, NOW, WIREFRAME_PLAN } from "@/domain/planner/test-support";
 import extractOk from "./fixtures/completion-extract-ok.json";
-import { assessTripBrief } from "@/domain/trip/brief";
-import { tripToQueries } from "@/domain/trip/queries";
 import liveAnswers from "./fixtures/live-answers-bangkok.json";
 import { museConfigFromEnv } from "./muse-config";
 import { MuseHttp, type Completion, type CompletionRequest, type MuseError } from "./muse-http";
@@ -88,47 +86,6 @@ describe("extracting constraints", () => {
     const result = await planner.extractConstraints(extractInput);
     expect(result.ok ? null : result.error).toEqual({ code: "planner_unavailable", message: "Muse rejected the API key" });
     expect(requests).toHaveLength(1);
-  });
-});
-
-describe("reading the chat for where and when", () => {
-  const briefInput = { memberIds: MEMBER_LIST, messages: [{ memberId: "nevin", text: "Bangkok, 11 to 13 Dec" }], today: "2026-10-27" };
-  const briefJson = JSON.stringify({ fields: { destinationCity: "Bangkok", destinationCountry: "TH", destinationAirport: "BKK", departDate: "2026-12-11", returnDate: "2026-12-13" }, questions: ["Which airport will you fly from?"] });
-
-  it("returns what the model understood and what it still needs to ask", async () => {
-    const result = await scripted([answer(briefJson)]).planner.extractTripBrief(briefInput);
-    expect(result.ok && result.value.fields.destinationAirport).toBe("BKK");
-    expect(result.ok && result.value.questions).toEqual(["Which airport will you fly from?"]);
-  });
-
-  it("accepts null for a field that was not mentioned", async () => {
-    const result = await scripted([answer('{"fields":{"destinationCity":"Bangkok","originAirport":null},"questions":[]}')]).planner.extractTripBrief(briefInput);
-    expect(result.ok && result.value.fields.originAirport).toBeUndefined();
-  });
-
-  it("tries once more when the answer is unusable, and says what was wrong if it still is", async () => {
-    const fixed = scripted([answer("sorry"), answer(briefJson)]);
-    expect((await fixed.planner.extractTripBrief(briefInput)).ok).toBe(true);
-    expect(fixed.requests).toHaveLength(2);
-
-    const stuck = scripted([answer("sorry"), answer('{"fields":{"price":1},"questions":[]}')]);
-    const result = await stuck.planner.extractTripBrief(briefInput);
-    expect(codeOf(result)).toBe("invalid_output");
-    expect(messageOf(result)).toContain("does not match the schema");
-  });
-
-  it("does not retry an outage", async () => {
-    const { planner, requests } = scripted([failure("unavailable")]);
-    expect(codeOf(await planner.extractTripBrief(briefInput))).toBe("planner_unavailable");
-    expect(requests).toHaveLength(1);
-  });
-
-  it("sends the chat in the user message and the date with it", async () => {
-    const { planner, requests } = scripted([answer(briefJson)]);
-    await planner.extractTripBrief(briefInput);
-    expect(requests[0].user).toContain("Bangkok, 11 to 13 Dec");
-    expect(requests[0].user).toContain("2026-10-27");
-    expect(requests[0].system).not.toContain("Bangkok, 11 to 13 Dec");
   });
 });
 
@@ -283,33 +240,3 @@ describe("on Muse's real answers for the Bangkok trip", () => {
   });
 });
 
-describe("on Muse's real reading of the chat for where and when", () => {
-  const today = "2026-10-27";
-  const input = { memberIds: MEMBER_LIST, messages: [{ memberId: "nevin", text: "Let's do Bangkok, leaving Fri 11 Dec and back Sun 13 Dec. We all fly from Singapore" }], today };
-
-  it("understood the whole trip, and the code agrees it is enough to search", async () => {
-    const result = await scripted([answer(liveAnswers.brief)]).planner.extractTripBrief(input);
-    if (!result.ok) throw new Error(result.error.message);
-    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: result.value.questions, today });
-    expect(assessment).toEqual({
-      status: "complete",
-      trip: { destinationCity: "Bangkok", destinationCountry: "TH", destinationAirport: "BKK", originAirport: "SIN", departDate: "2026-12-11", returnDate: "2026-12-13" },
-    });
-  });
-
-  it("asked sensible questions instead of guessing when the chat was vague", async () => {
-    const result = await scripted([answer(liveAnswers.briefVague)]).planner.extractTripBrief({ ...input, messages: [{ memberId: "nevin", text: "let's go somewhere warm soon!" }] });
-    if (!result.ok) throw new Error(result.error.message);
-    expect(result.value.fields).toEqual({});
-    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: result.value.questions, today });
-    expect(assessment.status === "incomplete" && assessment.questions).toHaveLength(3);
-  });
-
-  it("makes searches for the whole group from what it understood", async () => {
-    const result = await scripted([answer(liveAnswers.brief)]).planner.extractTripBrief(input);
-    if (!result.ok) throw new Error(result.error.message);
-    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: [], today });
-    if (assessment.status !== "complete") throw new Error("expected a complete trip");
-    expect(tripToQueries(assessment.trip, 4).map((q) => `${q.kind}:${q.guests}`)).toEqual(["flight:4", "hotel:1", "hotel:2", "hotel:3", "hotel:4"]);
-  });
-});

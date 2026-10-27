@@ -2,7 +2,6 @@
 export const EXTRACT_MAX_TOKENS = 4_000;
 export const PROPOSE_MAX_TOKENS = 8_000;
 export const SUGGEST_MAX_TOKENS = 6_000;
-export const BRIEF_MAX_TOKENS = 4_000;
 
 const MAX_TITLE_LENGTH = 120;
 
