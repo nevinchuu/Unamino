@@ -443,6 +443,84 @@ describe("a friend joins", () => {
   });
 });
 
+describe("someone who does not need a flight", () => {
+  const flight3 = { ...flight4, id: "flt-3", listingId: "flt-3", guests: 3, totalMinor: 54000 };
+  const searchWith = (flyers?: string[]) => calls("search_trip", { ...BANGKOK_TRIP, ...(flyers && { flyers }) });
+  const proposeHotelOnlyForJia = (request: Parameters<typeof lastToolResult>[0]) => {
+    const found = lastToolResult(request) as unknown as { flights: { id: string }[]; hotels: { id: string; roomIsFor: number }[] };
+    return calls("propose_plan", {
+      title: "Bangkok, Jia is already there",
+      picks: [
+        { offerId: found.flights[0].id, reason: "Flight for the three who fly", members: ["m1", "m2", "m3"].map(pickMember) },
+        { offerId: (found.hotels.find((h) => h.roomIsFor === 3) as { id: string }).id, reason: "Shared room", members: ["m1", "m2", "m3"].map(pickMember) },
+        { offerId: (found.hotels.find((h) => h.roomIsFor === 1) as { id: string }).id, reason: "Jia's own room", members: [pickMember("m4")] },
+      ],
+    });
+  };
+
+  it("searches flights for only the people who fly, and plans a hotel but no flight for the one who does not", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.source.offers = [flight3, triple, single];
+    world.script(searchWith(["m1", "m2", "m3"]), proposeHotelOnlyForJia, says("Jia just needs the room."));
+    await callAgent(world);
+
+    expect(world.source.queries.find((q) => q.kind === "flight")).toMatchObject({ guests: 3 });
+    expect(world.plans.records).toHaveLength(1);
+    const saved = world.plans.records[0].input.picks;
+    expect(saved.find((p) => p.offer.kind === "flight")?.memberIds).toEqual(["nevin", "ana", "ben"]);
+    expect(saved.find((p) => p.offer.id === "fx-htl-single")?.memberIds).toEqual(["jia"]);
+    expect(saved.flatMap((p) => (p.offer.kind === "flight" ? p.memberIds : []))).not.toContain("jia");
+  });
+
+  it("tells the model who needs no flight, and still searches rooms for everyone", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.source.offers = [flight3, triple, single];
+    world.script(searchWith(["m1", "m2", "m3"]), says("ok"));
+    await callAgent(world);
+    const result = toolMessages(world).at(-1) ?? "";
+    expect(result).toContain("noFlightNeeded");
+    expect(result).toContain("Jia");
+    expect(world.source.queries.filter((q) => q.kind === "hotel").map((q) => q.kind === "hotel" && q.guests)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("still refuses a plan that leaves a flyer without a flight", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.source.offers = [flight3, triple, single];
+    world.script(searchWith(["m1", "m2", "m3", "m4"].slice(0, 3)), (request) => {
+      const found = lastToolResult(request) as unknown as { hotels: { id: string; roomIsFor: number }[] };
+      return calls("propose_plan", { title: "No flights", picks: [{ offerId: (found.hotels.find((h) => h.roomIsFor === 3) as { id: string }).id, reason: "Room", members: ["m1", "m2", "m3"].map(pickMember) }, { offerId: (found.hotels.find((h) => h.roomIsFor === 1) as { id: string }).id, reason: "Room", members: [pickMember("m4")] }] });
+    }, says("That did not work."));
+    await callAgent(world);
+    expect(toolMessages(world).at(-1)).toContain("No flight for");
+    expect(world.plans.records).toHaveLength(0);
+  });
+
+  it("explains an unknown person in the flyers list so the model can fix it", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.script(searchWith(["m1", "m9"]), says("ok"));
+    await callAgent(world);
+    expect(toolMessages(world).at(-1)).toContain("m9");
+    expect(world.source.queries).toHaveLength(0);
+  });
+
+  it("treats a change in who flies as a new plan, not the same one", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.source.offers = [flight3, triple, single];
+    world.script(searchWith(["m1", "m2", "m3"]), proposeHotelOnlyForJia, says("First."));
+    await callAgent(world);
+    world.source.offers = [flight4, triple, single];
+    world.script(searchWith(), (request) => proposeFrom(request), says("Everyone flies now."));
+    await callAgent(world, "ana", "@trippy Jia flies too");
+    expect(world.plans.records).toHaveLength(2);
+    expect(world.plans.records[0].input.inputsHash).not.toBe(world.plans.records[1].input.inputsHash);
+  });
+});
+
 describe("quoting prices", () => {
   it("asks the model to fix a price it made up, and posts the fixed reply", async () => {
     const world = buildWorld();

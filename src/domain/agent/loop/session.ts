@@ -19,6 +19,8 @@ export interface Session {
   searches: readonly SearchRecord[];
   /** The offers the model may choose from, by the short id it was shown (F1, H2, ...). */
   offersByAlias: ReadonlyMap<string, Offer>;
+  /** Who the last search was for on flights, when that is not everyone. Null means everyone flies. */
+  flyerIds: readonly string[] | null;
   /** The plan this turn made or found, so the reply carries its card. */
   planId: string | null;
 }
@@ -38,6 +40,6 @@ export interface ToolEnv {
   readonly note: (stage: string, data: unknown) => void;
 }
 
-export const newSession = (): Session => ({ trip: null, searches: [], offersByAlias: new Map(), planId: null });
+export const newSession = (): Session => ({ trip: null, searches: [], offersByAlias: new Map(), flyerIds: null, planId: null });
 
 export const members = (env: ToolEnv): readonly Member[] => env.roster.map((entry) => entry.member);

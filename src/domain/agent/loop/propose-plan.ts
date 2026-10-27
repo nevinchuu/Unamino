@@ -71,7 +71,7 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
 
   const people = members(env);
   const constraints = await env.constraints();
-  const inputsHash = computeInputsHash({ trip, memberIds: people.map((member) => member.id), constraints });
+  const inputsHash = computeInputsHash({ trip, memberIds: people.map((member) => member.id), constraints, flyingMemberIds: session.flyerIds ?? undefined });
   const current = await deps.plans.latest(run.groupId);
   env.note("decision", { currentPlan: current ? { id: current.id, status: current.status, sameInputs: current.inputsHash === inputsHash } : null, inputsHash });
 
@@ -100,6 +100,7 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
     offers,
     fx: fx.value,
     requiredKinds: REQUIRED_KINDS,
+    flyingMemberIds: session.flyerIds ?? undefined,
     now: env.now,
     maxAttempts: 1,
   });

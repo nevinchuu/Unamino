@@ -17,6 +17,8 @@ export interface BuildPlanInput {
   readonly offers: readonly Offer[];
   readonly fx: FxRateTable;
   readonly requiredKinds: readonly OfferKind[];
+  /** Who needs a flight, when that is not everyone. */
+  readonly flyingMemberIds?: readonly string[];
   readonly now: Date;
   readonly maxAttempts?: number;
 }
@@ -43,7 +45,7 @@ export interface BuildPlanError {
  * constraints that cannot all be met are reported as violations rather than hidden.
  */
 export async function buildPlan(input: BuildPlanInput): Promise<Result<BuiltPlan, BuildPlanError>> {
-  const { planner, members, constraints, offers, fx, requiredKinds, now } = input;
+  const { planner, members, constraints, offers, fx, requiredKinds, flyingMemberIds, now } = input;
   const maxAttempts = input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const memberIds = members.map((member) => member.id);
 
@@ -60,7 +62,7 @@ export async function buildPlan(input: BuildPlanInput): Promise<Result<BuiltPlan
       continue;
     }
 
-    const validated = validatePlan(proposed.value, { offers, memberIds, requiredKinds, now });
+    const validated = validatePlan(proposed.value, { offers, memberIds, requiredKinds, flyingMemberIds, now });
     if (!validated.ok) {
       lastProblem = validated.error.message;
       feedback = [validated.error.message];

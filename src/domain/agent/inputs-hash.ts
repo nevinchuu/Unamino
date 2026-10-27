@@ -18,6 +18,8 @@ export interface PlanInputs {
   readonly trip: CompleteTrip;
   readonly memberIds: readonly string[];
   readonly constraints: ConstraintSet;
+  /** Set only when some people do not fly, so plans made before this existed keep their fingerprint. */
+  readonly flyingMemberIds?: readonly string[];
 }
 
 /**
@@ -28,5 +30,6 @@ export function computeInputsHash(inputs: PlanInputs): string {
   const memberIds = [...inputs.memberIds].sort();
   // Only people in the plan matter, and someone who said nothing counts the same as an empty set of constraints.
   const constraints = Object.fromEntries(memberIds.map((id) => [id, inputs.constraints[id] ?? {}]));
-  return createHash("sha256").update(canonical({ trip: inputs.trip, memberIds, constraints })).digest("hex");
+  const flying = inputs.flyingMemberIds ? [...inputs.flyingMemberIds].sort() : undefined;
+  return createHash("sha256").update(canonical({ trip: inputs.trip, memberIds, constraints, flying })).digest("hex");
 }

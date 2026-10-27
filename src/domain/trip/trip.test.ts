@@ -114,6 +114,21 @@ describe("turning a trip into searches", () => {
     expect(Math.max(...queries.slice(1).map((q) => q.guests))).toBe(MAX_ROOM_SIZE);
   });
 
+  it("prices the flight for only the people who fly, while every room size is still searched for the whole group", () => {
+    const queries = tripToQueries(TRIP, 4, 3);
+    expect(queries[0]).toMatchObject({ kind: "flight", guests: 3 });
+    expect(queries.slice(1).map((q) => q.kind === "hotel" && q.guests)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("makes no flight search when nobody needs a flight, but still searches for rooms", () => {
+    const queries = tripToQueries(TRIP, 2, 0);
+    expect(queries.map((q) => q.kind)).toEqual(["hotel", "hotel"]);
+  });
+
+  it("makes no searches when more people fly than are in the group, or the count is not a whole number", () => {
+    for (const flyers of [5, -1, 1.5, Number.NaN]) expect(tripToQueries(TRIP, 4, flyers)).toEqual([]);
+  });
+
   it("makes no searches without travellers", () => {
     for (const headcount of [0, -1, 2.5, Number.NaN]) expect(tripToQueries(TRIP, headcount)).toEqual([]);
   });

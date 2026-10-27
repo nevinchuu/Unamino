@@ -48,9 +48,9 @@ export async function searchWithRetry(source: OfferSource, query: OfferQuery, op
  * Runs every search a trip needs, all at once. A search that fails is reported and does not stop the rest,
  * because one hotel size failing should not hide the flights. Only when every search fails is that an error.
  */
-export async function searchForTrip(source: OfferSource, trip: CompleteTrip, headcount: number, options: SearchOptions = {}): Promise<Result<TripSearchResult, OfferSourceError>> {
-  const queries = tripToQueries(trip, headcount);
-  if (queries.length === 0) return err({ code: "invalid_query", message: "A search needs at least one traveller" });
+export async function searchForTrip(source: OfferSource, trip: CompleteTrip, headcount: number, options: SearchOptions = {}, flyers: number = headcount): Promise<Result<TripSearchResult, OfferSourceError>> {
+  const queries = tripToQueries(trip, headcount, flyers);
+  if (queries.length === 0) return err({ code: "invalid_query", message: "A search needs at least one traveller, and no more flyers than travellers" });
 
   const outcomes = await Promise.all(queries.map(async (query) => ({ query, result: await searchWithRetry(source, query, options) })));
 

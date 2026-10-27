@@ -10,6 +10,8 @@ export interface PlanContext {
   readonly memberIds: readonly string[];
   /** Kinds every member must have at least one of, e.g. a flight and a stay. */
   readonly requiredKinds: readonly OfferKind[];
+  /** Who needs a flight, when that is fewer than everyone (someone already at the destination). Everyone still needs a room. */
+  readonly flyingMemberIds?: readonly string[];
   readonly now: Date;
 }
 
@@ -130,10 +132,11 @@ const perMemberOverlapCheck =
 const checkHotelsDoNotOverlap = perMemberOverlapCheck("overlapping_hotels", "hotel stays", hotelIntervals);
 const checkFlightsDoNotOverlap = perMemberOverlapCheck("overlapping_flights", "flights", flightIntervals);
 
-const checkEveryoneCovered: PlanCheck = (picks, { memberIds, requiredKinds }) => {
+const checkEveryoneCovered: PlanCheck = (picks, { memberIds, requiredKinds, flyingMemberIds }) => {
   for (const kind of requiredKinds) {
     const covered = new Set(picks.filter((pick) => pick.offer.kind === kind).flatMap((pick) => pick.memberIds));
-    const missing = memberIds.filter((id) => !covered.has(id));
+    const needing = kind === "flight" && flyingMemberIds ? flyingMemberIds : memberIds;
+    const missing = needing.filter((id) => !covered.has(id));
     if (missing.length > 0) {
       return { code: "member_not_covered", message: `No ${kind} for ${missing.join(", ")}`, memberIds: missing };
     }

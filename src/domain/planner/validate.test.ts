@@ -107,6 +107,17 @@ describe("validatePlan: rejections", () => {
     });
   });
 
+  it("needs a flight only for the people who fly, while everyone still needs a stay", () => {
+    const oneSeat = { ...BANGKOK_OFFERS.find((offer) => offer.id === "fx-flt-evening"), id: "fx-flt-one", guests: 1, totalMinor: 18000 } as Offer;
+    const offers = [...BANGKOK_OFFERS, oneSeat];
+    const picks = [pick("fx-flt-one", ["nevin"]), pick("fx-htl-triple", ["nevin", "ana", "ben"]), pick("fx-htl-single", ["jia"])];
+
+    expect(errorOf(picks, { offers })).toMatchObject({ code: "member_not_covered", memberIds: ["ana", "ben", "jia"] });
+    expect(errorOf(picks, { offers, flyingMemberIds: ["nevin"] })).toBeNull();
+    expect(errorOf(picks, { offers, flyingMemberIds: ["nevin", "ana"] })).toMatchObject({ code: "member_not_covered", memberIds: ["ana"] });
+    expect(errorOf([pick("fx-flt-one", ["nevin"]), pick("fx-htl-triple", ["nevin", "ana", "ben"])], { offers, flyingMemberIds: ["nevin"] })).toMatchObject({ code: "member_not_covered", memberIds: ["jia"] });
+  });
+
   it("only requires the kinds the caller asks for", () => {
     const result = validatePlan(withPicks([pick("fx-act-market", ALL)]), { ...context, requiredKinds: [] });
     expect(result.ok).toBe(true);
