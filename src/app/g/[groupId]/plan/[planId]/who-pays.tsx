@@ -10,6 +10,9 @@ function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: 
   const wait = <Clock className="size-3.5" />;
   const cross = <X className="size-3.5" />;
 
+  // Once the trip is paid for, what matters is what was charged.
+  if (status === "captured" && person.chargedMinor !== null) return { text: "Paid", icon: tick, good: true };
+
   if (status === "reviewing" || status === "draft") {
     if (person.agreement === "agreed") return { text: "Agreed", icon: tick, good: true };
     if (person.agreement === "declined") return { text: "Declined", icon: cross, good: false };
@@ -27,8 +30,9 @@ function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: 
 
 /** Everyone's amount and progress. Your own breaks down into its parts, and the total is shown when every share is in one currency. */
 export function WhoPays({ people, status, currency, payments }: { readonly people: readonly PersonDto[]; readonly status: PlanViewDto["status"]; readonly currency: string; readonly payments: PlanViewDto["payments"] }) {
-  const sameCurrency = people.every((person) => person.currency === currency && person.shareMinor !== null);
-  const total = sameCurrency ? people.reduce((sum, person) => sum + (person.shareMinor ?? 0), 0) : null;
+  const amountOf = (person: PersonDto): number | null => (status === "captured" && person.chargedMinor !== null ? person.chargedMinor : person.shareMinor);
+  const sameCurrency = people.every((person) => person.currency === currency && amountOf(person) !== null);
+  const total = sameCurrency ? people.reduce((sum, person) => sum + (amountOf(person) ?? 0), 0) : null;
 
   return (
     <section aria-labelledby="who-pays-heading" className="rounded-xl bg-card p-2 shadow-sm">
@@ -53,7 +57,7 @@ export function WhoPays({ people, status, currency, payments }: { readonly peopl
                     {progress.text}
                   </p>
                 </div>
-                <p className="shrink-0 font-semibold">{person.shareMinor === null ? "…" : formatMinor(person.shareMinor, person.currency)}</p>
+                <p className="shrink-0 font-semibold">{amountOf(person) === null ? "…" : formatMinor(amountOf(person) as number, person.currency)}</p>
               </div>
               {person.isMe && person.lines.length > 0 ? (
                 <ul className="mt-2 ml-12 space-y-0.5 text-xs text-muted-foreground">
@@ -71,7 +75,7 @@ export function WhoPays({ people, status, currency, payments }: { readonly peopl
       </ul>
       {total !== null ? (
         <p className="flex justify-between border-t border-border px-2 pt-2 pb-1 text-sm">
-          <span className="text-muted-foreground">Trip total</span>
+          <span className="text-muted-foreground">{status === "captured" ? "Trip total paid" : "Trip total"}</span>
           <span className="font-semibold">{formatMinor(total, currency)}</span>
         </p>
       ) : null}

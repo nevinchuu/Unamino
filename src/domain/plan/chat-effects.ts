@@ -1,3 +1,4 @@
+import { planReference } from "@/lib/plan-reference";
 import { err, ok, type Result } from "@/lib/result";
 import type { MessageRepository } from "@/domain/group/repository";
 import type { EffectError, EffectRunner } from "./effects";
@@ -13,7 +14,7 @@ export interface ChatEffectDeps {
 }
 
 /** The line to put in the chat for an effect, or null when the effect is not something the group needs to be told. */
-export function chatLineFor(effect: PlanEffect, names: ReadonlyMap<string, string>, options: { readonly demoBooking?: boolean } = {}): string | null {
+export function chatLineFor(effect: PlanEffect, names: ReadonlyMap<string, string>, options: { readonly demoBooking?: boolean; readonly reference?: string } = {}): string | null {
   switch (effect.type) {
     case "request_review":
       return "The plan changed, so everyone needs to look at it again.";
@@ -24,7 +25,7 @@ export function chatLineFor(effect: PlanEffect, names: ReadonlyMap<string, strin
     case "book":
       return "Everyone has approved. The next step is booking.";
     case "capture_holds":
-      return `Booked. Each person was charged their share, and the rest of their hold was let go.${options.demoBooking ? " Demo: nothing was really booked." : ""}`;
+      return `Booked.${options.reference ? ` Reference ${options.reference}.` : ""} Each person was charged their share, and the rest of their hold was let go.${options.demoBooking ? " Demo: nothing was really booked." : ""}`;
     case "place_hold":
     case "release_holds":
       return null;
@@ -59,6 +60,6 @@ export class ChatEffectRunner implements EffectRunner {
       const group = await this.deps.groupIdOf(planId);
       if (group.ok && group.value !== null) names = await this.deps.memberNames(group.value);
     }
-    return effects.flatMap((effect) => chatLineFor(effect, names, { demoBooking: this.deps.demoBooking }) ?? []);
+    return effects.flatMap((effect) => chatLineFor(effect, names, { demoBooking: this.deps.demoBooking, reference: planReference(planId) }) ?? []);
   }
 }

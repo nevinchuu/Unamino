@@ -67,6 +67,13 @@ describe("chatLineFor", () => {
     expect(chatLineFor(charge, names, { demoBooking: true })).toBe("Booked. Each person was charged their share, and the rest of their hold was let go. Demo: nothing was really booked.");
   });
 
+  it("puts the trip's reference in the chat line when it has one, and still no amount", () => {
+    const charge: PlanEffect = { type: "capture_holds", captures: [{ memberId: "ana", captureMinor: 25_000, releaseMinor: 5_000 }] };
+    const line = chatLineFor(charge, names, { reference: "UN-E79DBE" });
+    expect(line).toBe("Booked. Reference UN-E79DBE. Each person was charged their share, and the rest of their hold was let go.");
+    expect(line).not.toMatch(/\d{3}/);
+  });
+
   it("never puts an amount or a card detail in the chat", () => {
     const lines = ([{ type: "request_reapproval", memberId: "ben", newAmountMinor: 35_000 }, { type: "request_approval", memberIds: ["ben"] }] as PlanEffect[]).map((effect) => chatLineFor(effect, names));
     expect(lines.join(" ")).not.toMatch(/\d{3}|\$/);

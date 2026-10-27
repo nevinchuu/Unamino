@@ -6,7 +6,7 @@ import type { PlanViewRaw, ViewIdea, ViewMember } from "./view-store";
 
 const DEADLINE = new Date("2026-10-27T01:09:00.000Z");
 
-const member = (id: string, name: string, overrides: Partial<ViewMember> = {}): ViewMember => ({ id, name, currency: "USD", planAgreement: "pending", approval: "pending", approvedMinor: null, holdPlaced: false, ...overrides });
+const member = (id: string, name: string, overrides: Partial<ViewMember> = {}): ViewMember => ({ id, name, currency: "USD", planAgreement: "pending", approval: "pending", approvedMinor: null, chargedMinor: null, holdPlaced: false, ...overrides });
 
 const IDEA: ViewIdea = {
   id: "i1", date: "2026-12-12", startTime: "10:00", endTime: "12:00", category: "market", why: "Ana and Ben both like markets",
@@ -185,5 +185,24 @@ describe("traveller details on the plan screen", () => {
     expect(buildPlanView(hotelOnly, "ana", asked).me.details).toEqual({ needed: true, passportRequired: false });
     const benOnly = raw({ status: "approving", members: approved(), picks: [{ id: "f", offer: flight(), memberIds: ["ben"], reason: "r", notes: {} }] });
     expect(buildPlanView(benOnly, "ana", asked).me.details.passportRequired).toBe(false);
+  });
+});
+
+describe("a paid trip", () => {
+  const paid = (overrides: Partial<PlanViewRaw> = {}) =>
+    raw({ status: "captured", members: [member("ana", "Ana", { planAgreement: "agreed", approval: "approved", approvedMinor: 30_000, chargedMinor: 26_500, holdPlaced: true }), member("ben", "Ben", { planAgreement: "agreed", approval: "approved", approvedMinor: 30_000, chargedMinor: 27_000, holdPlaced: true })], ...overrides });
+
+  it("carries a reference made from the plan, and what each person was really charged", () => {
+    const shown = buildPlanView(paid(), "ana", { payments: "stripe" });
+    expect(shown.reference).toBe("UN-A10000");
+    expect(shown.people.map((person) => person.chargedMinor)).toEqual([26_500, 27_000]);
+    expect(shown.me.approvedMinor).toBe(30_000);
+  });
+
+  it("has no reference, and nothing charged, before the trip is paid for", () => {
+    for (const status of ["reviewing", "approving", "held", "booking", "booked", "expired"] as const) {
+      expect(buildPlanView(raw({ status }), "ana", { payments: "stripe" }).reference, status).toBeNull();
+    }
+    expect(view().people.every((person) => person.chargedMinor === null)).toBe(true);
   });
 });

@@ -13,6 +13,7 @@ import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
 import { CardSheet } from "./card-sheet";
 import { IdeaCard, ItemCard } from "./plan-items";
+import { TripConfirmed } from "./trip-confirmed";
 import { WhoPays } from "./who-pays";
 
 /** How often the screen asks where the plan stands. Slower once nobody is deciding any more. */
@@ -162,20 +163,24 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
       <AppBar title={view.title} subtitle={subtitle} backHref={`/g/${view.groupId}`} />
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-6">
-        <section className={cn("rounded-xl px-4 py-3", TONE_STYLES[stage.tone])} aria-live="polite">
-          {stage.step ? <p className="text-xs font-semibold tracking-wide uppercase opacity-80">{stage.step}</p> : null}
-          <p className="text-lg font-semibold">{stage.headline}</p>
-          <p className="text-sm opacity-90">{stage.detail}</p>
-          {live ? (
-            <p className="mt-2 text-xs opacity-80" suppressHydrationWarning>
-              {priceHoldElapsed(deadline, new Date(now))
-                ? "Checking the latest prices again…"
-                : `Prices held until ${deadline.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${countdownText(deadline, new Date(now))}`}
-            </p>
-          ) : null}
-        </section>
+        {view.reference ? (
+          <TripConfirmed view={view} />
+        ) : (
+          <section className={cn("rounded-xl px-4 py-3", TONE_STYLES[stage.tone])} aria-live="polite">
+            {stage.step ? <p className="text-xs font-semibold tracking-wide uppercase opacity-80">{stage.step}</p> : null}
+            <p className="text-lg font-semibold">{stage.headline}</p>
+            <p className="text-sm opacity-90">{stage.detail}</p>
+            {live ? (
+              <p className="mt-2 text-xs opacity-80" suppressHydrationWarning>
+                {priceHoldElapsed(deadline, new Date(now))
+                  ? "Checking the latest prices again…"
+                  : `Prices held until ${deadline.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${countdownText(deadline, new Date(now))}`}
+              </p>
+            ) : null}
+          </section>
+        )}
 
-        {view.demoBooking && (view.status === "booked" || view.status === "captured") ? (
+        {view.demoBooking && view.status === "booked" ? (
           <p className="px-1 text-xs text-muted-foreground">Demo: no flights or hotel were really booked.</p>
         ) : null}
 
@@ -190,7 +195,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
 
         <section aria-labelledby="plan-heading" className="space-y-3">
           <h2 id="plan-heading" className="px-1 text-sm font-medium text-muted-foreground">
-            The plan
+            {view.reference ? "Your trip" : "The plan"}
           </h2>
           {view.items.map((item) => (
             <ItemCard key={item.id} item={item} />

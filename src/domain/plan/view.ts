@@ -2,6 +2,7 @@ import type { Offer } from "@/domain/offers/schema";
 import type { PaymentsMode } from "@/domain/payments/types";
 import { passportRequiredFor } from "@/domain/travellers/requirements";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
+import { planReference } from "@/lib/plan-reference";
 import { currentShares } from "./pricing";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import type { PlanViewRaw, ViewIdea, ViewPick } from "./view-store";
@@ -60,6 +61,8 @@ export interface PersonDto {
   readonly shareMinor: number | null;
   readonly currency: string;
   readonly approvedMinor: number | null;
+  /** What they were really charged. Null until the trip is paid for. */
+  readonly chargedMinor: number | null;
   /** The parts of their share, only when they pay in the plan's own currency so the parts add up to the total shown. */
   readonly lines: readonly { readonly label: string; readonly minor: number }[];
 }
@@ -105,6 +108,8 @@ export interface PlanViewDto {
   /** ISO time. Moves later when the offers are renewed. */
   readonly deadlineAt: string;
   readonly replacedBy: string | null;
+  /** The code the group can quote for a paid trip. Null until the trip is paid for. */
+  readonly reference: string | null;
   /** How money is handled, so the screen shows a card form, a demo note, or nothing. */
   readonly payments: PaymentsMode;
   /** True when booking is only pretended, so the screen says nothing real was booked. */
@@ -192,6 +197,7 @@ export function buildPlanView(
       shareMinor: share?.shareMinor ?? null,
       currency: member.currency,
       approvedMinor: member.approvedMinor,
+      chargedMinor: member.chargedMinor,
       lines: share && share.currency === raw.baseCurrency ? share.lines.map((line) => ({ label: line.label, minor: line.baseMinor })) : [],
     };
   });
@@ -221,6 +227,7 @@ export function buildPlanView(
     headcount: raw.headcount,
     deadlineAt: raw.deadlineAt.toISOString(),
     replacedBy: raw.replacedByPlanId,
+    reference: raw.status === "captured" ? planReference(raw.id) : null,
     payments: options.payments,
     demoBooking: options.demoBooking ?? false,
     currency: raw.baseCurrency,

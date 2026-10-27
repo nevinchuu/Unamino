@@ -13,6 +13,8 @@ export interface ViewMember {
   readonly planAgreement: PlanAgreementStatus;
   readonly approval: ApprovalStatus;
   readonly approvedMinor: number | null;
+  /** What was really charged, once the trip is paid for. */
+  readonly chargedMinor: number | null;
   readonly holdPlaced: boolean;
 }
 

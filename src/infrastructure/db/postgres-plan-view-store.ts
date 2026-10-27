@@ -40,7 +40,7 @@ export class PostgresPlanViewStore implements PlanViewStore {
         headcount: plan.headcount,
         replacedByPlanId: plan.replacedByPlanId,
         trip: { city: brief.destinationCity, departDate: brief.departDate, returnDate: brief.returnDate },
-        members: people.map(({ row, name, currency }) => ({ id: row.memberId, name, currency, planAgreement: row.planAgreement, approval: row.approval, approvedMinor: row.approvedMinor, holdPlaced: row.holdPlaced })),
+        members: people.map(({ row, name, currency }) => ({ id: row.memberId, name, currency, planAgreement: row.planAgreement, approval: row.approval, approvedMinor: row.approvedMinor, chargedMinor: row.chargedMinor, holdPlaced: row.holdPlaced })),
         picks: picks.map((pick) => ({ id: pick.id, offer: pick.offer, memberIds: pick.memberIds, reason: pick.reason, notes: pick.notes })),
         ideas: ideas.map((idea) => ({ id: idea.id, date: idea.date, startTime: idea.startTime, endTime: idea.endTime, category: idea.category, why: idea.why, venue: idea.venue })),
       });

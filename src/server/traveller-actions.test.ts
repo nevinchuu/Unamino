@@ -17,7 +17,7 @@ const NOT_FOUND = { ok: false, error: "We couldn't find that plan." };
 const plan = (overrides: Partial<PlanViewRaw> = {}): PlanViewRaw => ({
   id: PLAN_ID, groupId: GROUP, title: "t", summary: null, status: "approving", deadlineAt: new Date("2026-10-27T01:09:00Z"), baseCurrency: "USD",
   fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: 1, replacedByPlanId: null, trip: { city: "Bangkok", departDate: "2026-12-11", returnDate: "2026-12-13" },
-  members: [{ id: "ana", name: "Ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 100, holdPlaced: false }],
+  members: [{ id: "ana", name: "Ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 100, chargedMinor: null, holdPlaced: false }],
   picks: [{ id: "f", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "h", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [],
   ...overrides,
 });
