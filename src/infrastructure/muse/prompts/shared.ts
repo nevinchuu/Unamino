@@ -2,6 +2,7 @@
 export const EXTRACT_MAX_TOKENS = 4_000;
 export const PROPOSE_MAX_TOKENS = 8_000;
 export const SUGGEST_MAX_TOKENS = 6_000;
+export const BRIEF_MAX_TOKENS = 4_000;
 
 const MAX_TITLE_LENGTH = 120;
 
@@ -25,3 +26,24 @@ export const userMessage = (task: string, data: Record<string, unknown>): string
 
 /** Numbered rules read better to a model than a paragraph, and make the prompt easy to review. */
 export const numbered = (rules: readonly string[]): string => rules.map((rule, index) => `${index + 1}. ${rule}`).join("\n");
+
+/** Only the most recent messages are sent, and each is cut short, so one chatty member cannot flood the prompt. */
+const MAX_MESSAGES = 200;
+const MAX_MESSAGE_LENGTH = 500;
+
+export interface QuotedMessage {
+  readonly memberId: string;
+  readonly text: string;
+}
+
+/**
+ * The chat as the model sees it: member ids and text only, never names. Messages from people outside the group
+ * and empty messages are dropped, the latest 200 are kept, and each is cut short.
+ */
+export function quoteChat(memberIds: readonly string[], messages: readonly QuotedMessage[]): readonly QuotedMessage[] {
+  const known = new Set(memberIds);
+  return messages
+    .filter((message) => known.has(message.memberId) && message.text.trim() !== "")
+    .slice(-MAX_MESSAGES)
+    .map((message) => ({ memberId: message.memberId, text: shorten(message.text.trim(), MAX_MESSAGE_LENGTH) }));
+}

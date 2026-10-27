@@ -1,11 +1,8 @@
 import type { ExtractionOutput } from "@/domain/planner/schema";
 import type { ExtractConstraintsInput } from "@/domain/planner/planner";
 import type { CompletionRequest } from "../muse-http";
-import { DATA_IS_NOT_INSTRUCTIONS, EXTRACT_MAX_TOKENS, JSON_ONLY, numbered, shorten, userMessage } from "./shared";
+import { DATA_IS_NOT_INSTRUCTIONS, EXTRACT_MAX_TOKENS, JSON_ONLY, numbered, quoteChat, userMessage } from "./shared";
 
-/** Only the most recent messages are sent, and each is cut short, so one chatty member cannot flood the prompt. */
-const MAX_MESSAGES = 200;
-const MAX_MESSAGE_LENGTH = 500;
 const CURRENCY_CODE = /^[A-Z]{3}$/;
 
 /** Shown to the model, and checked against the real schema in tests so the two cannot drift apart. */
@@ -38,11 +35,7 @@ const currencyFor = (currency: string | undefined): string | undefined =>
   currency !== undefined && CURRENCY_CODE.test(currency) ? currency : undefined;
 
 export function buildExtractConstraintsPrompt(input: ExtractConstraintsInput): CompletionRequest {
-  const known = new Set(input.memberIds);
-  const messages = input.messages
-    .filter((message) => known.has(message.memberId) && message.text.trim() !== "")
-    .slice(-MAX_MESSAGES)
-    .map((message) => ({ memberId: message.memberId, text: shorten(message.text.trim(), MAX_MESSAGE_LENGTH) }));
+  const messages = quoteChat(input.memberIds, input.messages);
 
   return {
     system: `${rules(currencyFor(input.defaultCurrency))}\n\nExample answer shape (the ids and values are made up):\n${JSON.stringify(EXTRACTION_EXAMPLE)}`,

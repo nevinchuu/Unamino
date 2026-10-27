@@ -1,11 +1,13 @@
 import { err, ok, type Result } from "@/lib/result";
 import type { ConstraintSet } from "@/domain/constraints/schema";
 import type { PlannerError } from "@/domain/planner/errors";
-import type { ExtractConstraintsInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
+import type { ExtractConstraintsInput, ExtractTripBriefInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
 import { parseExtractionText, parsePlannerText, type PlannerOutput } from "@/domain/planner/schema";
 import { parseSuggestionText, type SuggestionOutput } from "@/domain/schedule/suggestion-schema";
+import { parseTripBriefText, type TripBriefOutput } from "@/domain/trip/brief-schema";
 import type { Completion, CompletionRequest, MuseError } from "./muse-http";
 import { buildExtractConstraintsPrompt } from "./prompts/extract-constraints";
+import { buildExtractTripBriefPrompt } from "./prompts/extract-trip-brief";
 import { buildProposePlanPrompt } from "./prompts/propose-plan";
 import { buildSuggestFreeTimePrompt } from "./prompts/suggest-free-time";
 
@@ -15,10 +17,10 @@ export interface CompletionClient {
 }
 
 /**
- * Reading chat has no outer retry loop, so it gets one more try of its own when Muse answers badly.
+ * Reading the chat (constraints, trip brief) has no outer retry loop, so it gets one more try of its own when Muse answers badly.
  * The plan and the suggestions already have loops that feed back what was wrong.
  */
-const EXTRACT_ATTEMPTS = 2;
+const READ_ATTEMPTS = 2;
 
 const unavailable = (message: string): PlannerError => ({ code: "planner_unavailable", message });
 const invalid = (message: string): PlannerError => ({ code: "invalid_output", message });
@@ -43,20 +45,15 @@ export class MusePlanner implements Planner {
   constructor(private readonly client: CompletionClient) {}
 
   async extractConstraints(input: ExtractConstraintsInput): Promise<Result<ConstraintSet, PlannerError>> {
-    const request = buildExtractConstraintsPrompt(input);
+    const answer = await this.askWithRetry(buildExtractConstraintsPrompt(input), parseExtractionText);
+    if (!answer.ok) return answer;
+    // A member id the model made up cannot belong to anyone, so it is dropped rather than trusted.
     const known = new Set(input.memberIds);
-    let lastProblem: PlannerError = invalid("Muse did not return any constraints");
+    return ok(Object.fromEntries(Object.entries(answer.value.constraints).filter(([memberId]) => known.has(memberId))));
+  }
 
-    for (let attempt = 1; attempt <= EXTRACT_ATTEMPTS; attempt += 1) {
-      const answer = await this.ask(request, parseExtractionText);
-      if (answer.ok) {
-        // A member id the model made up cannot belong to anyone, so it is dropped rather than trusted.
-        return ok(Object.fromEntries(Object.entries(answer.value.constraints).filter(([memberId]) => known.has(memberId))));
-      }
-      if (answer.error.code === "planner_unavailable") return answer;
-      lastProblem = answer.error;
-    }
-    return err(lastProblem);
+  extractTripBrief(input: ExtractTripBriefInput): Promise<Result<TripBriefOutput, PlannerError>> {
+    return this.askWithRetry(buildExtractTripBriefPrompt(input), parseTripBriefText);
   }
 
   proposePlan(input: ProposePlanInput): Promise<Result<PlannerOutput, PlannerError>> {
@@ -65,6 +62,20 @@ export class MusePlanner implements Planner {
 
   suggestFreeTime(input: SuggestFreeTimeInput): Promise<Result<SuggestionOutput, PlannerError>> {
     return this.ask(buildSuggestFreeTimePrompt(input), parseSuggestionText);
+  }
+
+  /** Asks again once when the answer is unusable. A failed call is not retried: the model cannot fix an outage. */
+  private async askWithRetry<T>(
+    request: CompletionRequest,
+    parse: (text: string) => Result<T, { readonly message: string }>,
+  ): Promise<Result<T, PlannerError>> {
+    let lastProblem: PlannerError = invalid("Muse did not return a usable answer");
+    for (let attempt = 1; attempt <= READ_ATTEMPTS; attempt += 1) {
+      const answer = await this.ask(request, parse);
+      if (answer.ok || answer.error.code === "planner_unavailable") return answer;
+      lastProblem = answer.error;
+    }
+    return err(lastProblem);
   }
 
   /** Sends one prompt and parses the text that comes back. Parse problems keep their plain-words message for feedback. */

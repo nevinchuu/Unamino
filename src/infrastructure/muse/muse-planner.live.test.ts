@@ -5,6 +5,9 @@ import { prefilterOffers } from "@/domain/planner/prefilter";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, FX, MEMBER_IDS, MEMBERS, NOW } from "@/domain/planner/test-support";
 import { buildSchedule } from "@/domain/schedule/build-schedule";
 import { suggestFreeTime } from "@/domain/schedule/suggest-free-time";
+import { assessTripBrief } from "@/domain/trip/brief";
+import { searchForTrip } from "@/domain/trip/search";
+import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
 import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup";
 import { museConfigFromEnv } from "./muse-config";
 import { MuseHttp, type Completion, type CompletionRequest, type MuseError, type MuseUsage } from "./muse-http";
@@ -96,6 +99,60 @@ describe.skipIf(!LIVE)("MusePlanner against the real model", () => {
       ? { attempts: result.value.attempts, verified: result.value.verified.map((v) => ({ gap: v.gapId, venue: v.venue.name, start: v.startTime, end: v.endTime, category: v.category })), rejected: result.value.rejected.map((r) => ({ venue: r.suggestion.venueName, code: r.code, message: r.message })) }
       : result;
     expect(result.ok).toBe(true);
+  });
+
+  const todayString = new Date().toISOString().slice(0, 10);
+  const tripChat = [
+    { memberId: "nevin", text: "Let's do Bangkok, leaving Fri 11 Dec and back Sun 13 Dec. We all fly from Singapore" },
+    ...CHAT.slice(1),
+  ];
+
+  it("reads where and when from the chat, and the code agrees it is enough to search", { timeout: 180_000 }, async () => {
+    step = "brief";
+    const result = await planner.extractTripBrief({ memberIds: MEMBER_LIST, messages: tripChat, today: todayString });
+    report.brief = result;
+    if (!result.ok) throw new Error(result.error.message);
+    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: result.value.questions, today: todayString });
+    report.briefAssessment = assessment;
+    expect(assessment.status).toBe("complete");
+  });
+
+  it("asks questions instead of guessing when the chat is vague", { timeout: 180_000 }, async () => {
+    step = "vague";
+    const result = await planner.extractTripBrief({ memberIds: MEMBER_LIST, messages: [{ memberId: "nevin", text: "let's go somewhere warm soon!" }, { memberId: "ana", text: "yes please" }], today: todayString });
+    report.vague = result;
+    if (!result.ok) throw new Error(result.error.message);
+    const assessment = assessTripBrief({ fields: result.value.fields, modelQuestions: result.value.questions, today: todayString });
+    report.vagueAssessment = assessment;
+    expect(assessment.status).toBe("incomplete");
+    expect(assessment.status === "incomplete" && assessment.questions.length).toBeGreaterThan(0);
+  });
+
+  it("goes from the chat to real flights and hotels to a plan the code accepts", { timeout: 420_000 }, async () => {
+    const assessment = report.briefAssessment as ReturnType<typeof assessTripBrief> | undefined;
+    const liteKey = process.env.LITEAPI_KEY;
+    if (!liteKey || assessment?.status !== "complete") {
+      report.pipeline = { skipped: !liteKey ? "no LITEAPI_KEY" : "brief was not complete" };
+      return;
+    }
+    step = "pipeline";
+    const source = new LiteApiOfferSource({ apiKey: liteKey, currency: "USD", guestNationality: "SG" });
+    const searched = await searchForTrip(source, assessment.trip, MEMBERS.length);
+    if (!searched.ok) throw new Error(searched.error.message);
+
+    const now = new Date();
+    const kept = prefilterOffers({ offers: searched.value.offers, constraints: BANGKOK_CONSTRAINTS, now });
+    const built = await buildPlan({ planner, members: MEMBERS, constraints: BANGKOK_CONSTRAINTS, offers: kept.offers, fx: FX, requiredKinds: ["flight", "hotel"], now });
+    report.pipeline = {
+      searches: searched.value.searches.map((s) => ({ kind: s.query.kind, guests: s.query.guests, found: s.offers.length })),
+      failures: searched.value.failures.map((f) => ({ kind: f.query.kind, guests: f.query.guests, error: f.error.message })),
+      totalOffers: searched.value.offers.length,
+      sentToMuse: kept.offers.length,
+      plan: built.ok
+        ? { attempts: built.value.attempts, totalMinor: built.value.plan.totalMinor, currency: built.value.plan.currency, violations: built.value.violations.map((v) => v.message), picks: built.value.plan.picks.map((p) => ({ title: p.offer.title, members: p.memberIds, totalMinor: p.offer.totalMinor })) }
+        : built.error,
+    };
+    expect(built.ok).toBe(true);
   });
 
   it("records what happened", () => {
