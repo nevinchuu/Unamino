@@ -24,6 +24,7 @@ export interface BubbleModel {
 }
 
 interface MessageBubbleProps {
+  readonly groupId: string;
   readonly model: BubbleModel;
   readonly mine: boolean;
   readonly startsRun: boolean;
@@ -50,7 +51,7 @@ function Words({ body }: { readonly body: string }) {
   );
 }
 
-export function MessageBubble({ model, mine, startsRun, latestPlan, onReply, onRetry }: MessageBubbleProps) {
+export function MessageBubble({ groupId, model, mine, startsRun, latestPlan, onReply, onRetry }: MessageBubbleProps) {
   if (model.kind === "system") {
     return (
       <div className="my-2 flex justify-center">
@@ -107,7 +108,7 @@ export function MessageBubble({ model, mine, startsRun, latestPlan, onReply, onR
           </span>
         </p>
 
-        {model.planId ? <PlanCard planId={model.planId} latest={latestPlan} /> : null}
+        {model.planId ? <PlanCard groupId={groupId} planId={model.planId} latest={latestPlan} /> : null}
 
         {model.status === "failed" ? (
           <button type="button" onClick={() => onRetry(model)} className="mt-1 block text-left text-xs font-medium text-destructive">

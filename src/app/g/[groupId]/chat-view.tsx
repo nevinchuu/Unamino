@@ -231,6 +231,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
               </div>
             ) : null}
             <MessageBubble
+              groupId={groupId}
               model={item}
               mine={item.senderId === meId}
               startsRun={startsRun}
