@@ -1,76 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { err, ok } from "@/lib/result";
-import type { OfferQuery } from "@/domain/offers/offer-source";
-import type { FlightOffer, HotelOffer, Offer } from "@/domain/offers/schema";
-import { refreshPlan, REFRESH_COOLDOWN_MS, type RefreshDeps } from "./refresh";
-import { MemoryDetailsStore, MemoryPlanRepository, memberSnapshot, ScriptedSource } from "./test-support";
-import type { MemberSnapshot, PlanSnapshot } from "./types";
+import { refreshPlan, REFRESH_COOLDOWN_MS } from "./refresh";
 import type { PlanStatus } from "./statuses";
-
-const NOW = new Date("2026-10-27T01:00:00.000Z");
-const minutesAfter = (minutes: number): Date => new Date(NOW.getTime() + minutes * 60_000);
-const DEADLINE = minutesAfter(2);
-const HARD = minutesAfter(48 * 60);
-
-const HOTEL_QUERY: OfferQuery = { kind: "hotel", city: "Bangkok", countryCode: "TH", checkIn: "2026-12-11", checkOut: "2026-12-13", guests: 2 };
-const FLIGHT_QUERY: OfferQuery = { kind: "flight", city: "Bangkok", origin: "SIN", destination: "BKK", departDate: "2026-12-11", returnDate: "2026-12-13", guests: 2 };
-
-const hotel = (overrides: Partial<HotelOffer> = {}): HotelOffer => ({
-  kind: "hotel", id: "hotel-offer-1", listingId: "hotel-room-1", title: "Riverside Hotel", provider: "test", city: "Bangkok", currency: "USD",
-  totalMinor: 40_000, guests: 2, checkIn: "2026-12-11", checkOut: "2026-12-13", roomName: "Twin", expiresAt: minutesAfter(2).toISOString(), ...overrides,
-});
-
-const flight = (overrides: Partial<FlightOffer> = {}): FlightOffer => ({
-  kind: "flight", id: "flight-offer-1", listingId: "SIN-BKK-1", title: "SIN to BKK", provider: "test", city: "Bangkok", currency: "USD",
-  totalMinor: 20_000, guests: 2, refundable: false, expiresAt: minutesAfter(2).toISOString(),
-  legs: [{ origin: "SIN", destination: "BKK", departAt: "2026-12-11T20:10:00", arriveAt: "2026-12-11T21:35:00", carrier: "Scoot", direction: "outbound" }], ...overrides,
-});
-
-/** What the searches return now. Each test changes it to say what happened to the offers since the plan was made. */
-interface World {
-  hotels: Offer[];
-  flights: Offer[];
-}
-
-interface SetupOptions {
-  status?: PlanStatus;
-  members?: MemberSnapshot[];
-  hardDeadlineAt?: Date;
-  world?: Partial<World>;
-  offersCheckedAt?: Date | null;
-  hotelSearchId?: string | null;
-}
-
-function setup(options: SetupOptions = {}) {
-  const members = options.members ?? [memberSnapshot("ana"), memberSnapshot("ben")];
-  const plan: PlanSnapshot = { status: options.status ?? "reviewing", deadlineAt: DEADLINE, hardDeadlineAt: options.hardDeadlineAt ?? HARD, members };
-  const world: World = {
-    hotels: [hotel({ id: "hotel-offer-2", expiresAt: minutesAfter(9).toISOString() })],
-    flights: [flight({ id: "flight-offer-2", expiresAt: minutesAfter(9).toISOString() })],
-    ...options.world,
-  };
-  const everyone = members.map((member) => member.id);
-  const plans = new MemoryPlanRepository({ id: "plan-1", version: 1, plan });
-  const details = new MemoryDetailsStore({
-    planId: "plan-1",
-    baseCurrency: "USD",
-    fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} },
-    offersCheckedAt: options.offersCheckedAt ?? null,
-    members: everyone.map((id) => ({ id, currency: "USD" })),
-    picks: [
-      { id: "pick-hotel", offer: hotel(), searchId: options.hotelSearchId === undefined ? "search-hotel" : options.hotelSearchId, memberIds: everyone },
-      { id: "pick-flight", offer: flight(), searchId: "search-flight", memberIds: everyone },
-    ],
-    queries: new Map<string, OfferQuery>([["search-hotel", HOTEL_QUERY], ["search-flight", FLIGHT_QUERY]]),
-  });
-  const source = new ScriptedSource((query) => ok(query.kind === "hotel" ? world.hotels : world.flights));
-  const deps: RefreshDeps = { plans, details, source, search: { retryDelayMs: 0 } };
-  return { world, plans, details, source, deps };
-}
-
-const agreed = (id: string): MemberSnapshot => memberSnapshot(id, { planAgreement: "agreed", agreedShareMinor: 30_000 });
-const approved = (id: string, extra: Partial<MemberSnapshot> = {}): MemberSnapshot =>
-  memberSnapshot(id, { planAgreement: "agreed", agreedShareMinor: 30_000, approval: "approved", approvedMinor: 30_000, currentShareMinor: 30_000, approvalExpiresAt: DEADLINE, ...extra });
+import { agreed, approved, DEADLINE, FLIGHT_QUERY, flight, HOTEL_QUERY, hotel, memberSnapshot, minutesAfter, NOW, ScriptedSource, setup } from "./test-support";
 
 async function refresh(setupResult: ReturnType<typeof setup>) {
   const result = await refreshPlan(setupResult.deps, "plan-1", NOW);

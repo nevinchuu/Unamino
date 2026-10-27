@@ -32,12 +32,14 @@ export type RefreshOutcome =
   | {
       readonly status: "refreshed";
       readonly plan: PlanSnapshot;
+      /** The plan's version after the last event applied, which names the effects that came with it. */
+      readonly version: number;
       readonly shares: readonly MemberShare[];
       readonly deadlineExtended: boolean;
       readonly effects: readonly PlanEffect[];
     }
   /** A chosen listing is gone, so the plan has ended. `titles` names what could not be found. */
-  | { readonly status: "unavailable"; readonly plan: PlanSnapshot; readonly titles: readonly string[]; readonly effects: readonly PlanEffect[] };
+  | { readonly status: "unavailable"; readonly plan: PlanSnapshot; readonly version: number; readonly titles: readonly string[]; readonly effects: readonly PlanEffect[] };
 
 /**
  * "search_failed": the offers could not be looked up. The plan is unchanged and the check can be tried again.
@@ -108,10 +110,12 @@ export async function refreshPlan(deps: RefreshDeps, planId: string, now: Date):
 
   const effects: PlanEffect[] = [];
   let current = loaded.value.plan;
+  let version = loaded.value.version;
   const apply = async (event: PlanEvent): Promise<Result<void, ApplyEventError>> => {
     const applied = await applyPlanEvent(deps.plans, planId, event);
     if (!applied.ok) return err(applied.error);
     current = applied.value.plan;
+    version = applied.value.version;
     effects.push(...applied.value.effects);
     return ok(undefined);
   };
@@ -119,7 +123,7 @@ export async function refreshPlan(deps: RefreshDeps, planId: string, now: Date):
   const renewal = renewPicks(details, searched.value);
   if ("missing" in renewal) {
     const ended = await apply({ type: "offers_unavailable", at: now });
-    return ended.ok ? ok({ status: "unavailable", plan: current, titles: renewal.missing, effects }) : err(ended.error);
+    return ended.ok ? ok({ status: "unavailable", plan: current, version, titles: renewal.missing, effects }) : err(ended.error);
   }
 
   // Priced before anything is saved, so offers that cannot be priced leave the plan exactly as it was.
@@ -150,5 +154,5 @@ export async function refreshPlan(deps: RefreshDeps, planId: string, now: Date):
     if (!rechecked.ok) return err(rechecked.error);
   }
 
-  return ok({ status: "refreshed", plan: current, shares: shares.value, deadlineExtended, effects });
+  return ok({ status: "refreshed", plan: current, version, shares: shares.value, deadlineExtended, effects });
 }
