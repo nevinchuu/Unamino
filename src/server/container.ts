@@ -2,8 +2,12 @@ import type { AgentDeps } from "@/domain/agent/run-agent";
 import { StaticFxRates } from "@/domain/agent/static-fx";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { OfferSource } from "@/domain/offers/offer-source";
+import { ChatEffectRunner } from "@/domain/plan/chat-effects";
+import { CompositeEffectRunner, type EffectRunner } from "@/domain/plan/effects";
 import { PlanService } from "@/domain/plan/service";
+import { SimulatedHoldRunner } from "@/domain/plan/simulated-holds";
 import type { PlanStatusReader } from "@/domain/plan/status-reader";
+import type { PlanViewStore } from "@/domain/plan/view-store";
 import { connectDatabase } from "@/infrastructure/db/client";
 import { PostgresBriefRepository } from "@/infrastructure/db/postgres-brief-repository";
 import { PostgresConstraintRepository } from "@/infrastructure/db/postgres-constraint-repository";
@@ -14,6 +18,7 @@ import { PostgresPlanDetailsStore } from "@/infrastructure/db/postgres-plan-deta
 import { PostgresPlanRepository } from "@/infrastructure/db/postgres-plan-repository";
 import { PostgresPlanStatusReader } from "@/infrastructure/db/postgres-plan-status-reader";
 import { PostgresPlanStore } from "@/infrastructure/db/postgres-plan-store";
+import { PostgresPlanViewStore } from "@/infrastructure/db/postgres-plan-view-store";
 import { PostgresRunRepository } from "@/infrastructure/db/postgres-run-repository";
 import { PostgresSearchStore } from "@/infrastructure/db/postgres-search-store";
 import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup";
@@ -21,7 +26,7 @@ import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-sourc
 import { MuseHttp } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
 import type { ChatDeps } from "./chat";
-import { readServerEnv } from "./env";
+import { readServerEnv, resolveHoldSimulation } from "./env";
 import { GROUP_CURRENCY } from "./group-currency";
 
 /** A flight search can take several seconds, and slower when run alongside the hotel searches. */
@@ -37,6 +42,10 @@ export interface Container {
   readonly chat: ChatDeps;
   readonly plans: PlanService;
   readonly planStatus: PlanStatusReader;
+  /** What the plan screen reads. */
+  readonly views: PlanViewStore;
+  /** True when card holds are pretended (development only), so the screen says so. */
+  readonly demoHolds: boolean;
   readonly offers: OfferSource;
   readonly cronSecret: string | null;
 }
@@ -45,6 +54,10 @@ function build(): Container {
   const env = readServerEnv(process.env);
   // A server missing its keys cannot do anything useful, so this stops the request with a plain message (names only).
   if (!env.ok) throw new Error(`Server is not configured. Missing: ${env.error.missing.join(", ") || "MUSE_SPARK_API_KEY"}`);
+
+  // Asking to pretend card holds in production stops the server, rather than letting people "pay" without paying.
+  const simulation = resolveHoldSimulation(env.value.simulateHolds, process.env.NODE_ENV);
+  if (!simulation.ok) throw new Error(simulation.error.message);
 
   const { db } = connectDatabase(env.value.databaseUrl, MAX_CONNECTIONS);
   const groups = new PostgresGroupRepository(db);
@@ -68,13 +81,30 @@ function build(): Container {
     clock: () => new Date(),
   };
 
+  const views = new PostgresPlanViewStore(db);
+
+  // What follows a change to a plan: it is written down, the group is told in the chat, and in development the card hold can be pretended.
+  const runners: EffectRunner[] = [
+    new PostgresEffectRecorder(db),
+    new ChatEffectRunner({
+      groupIdOf: (planId) => views.groupIdOf(planId),
+      memberNames: (groupId) => groups.memberNames(groupId),
+      messages,
+    }),
+  ];
+  const effects = new CompositeEffectRunner(runners);
+  // The simulated hold passes on what the last hold sets in motion, so it needs the whole set, itself included.
+  if (simulation.value) runners.push(new SimulatedHoldRunner(planRepository, () => effects, agent.clock));
+
   return {
     groups,
     messages,
     agent,
     chat: { groups, messages, runs: agent.runs, plans: agent.plans, clock: agent.clock },
-    plans: new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects: new PostgresEffectRecorder(db) }),
+    plans: new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects }),
     planStatus: new PostgresPlanStatusReader(db),
+    views,
+    demoHolds: simulation.value,
     offers,
     cronSecret: env.value.cronSecret,
   };

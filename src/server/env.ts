@@ -10,6 +10,8 @@ export interface ServerEnv {
   readonly placesApiKey: string | null;
   /** Without it the cron route refuses every call. */
   readonly cronSecret: string | null;
+  /** Asked for with SIMULATE_HOLDS=1. Whether it is allowed is decided by `resolveHoldSimulation`. */
+  readonly simulateHolds: boolean;
 }
 
 export interface EnvError {
@@ -31,5 +33,14 @@ export function readServerEnv(env: Readonly<Record<string, string | undefined>>)
   const databaseUrl = clean(env.DATABASE_URL);
   const liteApiKey = clean(env.LITEAPI_KEY);
   if (missing.length > 0 || !muse.ok || !databaseUrl || !liteApiKey) return err({ missing });
-  return ok({ databaseUrl, liteApiKey, muse: muse.value, placesApiKey: clean(env.GOOGLE_PLACES_API_KEY), cronSecret: clean(env.CRON_SECRET) });
+  return ok({ databaseUrl, liteApiKey, muse: muse.value, placesApiKey: clean(env.GOOGLE_PLACES_API_KEY), cronSecret: clean(env.CRON_SECRET), simulateHolds: clean(env.SIMULATE_HOLDS) === "1" });
+}
+
+/**
+ * Pretending a card hold is placed is for trying the screens out before payments are connected. In production it
+ * would let people "pay" without paying, so asking for it there stops the server instead of quietly allowing it.
+ */
+export function resolveHoldSimulation(requested: boolean, nodeEnv: string | undefined): Result<boolean, { readonly message: string }> {
+  if (requested && nodeEnv === "production") return err({ message: "SIMULATE_HOLDS must not be set in production" });
+  return ok(requested);
 }
