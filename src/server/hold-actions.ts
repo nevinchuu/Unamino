@@ -1,6 +1,7 @@
 import type { Member } from "@/domain/group/types";
 import type { HoldFailure, HoldService } from "@/domain/payments/hold-service";
 import type { PlanViewStore } from "@/domain/plan/view-store";
+import type { TravellerService } from "@/domain/travellers/service";
 import { isUuid } from "./ids";
 
 /** What the browser needs to show Stripe's card form. The secret is for this person's hold only. */
@@ -15,12 +16,15 @@ export interface HoldActionDeps {
   /** Null when this server does not take real card holds. */
   readonly holds: Pick<HoldService, "ensureHold" | "confirmHold"> | null;
   readonly views: Pick<PlanViewStore, "groupIdOf">;
+  /** When present, a card hold is only opened for someone who has given their traveller details. */
+  readonly travellers?: Pick<TravellerService, "haveDetails"> | null;
 }
 
 const NOT_SIGNED_IN = "Open your invite link to rejoin this group.";
 const NOT_FOUND = "We couldn't find that plan.";
 const NOT_SET_UP = "Card payments are not set up on this server.";
 const UNAVAILABLE = "Couldn't reach the payment service. Try again in a moment.";
+const DETAILS_FIRST = "Add your traveller details first. The booking needs them.";
 
 /** What to tell a person when a hold step failed. Never the internal reason, which can name the payment provider's internals. */
 export function describeHoldFailure(failure: HoldFailure): string {
@@ -51,6 +55,12 @@ export async function runCardForm(deps: HoldActionDeps, member: Member | null, p
   const denied = await checkAccess(deps, member, planId);
   if (denied) return { ok: false, error: denied };
   if (!deps.holds || !member) return { ok: false, error: NOT_SET_UP };
+
+  if (deps.travellers) {
+    const have = await deps.travellers.haveDetails([member.id]);
+    if (!have.ok) return { ok: false, error: UNAVAILABLE };
+    if (!have.value.has(member.id)) return { ok: false, error: DETAILS_FIRST };
+  }
 
   const form = await deps.holds.ensureHold(planId, member.id);
   if (!form.ok) {

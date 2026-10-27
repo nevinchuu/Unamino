@@ -7,6 +7,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { getStripe, isTestKey, outcomeOfCardEntry, TEST_CARD_HINT } from "@/lib/stripe-browser";
 import { confirmCardHold, openCardForm } from "./actions";
+import { TravellerForm } from "./traveller-form";
 
 interface CardSheetProps {
   readonly open: boolean;
@@ -19,6 +20,11 @@ interface CardSheetProps {
   readonly publishableKey: string | null;
   /** Called once the hold is recorded, so the screen can move on. */
   readonly onPlaced: () => void;
+  /** True while the person's traveller details are still to be given. They come first, and the card after. */
+  readonly detailsNeeded: boolean;
+  readonly passportRequired: boolean;
+  /** Called once the details are saved, so the screen can ask where things stand and move on to the card. */
+  readonly onDetailsSaved: () => void;
 }
 
 type Loaded = { readonly state: "loading" } | { readonly state: "ready"; readonly clientSecret: string } | { readonly state: "error"; readonly message: string };
@@ -29,7 +35,7 @@ const APPEARANCE = {
 } as const;
 
 /** The card form for one person's hold, in a sheet over the plan. The card number goes straight to Stripe's own fields. */
-export function CardSheet({ open, onOpenChange, groupId, planId, amountText, publishableKey, onPlaced }: CardSheetProps) {
+export function CardSheet({ open, onOpenChange, groupId, planId, amountText, publishableKey, onPlaced, detailsNeeded, passportRequired, onDetailsSaved }: CardSheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -37,23 +43,28 @@ export function CardSheet({ open, onOpenChange, groupId, planId, amountText, pub
         <Dialog.Popup className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[90dvh] w-full max-w-[430px] overflow-y-auto rounded-t-2xl bg-background px-5 pt-5 pb-6 shadow-xl outline-none">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <Dialog.Title className="text-lg font-semibold">Add your card</Dialog.Title>
-              <Dialog.Description className="mt-1 text-sm text-muted-foreground">We hold {amountText} on your card. It is not a charge. You are only charged once everyone is in and the trip is booked, and the hold is let go if the plan ends.</Dialog.Description>
+              <Dialog.Title className="text-lg font-semibold">{detailsNeeded ? "Your traveller details" : "Add your card"}</Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                {detailsNeeded
+                  ? "The airline and the hotel need these to book your place. Then you add your card."
+                  : `We hold ${amountText} on your card. It is not a charge. You are only charged once everyone is in and the trip is booked, and the hold is let go if the plan ends.`}
+              </Dialog.Description>
             </div>
             <Dialog.Close aria-label="Close" className="-mt-1 -mr-1 rounded-full p-2 text-muted-foreground hover:bg-muted">
               <X className="size-5" />
             </Dialog.Close>
           </div>
 
-          {/* Only mounted while open, so the hold is made when the person asks for the form and not before. */}
-          {open ? <Body groupId={groupId} planId={planId} amountText={amountText} publishableKey={publishableKey} onPlaced={onPlaced} onClose={() => onOpenChange(false)} /> : null}
+          {/* The card form is only mounted once the details are in and the sheet is open, so the hold is made when it is asked for and not before. */}
+          {open && detailsNeeded ? <TravellerForm groupId={groupId} planId={planId} passportRequired={passportRequired} onSaved={onDetailsSaved} /> : null}
+          {open && !detailsNeeded ? <Body groupId={groupId} planId={planId} amountText={amountText} publishableKey={publishableKey} onPlaced={onPlaced} onClose={() => onOpenChange(false)} /> : null}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
   );
 }
 
-function Body({ groupId, planId, amountText, publishableKey, onPlaced, onClose }: Omit<CardSheetProps, "open" | "onOpenChange"> & { readonly onClose: () => void }) {
+function Body({ groupId, planId, amountText, publishableKey, onPlaced, onClose }: Pick<CardSheetProps, "groupId" | "planId" | "amountText" | "publishableKey" | "onPlaced"> & { readonly onClose: () => void }) {
   const [loaded, setLoaded] = useState<Loaded>({ state: "loading" });
 
   // Asks the server for this person's hold. If the card is already on it (they were interrupted), it is recorded straight away.

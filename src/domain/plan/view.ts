@@ -1,5 +1,6 @@
 import type { Offer } from "@/domain/offers/schema";
 import type { PaymentsMode } from "@/domain/payments/types";
+import { passportRequiredFor } from "@/domain/travellers/requirements";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
 import { currentShares } from "./pricing";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
@@ -70,6 +71,14 @@ export interface PlanActions {
   readonly declineAmount: boolean;
 }
 
+/** What this person still owes the booking in the way of personal details. */
+export interface DetailsDto {
+  /** True when their traveller details are asked for now and not yet given. */
+  readonly needed: boolean;
+  /** True when they take part in a flight, which needs a passport. */
+  readonly passportRequired: boolean;
+}
+
 export interface MeDto {
   readonly id: string;
   /** False for someone who joined the group after this plan was made. They can look but not act. */
@@ -80,6 +89,7 @@ export interface MeDto {
   readonly approvedMinor: number | null;
   /** True when this person has approved and their card still has to be added to the hold. */
   readonly cardNeeded: boolean;
+  readonly details: DetailsDto;
   readonly actions: PlanActions;
 }
 
@@ -156,7 +166,16 @@ function ideaOf(idea: ViewIdea): IdeaDto {
  * What one person sees of a plan, worked out from what is stored. Prices are today's, from the stored offers, and
  * what the person may do is decided here from the plan's state and their own, so the screen never has to guess.
  */
-export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { readonly payments: PaymentsMode; readonly demoBooking?: boolean }): PlanViewDto {
+export function buildPlanView(
+  raw: PlanViewRaw,
+  viewerId: string,
+  options: {
+    readonly payments: PaymentsMode;
+    readonly demoBooking?: boolean;
+    /** Present when this server takes traveller details. `given` is whether the viewer has already given theirs. */
+    readonly travellers?: { readonly given: boolean };
+  },
+): PlanViewDto {
   const names = new Map(raw.members.map((member) => [member.id, member.name]));
   const priced = currentShares(raw, raw.picks);
   const shares = new Map(priced.ok ? priced.value.map((share) => [share.memberId, share]) : []);
@@ -188,6 +207,9 @@ export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { rea
     declineAmount: (approving || raw.status === "held") && mine !== undefined,
   };
 
+  // The card and the details are asked for together, once the person has approved their amount.
+  const cardNeeded = options.payments === "stripe" && approving && mine?.approval === "approved" && mine.holdPlaced === false;
+
   return {
     id: raw.id,
     groupId: raw.groupId,
@@ -213,7 +235,8 @@ export function buildPlanView(raw: PlanViewRaw, viewerId: string, options: { rea
       approval: mine?.approval ?? null,
       shareMinor: mine?.shareMinor ?? null,
       approvedMinor: mine?.approvedMinor ?? null,
-      cardNeeded: options.payments === "stripe" && approving && mine?.approval === "approved" && mine.holdPlaced === false,
+      cardNeeded,
+      details: { needed: cardNeeded && options.travellers !== undefined && !options.travellers.given, passportRequired: passportRequiredFor(raw.picks, viewerId) },
       actions,
     },
   };

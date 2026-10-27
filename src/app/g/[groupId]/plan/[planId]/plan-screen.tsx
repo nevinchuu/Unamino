@@ -106,6 +106,11 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
     return () => clearInterval(ticking);
   }, [live]);
 
+  // After the details are saved the view says they are no longer needed, which is what turns the sheet over to the card.
+  const detailsSaved = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
   const cardPlaced = useCallback(() => {
     setCardOpen(false);
     void refetch();
@@ -236,7 +241,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
             {me.cardNeeded && me.approvedMinor !== null ? (
               <>
                 <Button type="button" className="h-12 w-full rounded-full text-base font-semibold" onClick={() => setCardOpen(true)}>
-                  Add your card · {formatMinor(me.approvedMinor, view.currency)}
+                  {me.details.needed ? "Add your details and card" : "Add your card"} · {formatMinor(me.approvedMinor, view.currency)}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">A hold for this amount, not a charge.</p>
               </>
@@ -282,6 +287,9 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
         amountText={me.approvedMinor !== null ? formatMinor(me.approvedMinor, view.currency) : ""}
         publishableKey={PUBLISHABLE_KEY}
         onPlaced={cardPlaced}
+        detailsNeeded={me.details.needed}
+        passportRequired={me.details.passportRequired}
+        onDetailsSaved={detailsSaved}
       />
     </>
   );

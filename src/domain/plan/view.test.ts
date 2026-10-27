@@ -153,3 +153,37 @@ describe("which states keep the screen checking", () => {
     expect([...LIVE_PLAN_STATUSES].sort()).toEqual(["approving", "draft", "held", "reviewing"]);
   });
 });
+
+describe("traveller details on the plan screen", () => {
+  const approved = (overrides: Partial<ViewMember> = {}) => [member("ana", "Ana", { planAgreement: "agreed", approval: "approved", approvedMinor: 30_000, ...overrides }), member("ben", "Ben")];
+  const details = (options: { given?: boolean; payments?: "stripe" | "demo" | "none"; status?: PlanStatus; members?: ViewMember[] } = {}) =>
+    buildPlanView(raw({ status: options.status ?? "approving", members: options.members ?? approved() }), "ana", {
+      payments: options.payments ?? "stripe",
+      travellers: { given: options.given ?? false },
+    }).me.details;
+
+  it("asks for details at the moment the card is asked for, and not before or after", () => {
+    expect(details().needed).toBe(true);
+    expect(details({ status: "reviewing" }).needed).toBe(false);
+    expect(details({ members: approved({ approval: "pending" }) }).needed).toBe(false);
+    expect(details({ members: approved({ holdPlaced: true }) }).needed).toBe(false);
+  });
+
+  it("stops asking once they are given", () => {
+    expect(details({ given: true }).needed).toBe(false);
+  });
+
+  it("does not ask when this server takes no details, or when no real card is involved", () => {
+    expect(buildPlanView(raw({ status: "approving", members: approved() }), "ana", { payments: "stripe" }).me.details.needed).toBe(false);
+    expect(details({ payments: "demo" }).needed).toBe(false);
+  });
+
+  it("asks for a passport only from people on a flight", () => {
+    expect(details().passportRequired).toBe(true);
+    const asked = { payments: "stripe", travellers: { given: false } } as const;
+    const hotelOnly = raw({ status: "approving", members: approved(), picks: [{ id: "h", offer: hotel(), memberIds: ["ana", "ben"], reason: "r", notes: {} }] });
+    expect(buildPlanView(hotelOnly, "ana", asked).me.details).toEqual({ needed: true, passportRequired: false });
+    const benOnly = raw({ status: "approving", members: approved(), picks: [{ id: "f", offer: flight(), memberIds: ["ben"], reason: "r", notes: {} }] });
+    expect(buildPlanView(benOnly, "ana", asked).me.details.passportRequired).toBe(false);
+  });
+});

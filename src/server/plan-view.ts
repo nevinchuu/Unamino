@@ -2,6 +2,7 @@ import type { Member } from "@/domain/group/types";
 import type { PaymentsMode } from "@/domain/payments/types";
 import { buildPlanView, LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
 import type { PlanViewStore } from "@/domain/plan/view-store";
+import type { TravellerService } from "@/domain/travellers/service";
 import { isUuid } from "./ids";
 
 export interface PlanViewDeps {
@@ -12,6 +13,8 @@ export interface PlanViewDeps {
   readonly payments: PaymentsMode;
   /** True when booking is only pretended. */
   readonly demoBooking?: boolean;
+  /** Null when this server does not take traveller details. */
+  readonly travellers?: Pick<TravellerService, "haveDetails"> | null;
   /** Asks for the offers to be checked again once the response is on its way. Never waited for. */
   readonly scheduleRefresh: (planId: string) => void;
 }
@@ -33,7 +36,14 @@ export async function loadPlanViewFor(deps: PlanViewDeps, planId: string): Promi
 
   // Prices are checked after the answer is sent, so nobody waits for the airline and hotel searches.
   if (LIVE_PLAN_STATUSES.includes(raw.value.status)) deps.scheduleRefresh(planId);
-  return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking }) };
+  return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking, travellers: await travellerStatus(deps, member.id) }) };
+}
+
+/** Whether the viewer has given their details. Undefined when details are not taken here, or the store cannot be reached (the screen then does not ask). */
+async function travellerStatus(deps: PlanViewDeps, memberId: string): Promise<{ readonly given: boolean } | undefined> {
+  if (!deps.travellers) return undefined;
+  const have = await deps.travellers.haveDetails([memberId]);
+  return have.ok ? { given: have.value.has(memberId) } : undefined;
 }
 
 const json = (body: unknown, status: number): Response => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });

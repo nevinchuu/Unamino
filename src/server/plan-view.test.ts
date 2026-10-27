@@ -96,3 +96,22 @@ describe("handlePlanView", () => {
     expect(body).not.toMatch(/token|hash|inputsHash|password/i);
   });
 });
+
+describe("traveller details in the loaded view", () => {
+  const MEMBER = { id: "ana", name: "Ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 100, holdPlaced: false } as const;
+  const approving = async (travellers: PlanViewDeps["travellers"]) => {
+    const { deps } = setup({ status: "approving", load: async () => ok({ ...raw("approving"), members: [MEMBER] }) });
+    const loaded = await loadPlanViewFor({ ...deps, payments: "stripe", travellers }, PLAN_ID);
+    return loaded.ok ? loaded.view.me.details : null;
+  };
+
+  it("asks the person for their details until they are given", async () => {
+    expect(await approving({ haveDetails: async () => ok(new Set<string>()) })).toEqual({ needed: true, passportRequired: true });
+    expect(await approving({ haveDetails: async () => ok(new Set(["ana"])) })).toMatchObject({ needed: false });
+  });
+
+  it("does not ask when details are not taken here, or when the store cannot be reached", async () => {
+    expect(await approving(null)).toMatchObject({ needed: false });
+    expect(await approving({ haveDetails: async () => err({ kind: "unavailable" as const }) })).toMatchObject({ needed: false });
+  });
+});

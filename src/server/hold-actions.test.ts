@@ -100,3 +100,29 @@ describe("describeHoldFailure", () => {
     }
   });
 });
+
+describe("runCardForm and traveller details", () => {
+  const withDetails = (have: boolean | "down") => {
+    const { deps, calls } = setup();
+    const travellers: HoldActionDeps["travellers"] = { haveDetails: async () => (have === "down" ? err({ kind: "unavailable" as const }) : ok(new Set(have ? ["ana"] : []))) };
+    return { deps: { ...deps, travellers }, calls };
+  };
+
+  it("opens no hold for someone who has not given their details", async () => {
+    const { deps, calls } = withDetails(false);
+    expect(await runCardForm(deps, ana, PLAN_ID)).toEqual({ ok: false, error: "Add your traveller details first. The booking needs them." });
+    expect(calls).toEqual([]);
+  });
+
+  it("opens the hold once the details are in", async () => {
+    const { deps, calls } = withDetails(true);
+    expect(await runCardForm(deps, ana, PLAN_ID)).toMatchObject({ ok: true });
+    expect(calls).toEqual([["ensureHold", PLAN_ID, "ana"]]);
+  });
+
+  it("opens no hold when it cannot tell whether details were given", async () => {
+    const { deps, calls } = withDetails("down");
+    expect(await runCardForm(deps, ana, PLAN_ID)).toMatchObject({ ok: false });
+    expect(calls).toEqual([]);
+  });
+});

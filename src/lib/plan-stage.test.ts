@@ -9,7 +9,7 @@ function view(status: PlanStatus, people: PersonDto[], overrides: Partial<PlanVi
   const mine = people.find((p) => p.isMe);
   return {
     id: "p", groupId: "g", title: "t", summary: null, status, city: null, dates: null, headcount: people.length, deadlineAt: "2026-10-27T01:09:00.000Z", replacedBy: null, payments: "none", demoBooking: false, currency: "USD", pricesAvailable: true, items: [], ideas: [], people,
-    me: { id: "ana", inPlan, agreement: mine?.agreement ?? null, approval: mine?.approval ?? null, shareMinor: 30_000, approvedMinor: null, cardNeeded: false, actions: { agree: false, decline: false, approve: false, declineAmount: false } },
+    me: { id: "ana", inPlan, agreement: mine?.agreement ?? null, approval: mine?.approval ?? null, shareMinor: 30_000, approvedMinor: null, cardNeeded: false, details: { needed: false, passportRequired: false }, actions: { agree: false, decline: false, approve: false, declineAmount: false } },
     ...overrides,
   };
 }
