@@ -51,6 +51,10 @@ export type PlanEvent =
       readonly memberId: string;
       readonly currentMinor: number;
     }
+  /** Claimed by whoever runs the bookings before they start. From here the plan can no longer be replaced or expired. */
+  | { readonly type: "booking_started"; readonly at: Date }
+  /** The group changed (for example a friend joined), so a new plan replaces this one and everyone approves again. */
+  | { readonly type: "plan_replaced"; readonly at: Date }
   | { readonly type: "booking_succeeded"; readonly at: Date }
   | { readonly type: "booking_failed"; readonly at: Date }
   | { readonly type: "capture_succeeded"; readonly at: Date }
@@ -92,7 +96,8 @@ export type TransitionErrorCode =
   | "no_members"
   | "deadline_not_reached"
   | "deadline_reached"
-  | "invalid_deadline";
+  | "invalid_deadline"
+  | "booking_in_progress";
 
 export interface TransitionError {
   readonly code: TransitionErrorCode;

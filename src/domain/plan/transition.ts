@@ -224,8 +224,26 @@ const handlers: HandlerMap = {
     ]);
   },
 
-  booking_succeeded: (plan, event) => {
+  booking_started: (plan, event) => {
     const wrongStatus = requireStatus(plan, ["held"], event.type);
+    if (wrongStatus) return wrongStatus;
+    if (event.at >= plan.deadlineAt) {
+      return fail("deadline_reached", "The plan deadline has passed, so booking can no longer start");
+    }
+    return succeed({ ...plan, status: "booking" });
+  },
+
+  plan_replaced: (plan) => {
+    if (plan.status === "booking" || plan.status === "booked") {
+      return fail("booking_in_progress", "Booking has already started, so the plan can no longer be replaced");
+    }
+    const wrongStatus = requireStatus(plan, EXPIRABLE_PLAN_STATUSES, "plan_replaced");
+    if (wrongStatus) return wrongStatus;
+    return expire(plan);
+  },
+
+  booking_succeeded: (plan, event) => {
+    const wrongStatus = requireStatus(plan, ["booking"], event.type);
     if (wrongStatus) return wrongStatus;
     if (event.at >= plan.deadlineAt) {
       return fail("deadline_reached", "The plan deadline has passed, so the holds can no longer be charged");
@@ -238,7 +256,7 @@ const handlers: HandlerMap = {
   },
 
   booking_failed: (plan, event) => {
-    const wrongStatus = requireStatus(plan, ["held"], event.type);
+    const wrongStatus = requireStatus(plan, ["booking"], event.type);
     if (wrongStatus) return wrongStatus;
     return expire(plan);
   },

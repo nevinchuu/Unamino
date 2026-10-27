@@ -49,6 +49,9 @@ function approveAndHold(plan: PlanSnapshot, memberId: string, amountMinor: numbe
 const heldPlan = (anaMinor = 20000, benMinor = 15000): PlanSnapshot =>
   approveAndHold(approveAndHold(planOf(), "ana", anaMinor), "ben", benMinor);
 
+/** Moves a held plan to booking, the way the booking runner claims it before calling the airline and hotel. */
+const startBooking = (plan: PlanSnapshot): PlanSnapshot => run(plan, { type: "booking_started", at: minutes(2) }).plan;
+
 const byId = (plan: PlanSnapshot, id: string): MemberSnapshot => {
   const found = plan.members.find((candidate) => candidate.id === id);
   if (!found) throw new Error(`no member ${id}`);
@@ -248,7 +251,7 @@ describe("the cap: charged is never more than approved", () => {
     expect(rechecked.effects).toEqual([]);
     expect(byId(rechecked.plan, "ana")).toMatchObject({ approvedMinor: 20000, currentShareMinor: 19500, approval: "approved" });
 
-    const booked = run(rechecked.plan, { type: "booking_succeeded", at: minutes(3) });
+    const booked = run(startBooking(rechecked.plan), { type: "booking_succeeded", at: minutes(3) });
     expect(booked.plan.status).toBe("booked");
     expect(booked.effects).toEqual([
       {
@@ -267,7 +270,7 @@ describe("the cap: charged is never more than approved", () => {
   });
 
   it("charges the full cap when the price did not change", () => {
-    const booked = run(heldPlan(), { type: "booking_succeeded", at: minutes(3) });
+    const booked = run(startBooking(heldPlan()), { type: "booking_succeeded", at: minutes(3) });
     expect(booked.effects[0]).toMatchObject({
       captures: [{ captureMinor: 20000, releaseMinor: 0 }, { captureMinor: 15000, releaseMinor: 0 }],
     });
@@ -327,26 +330,102 @@ describe("the cap: charged is never more than approved", () => {
 describe("booking", () => {
   it("only books a held plan", () => {
     expect(errorCode(planOf(), { type: "booking_succeeded", at: minutes(1) })).toBe("invalid_status");
+    // Held is not enough: booking has to be claimed first.
+    expect(errorCode(heldPlan(), { type: "booking_succeeded", at: minutes(3) })).toBe("invalid_status");
   });
 
   it("refuses to charge after the deadline", () => {
-    expect(errorCode(heldPlan(), { type: "booking_succeeded", at: DEADLINE })).toBe("deadline_reached");
+    expect(errorCode(startBooking(heldPlan()), { type: "booking_succeeded", at: DEADLINE })).toBe("deadline_reached");
   });
 
   it("refuses to charge if a share is above its cap", () => {
-    const held = heldPlan();
+    const held = startBooking(heldPlan());
     const broken: PlanSnapshot = { ...held, members: held.members.map((m) => (m.id === "ana" ? { ...m, currentShareMinor: 20001 } : m)) };
     expect(errorCode(broken, { type: "booking_succeeded", at: minutes(3) })).toBe("invalid_member_state");
   });
 
   it("expires the plan and releases every hold when booking fails", () => {
-    const { plan, effects } = run(heldPlan(), { type: "booking_failed", at: minutes(3) });
+    const { plan, effects } = run(startBooking(heldPlan()), { type: "booking_failed", at: minutes(3) });
     expect(plan.status).toBe("expired");
     expect(effects).toEqual([{ type: "release_holds", memberIds: ["ana", "ben"] }]);
   });
 
+  it("only fails a plan that is booking", () => {
+    expect(errorCode(heldPlan(), { type: "booking_failed", at: minutes(3) })).toBe("invalid_status");
+  });
+
   it("only captures a booked plan", () => {
     expect(errorCode(heldPlan(), { type: "capture_succeeded", at: minutes(3) })).toBe("invalid_status");
+  });
+});
+
+describe("starting to book", () => {
+  it("moves a held plan to booking without charging anyone", () => {
+    const { plan, effects } = run(heldPlan(), { type: "booking_started", at: minutes(2) });
+    expect(plan.status).toBe("booking");
+    expect(effects).toEqual([]);
+    expect(plan.members.every((m) => m.holdPlaced)).toBe(true);
+  });
+
+  it("only starts once everyone is held", () => {
+    expect(errorCode(planOf(), { type: "booking_started", at: minutes(1) })).toBe("invalid_status");
+    expect(errorCode(reviewingPlan(), { type: "booking_started", at: minutes(1) })).toBe("invalid_status");
+    expect(errorCode(startBooking(heldPlan()), { type: "booking_started", at: minutes(2) })).toBe("invalid_status");
+  });
+
+  it("refuses to start at or after the deadline", () => {
+    expect(errorCode(heldPlan(), { type: "booking_started", at: DEADLINE })).toBe("deadline_reached");
+    expect(errorCode(heldPlan(), { type: "booking_started", at: minutes(8) })).toBeNull();
+  });
+
+  it("cannot be ended by the deadline, a lost listing, a decline or a price check once it has started", () => {
+    const booking = startBooking(heldPlan());
+    expect(errorCode(booking, { type: "deadline_passed", at: HARD })).toBe("invalid_status");
+    expect(errorCode(booking, { type: "offers_unavailable", at: minutes(3) })).toBe("invalid_status");
+    expect(errorCode(booking, { type: "member_declined", at: minutes(3), memberId: "ana" })).toBe("invalid_status");
+    expect(errorCode(booking, { type: "price_rechecked", at: minutes(3), memberId: "ana", currentMinor: 1000 })).toBe("invalid_status");
+    expect(errorCode(booking, { type: "picks_changed", at: minutes(3) })).toBe("invalid_status");
+  });
+
+  it("is not part of the refresh and overdue checks", () => {
+    const booking = startBooking(heldPlan());
+    expect(needsOfferRefresh(booking, DEADLINE)).toBe(false);
+    expect(isPlanOverdue(booking, HARD)).toBe(false);
+  });
+});
+
+describe("replacing the plan", () => {
+  it("expires a plan in review with nothing to release", () => {
+    const { plan, effects } = run(agree(reviewingPlan(), "ana"), { type: "plan_replaced", at: minutes(2) });
+    expect(plan.status).toBe("expired");
+    expect(effects).toEqual([]);
+  });
+
+  it("releases only the holds that exist while approving", () => {
+    const { plan, effects } = run(approveAndHold(planOf(), "ana", 20000), { type: "plan_replaced", at: minutes(2) });
+    expect(plan.status).toBe("expired");
+    expect(effects).toEqual([{ type: "release_holds", memberIds: ["ana"] }]);
+  });
+
+  it("is allowed while held, before booking starts, and releases every hold", () => {
+    const { plan, effects } = run(heldPlan(), { type: "plan_replaced", at: minutes(2) });
+    expect(plan.status).toBe("expired");
+    expect(effects).toEqual([{ type: "release_holds", memberIds: ["ana", "ben"] }]);
+  });
+
+  it("is refused once booking has started, because bookings may already exist", () => {
+    expect(errorCode(startBooking(heldPlan()), { type: "plan_replaced", at: minutes(3) })).toBe("booking_in_progress");
+    expect(errorCode(planOf({ status: "booked" }), { type: "plan_replaced", at: minutes(3) })).toBe("booking_in_progress");
+  });
+
+  it("is refused once the plan has ended", () => {
+    for (const status of ["captured", "expired"] as const) {
+      expect(errorCode(planOf({ status }), { type: "plan_replaced", at: minutes(3) })).toBe("plan_closed");
+    }
+  });
+
+  it("works on a draft", () => {
+    expect(run(planOf({ status: "draft" }), { type: "plan_replaced", at: T0 }).plan.status).toBe("expired");
   });
 });
 
