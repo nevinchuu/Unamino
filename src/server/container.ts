@@ -14,6 +14,7 @@ import { SimulatedBookingRunner } from "@/domain/plan/simulated-booking";
 import { SimulatedHoldRunner } from "@/domain/plan/simulated-holds";
 import type { PlanStatusReader } from "@/domain/plan/status-reader";
 import type { PlanViewStore } from "@/domain/plan/view-store";
+import { TravellerService } from "@/domain/travellers/service";
 import { connectDatabase } from "@/infrastructure/db/client";
 import { PostgresBriefRepository } from "@/infrastructure/db/postgres-brief-repository";
 import { PostgresConstraintRepository } from "@/infrastructure/db/postgres-constraint-repository";
@@ -29,6 +30,8 @@ import { PostgresPlanStore } from "@/infrastructure/db/postgres-plan-store";
 import { PostgresPlanViewStore } from "@/infrastructure/db/postgres-plan-view-store";
 import { PostgresRunRepository } from "@/infrastructure/db/postgres-run-repository";
 import { PostgresSearchStore } from "@/infrastructure/db/postgres-search-store";
+import { PostgresTravellerStore } from "@/infrastructure/db/postgres-traveller-store";
+import { AesGcmCipher } from "@/infrastructure/crypto/aes-gcm-cipher";
 import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup";
 import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
 import { MuseHttp } from "@/infrastructure/muse/muse-http";
@@ -67,6 +70,8 @@ export interface Container {
     readonly retrier: EffectRetrier | null;
     readonly webhook: { readonly secret: string | null; readonly verify: (body: string, signature: string, secret: string) => StripeEventLike } | null;
   };
+  /** Null when there is no encryption key, in which case details cannot be taken. */
+  readonly travellers: TravellerService | null;
   readonly offers: OfferSource;
   readonly cronSecret: string | null;
 }
@@ -107,6 +112,14 @@ function build(): Container {
   };
 
   const views = new PostgresPlanViewStore(db);
+
+  // A key that is present but wrong stops the server: running without it would quietly refuse every traveller.
+  let travellers: TravellerService | null = null;
+  if (env.value.travellerEncryptionKey) {
+    const cipher = AesGcmCipher.fromBase64Key(env.value.travellerEncryptionKey);
+    if (!cipher.ok) throw new Error(`TRAVELLER_ENCRYPTION_KEY is not valid: ${cipher.error}`);
+    travellers = new TravellerService({ store: new PostgresTravellerStore(db), cipher: cipher.value, clock: agent.clock });
+  }
 
   const mode = resolvePaymentsMode({ simulateHolds: simulation.value, stripeSecretKey: env.value.stripeSecretKey });
 
@@ -158,6 +171,7 @@ function build(): Container {
     planStatus: new PostgresPlanStatusReader(db),
     views,
     payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, webhook },
+    travellers,
     offers,
     cronSecret: env.value.cronSecret,
   };

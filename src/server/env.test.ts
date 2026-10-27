@@ -14,6 +14,11 @@ describe("readServerEnv", () => {
     expect(env).toMatchObject({ ok: true, value: { placesApiKey: "places", cronSecret: "secret" } });
   });
 
+  it("reads the traveller encryption key, trimmed, and leaves it empty when absent", () => {
+    expect(readServerEnv(FULL)).toMatchObject({ ok: true, value: { travellerEncryptionKey: null } });
+    expect(readServerEnv({ ...FULL, TRAVELLER_ENCRYPTION_KEY: " abc= " })).toMatchObject({ ok: true, value: { travellerEncryptionKey: "abc=" } });
+  });
+
   it("treats blank values as missing", () => {
     expect(readServerEnv({ ...FULL, GOOGLE_PLACES_API_KEY: "   " })).toMatchObject({ ok: true, value: { placesApiKey: null } });
   });
