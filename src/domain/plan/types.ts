@@ -1,8 +1,12 @@
-import type { ApprovalStatus, PlanStatus } from "./statuses";
+import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 
 /** All amounts are minor units of the member's own currency. */
 export interface MemberSnapshot {
   readonly id: string;
+  /** Step 1: agreement to the plan itself. */
+  readonly planAgreement: PlanAgreementStatus;
+  /** The price the member saw when they agreed. A later rise is measured against this. Null until they agree. */
+  readonly agreedShareMinor: number | null;
   readonly approval: ApprovalStatus;
   /** The cap: the most this member agreed to pay, and the amount held on their card. */
   readonly approvedMinor: number | null;
@@ -24,7 +28,13 @@ export interface PlanSnapshot {
 }
 
 export type PlanEvent =
-  | { readonly type: "approval_started"; readonly at: Date }
+  /** The plan is ready for everyone to look at. No card is involved yet. */
+  | { readonly type: "review_started"; readonly at: Date }
+  /** `shareMinor` is the price the member saw, in their own currency. It is not locked. */
+  | { readonly type: "plan_agreed"; readonly at: Date; readonly memberId: string; readonly shareMinor: number }
+  | { readonly type: "plan_declined"; readonly at: Date; readonly memberId: string }
+  /** The flights, hotels or activities changed. Everyone looks again, and anything they approved is undone. */
+  | { readonly type: "picks_changed"; readonly at: Date }
   | {
       readonly type: "member_approved";
       readonly at: Date;
@@ -62,6 +72,10 @@ export interface HoldCapture {
 
 /** Side effects the caller must run after a successful transition. */
 export type PlanEffect =
+  /** Ask these members to look at the plan (again). */
+  | { readonly type: "request_review"; readonly memberIds: readonly string[] }
+  /** Step 1 is done: ask these members to approve their amount. The page shows today's amount, not this effect. */
+  | { readonly type: "request_approval"; readonly memberIds: readonly string[] }
   | { readonly type: "place_hold"; readonly memberId: string; readonly amountMinor: number }
   | { readonly type: "release_holds"; readonly memberIds: readonly string[] }
   | { readonly type: "request_reapproval"; readonly memberId: string; readonly newAmountMinor: number }

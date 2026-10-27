@@ -1,4 +1,5 @@
 import { isPositiveInteger } from "@/domain/money/currency";
+import { isMaterialRise } from "./material-rise";
 import { EXPIRABLE_PLAN_STATUSES, isTerminalPlanStatus, type PlanStatus } from "./statuses";
 import type {
   HoldCapture,
@@ -49,6 +50,25 @@ const everyMemberHasHold = (plan: PlanSnapshot): boolean =>
 const releaseHolds = (memberIds: readonly string[]): readonly PlanEffect[] =>
   memberIds.length > 0 ? [{ type: "release_holds", memberIds }] : [];
 
+const memberIdsOf = (plan: PlanSnapshot): readonly string[] => plan.members.map((member) => member.id);
+
+/** Back to step 1 for everyone: agreements and approvals are cleared, because they were given for a different plan. */
+const reopenReview = (plan: PlanSnapshot): PlanSnapshot => ({
+  ...plan,
+  status: "reviewing",
+  members: plan.members.map((member) => ({
+    ...member,
+    planAgreement: "pending",
+    agreedShareMinor: null,
+    approval: "pending",
+    approvedMinor: null,
+    currentShareMinor: null,
+    chargedMinor: null,
+    approvalExpiresAt: null,
+    holdPlaced: false,
+  })),
+});
+
 /** Ends the plan and gives every placed hold back. Nobody is charged. */
 const expire = (plan: PlanSnapshot): TransitionResult =>
   succeed(
@@ -70,12 +90,56 @@ function planCaptures(plan: PlanSnapshot): HoldCapture[] | null {
   return captures;
 }
 
+/**
+ * During review there is no cap, so a rise is judged against the price the member agreed to see.
+ * Small rises are shown to the member as a note; a rise past the threshold sends everyone back to look again.
+ */
+function recheckDuringReview(plan: PlanSnapshot, member: MemberSnapshot, currentMinor: number): TransitionResult {
+  if (member.agreedShareMinor === null || !isMaterialRise(member.agreedShareMinor, currentMinor)) return succeed(plan);
+  return succeed(reopenReview(plan), [{ type: "request_review", memberIds: memberIdsOf(plan) }]);
+}
+
 const handlers: HandlerMap = {
-  approval_started: (plan, event) => {
+  review_started: (plan, event) => {
     const wrongStatus = requireStatus(plan, ["draft"], event.type);
     if (wrongStatus) return wrongStatus;
     if (plan.members.length === 0) return fail("no_members", "A plan needs at least one member");
-    return succeed({ ...plan, status: "approving" });
+    return succeed({ ...plan, status: "reviewing" }, [{ type: "request_review", memberIds: memberIdsOf(plan) }]);
+  },
+
+  plan_agreed: (plan, event) => {
+    const wrongStatus = requireStatus(plan, ["reviewing"], event.type);
+    if (wrongStatus) return wrongStatus;
+    const member = findMember(plan, event.memberId);
+    if (!member) return fail("unknown_member", `No member ${event.memberId}`);
+    if (member.planAgreement !== "pending") {
+      return fail("invalid_member_state", `Member has already ${member.planAgreement} the plan`);
+    }
+    if (!isPositiveInteger(event.shareMinor)) {
+      return fail("invalid_amount", "The price the member saw must be a positive integer in minor units");
+    }
+    const agreed = replaceMember(plan, { ...member, planAgreement: "agreed", agreedShareMinor: event.shareMinor });
+    if (!agreed.members.every((candidate) => candidate.planAgreement === "agreed")) return succeed(agreed);
+    // The last agreement opens step 2: each member now approves their amount.
+    return succeed({ ...agreed, status: "approving" }, [{ type: "request_approval", memberIds: memberIdsOf(agreed) }]);
+  },
+
+  plan_declined: (plan, event) => {
+    const wrongStatus = requireStatus(plan, ["reviewing"], event.type);
+    if (wrongStatus) return wrongStatus;
+    if (!findMember(plan, event.memberId)) return fail("unknown_member", `No member ${event.memberId}`);
+    // Nothing is held during review, so ending the plan releases nothing.
+    return expire(plan);
+  },
+
+  picks_changed: (plan, event) => {
+    // Once every hold is placed, booking has started and the picks can no longer move.
+    const wrongStatus = requireStatus(plan, ["reviewing", "approving"], event.type);
+    if (wrongStatus) return wrongStatus;
+    return succeed(reopenReview(plan), [
+      ...releaseHolds(plan.members.filter((member) => member.holdPlaced).map((member) => member.id)),
+      { type: "request_review", memberIds: memberIdsOf(plan) },
+    ]);
   },
 
   member_approved: (plan, event) => {
@@ -127,15 +191,16 @@ const handlers: HandlerMap = {
   },
 
   price_rechecked: (plan, event) => {
-    const wrongStatus = requireStatus(plan, ["approving", "held"], event.type);
+    const wrongStatus = requireStatus(plan, ["reviewing", "approving", "held"], event.type);
     if (wrongStatus) return wrongStatus;
     const member = findMember(plan, event.memberId);
     if (!member) return fail("unknown_member", `No member ${event.memberId}`);
-    if (member.approval !== "approved" || member.approvedMinor === null) {
-      return fail("invalid_member_state", "Member has no approved amount to compare against");
-    }
     if (!isPositiveInteger(event.currentMinor)) {
       return fail("invalid_amount", "Current price must be a positive integer in minor units");
+    }
+    if (plan.status === "reviewing") return recheckDuringReview(plan, member, event.currentMinor);
+    if (member.approval !== "approved" || member.approvedMinor === null) {
+      return fail("invalid_member_state", "Member has no approved amount to compare against");
     }
 
     if (event.currentMinor <= member.approvedMinor) {

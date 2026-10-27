@@ -10,6 +10,8 @@ const minutes = (n: number): Date => new Date(T0.getTime() + n * 60_000);
 
 const member = (id: string, overrides: Partial<MemberSnapshot> = {}): MemberSnapshot => ({
   id,
+  planAgreement: "agreed",
+  agreedShareMinor: 20000,
   approval: "pending",
   approvedMinor: null,
   currentShareMinor: null,
@@ -53,14 +55,129 @@ const byId = (plan: PlanSnapshot, id: string): MemberSnapshot => {
   return found;
 };
 
-describe("starting approval", () => {
-  it("moves a draft to approving", () => {
-    expect(run(planOf({ status: "draft" }), { type: "approval_started", at: T0 }).plan.status).toBe("approving");
+/** A plan in step 1: nobody has agreed yet. */
+const reviewingPlan = (overrides: Partial<PlanSnapshot> = {}): PlanSnapshot =>
+  planOf({
+    status: "reviewing",
+    members: [member("ana", { planAgreement: "pending", agreedShareMinor: null }), member("ben", { planAgreement: "pending", agreedShareMinor: null })],
+    ...overrides,
+  });
+
+const agree = (plan: PlanSnapshot, memberId: string, shareMinor = 20000): PlanSnapshot =>
+  run(plan, { type: "plan_agreed", at: minutes(1), memberId, shareMinor }).plan;
+
+describe("starting the review", () => {
+  it("moves a draft to reviewing and asks everyone to look", () => {
+    const { plan, effects } = run(planOf({ status: "draft" }), { type: "review_started", at: T0 });
+    expect(plan.status).toBe("reviewing");
+    expect(effects).toEqual([{ type: "request_review", memberIds: ["ana", "ben"] }]);
   });
 
   it("needs members and a draft", () => {
-    expect(errorCode(planOf({ status: "draft", members: [] }), { type: "approval_started", at: T0 })).toBe("no_members");
-    expect(errorCode(planOf(), { type: "approval_started", at: T0 })).toBe("invalid_status");
+    expect(errorCode(planOf({ status: "draft", members: [] }), { type: "review_started", at: T0 })).toBe("no_members");
+    expect(errorCode(planOf(), { type: "review_started", at: T0 })).toBe("invalid_status");
+  });
+});
+
+describe("step 1: agreeing to the plan", () => {
+  it("records what the member saw and stays in review until everyone agrees", () => {
+    const plan = agree(reviewingPlan(), "ana", 19500);
+    expect(plan.status).toBe("reviewing");
+    expect(byId(plan, "ana")).toMatchObject({ planAgreement: "agreed", agreedShareMinor: 19500 });
+    expect(byId(plan, "ben").planAgreement).toBe("pending");
+  });
+
+  it("opens step 2 when the last member agrees, without asking for a card", () => {
+    const { plan, effects } = run(agree(reviewingPlan(), "ana"), { type: "plan_agreed", at: minutes(2), memberId: "ben", shareMinor: 15000 });
+    expect(plan.status).toBe("approving");
+    expect(effects).toEqual([{ type: "request_approval", memberIds: ["ana", "ben"] }]);
+    expect(plan.members.every((m) => m.approval === "pending" && !m.holdPlaced)).toBe(true);
+  });
+
+  it("rejects bad input", () => {
+    const base = reviewingPlan();
+    expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ghost", shareMinor: 100 })).toBe("unknown_member");
+    expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 0 })).toBe("invalid_amount");
+    expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 10.5 })).toBe("invalid_amount");
+    expect(errorCode(planOf(), { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 100 })).toBe("invalid_status");
+  });
+
+  it("does not let a member agree twice", () => {
+    expect(errorCode(agree(reviewingPlan(), "ana"), { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 100 })).toBe("invalid_member_state");
+  });
+
+  it("does not take approvals before step 1 is done", () => {
+    expect(errorCode(reviewingPlan(), { type: "member_approved", at: minutes(1), memberId: "ana", amountMinor: 20000, expiresAt: DEADLINE })).toBe("invalid_status");
+  });
+
+  it("expires the plan with nothing to release when a member declines it", () => {
+    const { plan, effects } = run(agree(reviewingPlan(), "ana"), { type: "plan_declined", at: minutes(2), memberId: "ben" });
+    expect(plan.status).toBe("expired");
+    expect(effects).toEqual([]);
+  });
+
+  it("only lets a member decline the plan during review", () => {
+    expect(errorCode(planOf(), { type: "plan_declined", at: T0, memberId: "ana" })).toBe("invalid_status");
+    expect(errorCode(reviewingPlan(), { type: "plan_declined", at: T0, memberId: "ghost" })).toBe("unknown_member");
+  });
+});
+
+describe("changing the picks", () => {
+  it("sends everyone back to review and clears their agreements", () => {
+    const { plan, effects } = run(agree(reviewingPlan(), "ana"), { type: "picks_changed", at: minutes(2) });
+    expect(plan.status).toBe("reviewing");
+    expect(plan.members.every((m) => m.planAgreement === "pending" && m.agreedShareMinor === null)).toBe(true);
+    expect(effects).toEqual([{ type: "request_review", memberIds: ["ana", "ben"] }]);
+  });
+
+  it("also undoes approvals and releases the holds that exist", () => {
+    const partial = approveAndHold(planOf(), "ana", 20000);
+    const { plan, effects } = run(partial, { type: "picks_changed", at: minutes(2) });
+    expect(plan.status).toBe("reviewing");
+    expect(byId(plan, "ana")).toMatchObject({ approval: "pending", approvedMinor: null, holdPlaced: false, approvalExpiresAt: null });
+    expect(effects).toEqual([
+      { type: "release_holds", memberIds: ["ana"] },
+      { type: "request_review", memberIds: ["ana", "ben"] },
+    ]);
+  });
+
+  it("is refused once every hold is placed and booking has started", () => {
+    expect(errorCode(heldPlan(), { type: "picks_changed", at: minutes(2) })).toBe("invalid_status");
+    expect(errorCode(planOf({ status: "booked" }), { type: "picks_changed", at: minutes(2) })).toBe("invalid_status");
+  });
+});
+
+describe("a price rise during review", () => {
+  /** Ana has agreed having seen `shareMinor`; Ben has not agreed yet. */
+  const anaAgreedAt = (shareMinor: number): PlanSnapshot =>
+    reviewingPlan({ members: [member("ana", { agreedShareMinor: shareMinor }), member("ben", { planAgreement: "pending", agreedShareMinor: null })] });
+  const recheck = (plan: PlanSnapshot, currentMinor: number) => run(plan, { type: "price_rechecked", at: minutes(2), memberId: "ana", currentMinor });
+
+  it("leaves the plan alone when the price is the same, lower, or up by no more than 5%", () => {
+    const plan = anaAgreedAt(20000);
+    for (const current of [19000, 20000, 21000]) {
+      const result = recheck(plan, current);
+      expect(result.plan).toBe(plan);
+      expect(result.effects).toEqual([]);
+    }
+  });
+
+  it("sends everyone back to review for a rise above 5%", () => {
+    const { plan, effects } = recheck(anaAgreedAt(20000), 21001);
+    expect(plan.status).toBe("reviewing");
+    expect(plan.members.every((m) => m.planAgreement === "pending" && m.agreedShareMinor === null)).toBe(true);
+    expect(effects).toEqual([{ type: "request_review", memberIds: ["ana", "ben"] }]);
+  });
+
+  it("measures against what the member saw, so small rises cannot add up", () => {
+    const plan = anaAgreedAt(20000);
+    expect(recheck(plan, 20800).plan).toBe(plan);
+    expect(recheck(plan, 21400).plan.members.every((m) => m.planAgreement === "pending")).toBe(true);
+  });
+
+  it("has nothing to compare for a member who has not agreed yet", () => {
+    const plan = reviewingPlan();
+    expect(run(plan, { type: "price_rechecked", at: minutes(2), memberId: "ana", currentMinor: 99999 }).plan).toBe(plan);
   });
 });
 
@@ -235,7 +352,7 @@ describe("booking", () => {
 
 describe("terminal plans", () => {
   it.each(["captured", "expired"] as const)("accepts no events once %s", (status) => {
-    expect(errorCode(planOf({ status }), { type: "approval_started", at: T0 })).toBe("plan_closed");
+    expect(errorCode(planOf({ status }), { type: "review_started", at: T0 })).toBe("plan_closed");
     expect(errorCode(planOf({ status }), { type: "deadline_passed", at: HARD })).toBe("plan_closed");
   });
 });
@@ -283,6 +400,26 @@ describe("deadlines", () => {
 
   it("does not end a booked plan when a listing is lost", () => {
     expect(errorCode(planOf({ status: "booked" }), { type: "offers_unavailable", at: T0 })).toBe("invalid_status");
+  });
+});
+
+describe("deadlines during review", () => {
+  it("expires a plan in review at the deadline with nothing to release", () => {
+    const { plan, effects } = run(reviewingPlan(), { type: "deadline_passed", at: DEADLINE });
+    expect(plan.status).toBe("expired");
+    expect(effects).toEqual([]);
+  });
+
+  it("extends the deadline and keeps agreements", () => {
+    const { plan } = run(agree(reviewingPlan(), "ana"), { type: "deadline_extended", at: DEADLINE, newDeadlineAt: minutes(18) });
+    expect(plan.deadlineAt).toEqual(minutes(18));
+    expect(byId(plan, "ana").planAgreement).toBe("agreed");
+  });
+
+  it("ends the plan when a listing is lost, and still checks for refresh and overdue", () => {
+    expect(run(reviewingPlan(), { type: "offers_unavailable", at: T0 }).plan.status).toBe("expired");
+    expect(needsOfferRefresh(reviewingPlan(), DEADLINE)).toBe(true);
+    expect(isPlanOverdue(reviewingPlan(), HARD)).toBe(true);
   });
 });
 
