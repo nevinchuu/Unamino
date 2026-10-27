@@ -30,6 +30,8 @@ export const plans = pgTable(
     fx: jsonb("fx").$type<FxRateTable>().notNull(),
     /** The people in this plan. Compared with the group's current headcount to tell when it is out of date. */
     headcount: integer("headcount").notNull(),
+    /** A fingerprint of what the plan was built from (trip, people, constraints), to tell when it is out of date. */
+    inputsHash: text("inputs_hash").notNull(),
     offersCheckedAt: instant("offers_checked_at"),
     recreatedFromPlanId: uuid("recreated_from_plan_id").references((): AnyPgColumn => plans.id),
     replacedByPlanId: uuid("replaced_by_plan_id").references((): AnyPgColumn => plans.id),

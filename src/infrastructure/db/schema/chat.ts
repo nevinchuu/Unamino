@@ -3,8 +3,11 @@ import { bigint, boolean, check, index, integer, pgTable, text, uniqueIndex, uui
 import { createdAt, id, instant } from "./columns";
 import { agentRunStatus, messageKind } from "./enums";
 import { groups, members } from "./groups";
+import { plans } from "./plans";
+import { MAX_MESSAGE_LENGTH } from "@/domain/group/types";
 
-export const MAX_MESSAGE_LENGTH = 4_000;
+// One limit for the database check and the code that enforces it before a write.
+export { MAX_MESSAGE_LENGTH } from "@/domain/group/types";
 
 export const messages = pgTable(
   "messages",
@@ -20,6 +23,8 @@ export const messages = pgTable(
     replyToMessageId: uuid("reply_to_message_id").references((): AnyPgColumn => messages.id, { onDelete: "set null" }),
     /** Decided by the server from the text, never by the client. Only human messages can call the agent. */
     mentionsAgent: boolean("mentions_agent").notNull().default(false),
+    /** Set on an agent message that announces a plan, so the chat can show the plan inline. */
+    planId: uuid("plan_id").references((): AnyPgColumn => plans.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (table) => [

@@ -8,6 +8,9 @@ export const groups = pgTable("groups", {
   id: id(),
   name: text("name").notNull(),
   baseCurrency: currencyCode("base_currency").notNull(),
+  /** Only a hash of the shared join link's secret is stored. Anyone holding the link can join while it is enabled. */
+  joinTokenHash: text("join_token_hash").unique(),
+  joinEnabled: boolean("join_enabled").notNull().default(true),
   createdAt: createdAt(),
 }).enableRLS();
 
@@ -25,7 +28,10 @@ export const members = pgTable(
     currency: currencyCode("currency").notNull(),
     status: memberStatus("status").notNull().default("invited"),
     isOrganiser: boolean("is_organiser").notNull().default(false),
-    /** Only a hash of the invite token is stored, so a leaked table cannot be used to sign in. */
+    /**
+     * Hash of this member's personal token, issued when they create or join the group and kept in their browser.
+     * Only the hash is stored, so a leaked table cannot be used to sign in. (Named for the earlier per-person invite idea.)
+     */
     inviteTokenHash: text("invite_token_hash").notNull().unique(),
     joinedAt: instant("joined_at"),
     leftAt: instant("left_at"),

@@ -22,6 +22,13 @@
       "when": 1793074638033,
       "tag": "0002_smart_frog_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793075606954,
+      "tag": "0003_condemned_gorilla_man",
+      "breakpoints": true
     }
   ]
 }

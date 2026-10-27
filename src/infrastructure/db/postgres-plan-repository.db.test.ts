@@ -29,7 +29,7 @@ describe.skipIf(!ENABLED)("PostgresPlanRepository on the real database", () => {
   async function seedPlan(status: "reviewing" | "approving" | "held" = "reviewing"): Promise<string> {
     const [plan] = await handle.db
       .insert(plans)
-      .values({ groupId, briefId, status, title: "Test trip", deadlineAt: DEADLINE, hardDeadlineAt: HARD, baseCurrency: "USD", fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: NAMES.length })
+      .values({ groupId, briefId, status, title: "Test trip", deadlineAt: DEADLINE, hardDeadlineAt: HARD, baseCurrency: "USD", fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: NAMES.length, inputsHash: "test" })
       .returning({ id: plans.id });
     await handle.db.insert(planMembers).values(memberIds.map((memberId) => ({ planId: plan.id, memberId })));
     return plan.id;
