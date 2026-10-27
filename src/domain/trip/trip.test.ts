@@ -144,6 +144,8 @@ describe("turning a trip into searches", () => {
   });
 });
 
+const NO_PAUSE = { retryDelayMs: 0 };
+
 describe("running the searches", () => {
   const flightOffers = BANGKOK_OFFERS.filter((o) => o.kind === "flight");
   const hotelOffers = BANGKOK_OFFERS.filter((o) => o.kind === "hotel");
@@ -170,7 +172,7 @@ describe("running the searches", () => {
 
   it("keeps going when one search fails, so a hotel size failing does not hide the flights", async () => {
     const { source } = sourceWith(async (q) => (q.kind === "hotel" && q.guests === 3 ? err({ code: "source_unavailable", message: "busy" }) : ok(q.kind === "flight" ? flightOffers : [])));
-    const result = await searchForTrip(source, TRIP, 4);
+    const result = await searchForTrip(source, TRIP, 4, NO_PAUSE);
     expect(result.ok && result.value.failures).toHaveLength(1);
     expect(result.ok && result.value.failures[0].query).toMatchObject({ kind: "hotel", guests: 3 });
     expect(result.ok && result.value.offers.length).toBe(flightOffers.length);
@@ -178,8 +180,51 @@ describe("running the searches", () => {
 
   it("is an error only when every search fails", async () => {
     const { source } = sourceWith(async () => err({ code: "source_unavailable", message: "liteAPI is down" }));
-    const result = await searchForTrip(source, TRIP, 4);
+    const result = await searchForTrip(source, TRIP, 4, NO_PAUSE);
     expect(result.ok ? null : result.error).toEqual({ code: "source_unavailable", message: "liteAPI is down" });
+  });
+
+  it("tries a failed search once more, because a busy service often answers a moment later", async () => {
+    let flightCalls = 0;
+    const { source } = sourceWith(async (q) => {
+      if (q.kind === "flight") {
+        flightCalls += 1;
+        if (flightCalls === 1) return err({ code: "source_unavailable", message: "timed out" });
+      }
+      return ok(q.kind === "flight" ? flightOffers : hotelOffers);
+    });
+    const result = await searchForTrip(source, TRIP, 4, NO_PAUSE);
+    expect(flightCalls).toBe(2);
+    expect(result.ok && result.value.failures).toEqual([]);
+    expect(result.ok && result.value.offers.some((o) => o.kind === "flight")).toBe(true);
+  });
+
+  it("gives up after the retry, and reports the failure", async () => {
+    let flightCalls = 0;
+    const { source } = sourceWith(async (q) => {
+      if (q.kind === "flight") { flightCalls += 1; return err({ code: "source_unavailable", message: "still down" }); }
+      return ok(hotelOffers);
+    });
+    const result = await searchForTrip(source, TRIP, 4, NO_PAUSE);
+    expect(flightCalls).toBe(2);
+    expect(result.ok && result.value.failures.map((f) => f.query.kind)).toEqual(["flight"]);
+  });
+
+  it("does not retry a search that was refused rather than unanswered", async () => {
+    let calls = 0;
+    const { source } = sourceWith(async (q) => {
+      calls += 1;
+      return q.kind === "flight" ? err({ code: "invalid_query", message: "bad date" }) : ok(hotelOffers);
+    });
+    await searchForTrip(source, TRIP, 1, NO_PAUSE);
+    expect(calls).toBe(2);
+  });
+
+  it("can be told not to retry at all", async () => {
+    let calls = 0;
+    const { source } = sourceWith(async () => { calls += 1; return err({ code: "source_unavailable", message: "down" }); });
+    await searchForTrip(source, TRIP, 1, { retries: 0 });
+    expect(calls).toBe(2);
   });
 
   it("treats a search that found nothing as a result, not a failure", async () => {
