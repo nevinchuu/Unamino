@@ -84,6 +84,14 @@ export interface PlanSummary {
   readonly agreedCount: number;
 }
 
+/** A trip the group has paid for or is paying for now. Its dates are taken, so a new plan cannot overlap them. */
+export interface CommittedTrip {
+  readonly planId: string;
+  readonly title: string;
+  readonly departDate: string;
+  readonly returnDate: string;
+}
+
 export interface NewPlan {
   readonly groupId: string;
   readonly briefId: string;
@@ -114,6 +122,8 @@ export interface NewPick {
 export interface PlanStore {
   /** The group's newest plan, whatever state it is in. */
   latest(groupId: string): Promise<PlanSummary | null>;
+  /** The group's trips that are being booked or already paid for, whichever plan is newest. */
+  committedTrips(groupId: string): Promise<readonly CommittedTrip[]>;
   /** Saves a plan, its people, its picks and its suggestions together, as a draft. */
   create(plan: NewPlan): Promise<Result<string, StoreError>>;
   /** Undoes `create`, for a plan that could not take over from the old one. */

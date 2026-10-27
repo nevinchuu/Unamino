@@ -10,6 +10,7 @@ import { buildSchedule } from "@/domain/schedule/build-schedule";
 import { suggestFreeTime } from "@/domain/schedule/suggest-free-time";
 import type { VerifiedSuggestion } from "@/domain/schedule/verify-suggestion";
 import type { CompleteTrip } from "@/domain/trip/brief";
+import { findClash } from "@/domain/trip/clash";
 import { nameMembers } from "../aliasing-planner";
 import { computeInputsHash } from "../inputs-hash";
 import { MESSAGES } from "../announce";
@@ -17,8 +18,10 @@ import { members, type ToolEnv } from "./session";
 import type { PlanStatus } from "@/domain/plan/statuses";
 
 const REQUIRED_KINDS = ["flight", "hotel"] as const;
-/** Once booking has started, a plan can no longer be changed. */
-const LOCKED_STATUSES: readonly PlanStatus[] = ["booking", "booked", "captured"];
+/** While a trip is being booked, its plan can no longer be changed. */
+const LOCKED_STATUSES: readonly PlanStatus[] = ["booking", "booked"];
+/** A plan that has ended or been paid for is done: the group's next plan is a new trip, not a change to it. */
+const FINISHED_STATUSES: readonly PlanStatus[] = ["expired", "captured"];
 
 const asJson = (value: unknown): string => JSON.stringify(value);
 const problem = (message: string): string => asJson({ error: message });
@@ -72,13 +75,20 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
   const current = await deps.plans.latest(run.groupId);
   env.note("decision", { currentPlan: current ? { id: current.id, status: current.status, sameInputs: current.inputsHash === inputsHash } : null, inputsHash });
 
-  if (current && current.status !== "expired" && current.inputsHash === inputsHash) {
-    session.planId = current.id;
-    return asJson({ alreadyExists: true, status: current.status, agreed: current.agreedCount, outOf: current.headcount, note: "Nothing has changed since this plan was made, so no new plan was created." });
+  const open = current && !FINISHED_STATUSES.includes(current.status) ? current : null;
+  if (open && open.inputsHash === inputsHash) {
+    session.planId = open.id;
+    return asJson({ alreadyExists: true, status: open.status, agreed: open.agreedCount, outOf: open.headcount, note: "Nothing has changed since this plan was made, so no new plan was created." });
   }
-  if (current && LOCKED_STATUSES.includes(current.status)) return problem(current.status === "captured" ? MESSAGES.trip_booked : MESSAGES.booking_started);
+  if (open && LOCKED_STATUSES.includes(open.status)) return problem(MESSAGES.booking_started);
 
-  const replacing = current && current.status !== "expired" ? current.id : null;
+  // Looks at every paid or booking trip, not just the newest plan, so an earlier trip still holds its dates. The plan
+  // being replaced is left out: if booking has just started on it, the swap below refuses with the right reason.
+  const taken = (await deps.plans.committedTrips(run.groupId)).filter((committed) => committed.planId !== open?.id);
+  const clash = findClash(trip, taken);
+  if (clash) return problem(`These dates overlap "${clash.title}" (${clash.departDate} to ${clash.returnDate}), which is already paid for or being booked. Ask the group for dates that do not overlap it.`);
+
+  const replacing = open ? open.id : null;
   const fx = await deps.fx.forCurrencies(env.group.baseCurrency, people.map((member) => member.currency));
   if (!fx.ok) return problem(MESSAGES.no_exchange_rate);
 

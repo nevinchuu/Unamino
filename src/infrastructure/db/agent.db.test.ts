@@ -274,6 +274,31 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       expect(picks.find((p) => p.position === 0)).toMatchObject({ listingId: flight4.listingId, reason: "Only evening flight" });
     }, 60_000);
 
+    it("lists the dates of trips that are being booked or paid for, in this group only", async () => {
+      const { groupId, people } = await newGroup();
+      const other = await newGroup(["Zed"]);
+      const stored = await brief(groupId, people[0].id);
+      const otherStored = await brief(other.groupId, other.people[0].id);
+      const base = { briefId: stored.id, summary: null, deadlineAt: new Date(NOW.getTime() + 540_000), hardDeadlineAt: new Date(NOW.getTime() + 172_800_000), baseCurrency: "USD", fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: 4, inputsHash: "h", offersCheckedAt: NOW, recreatedFromPlanId: null, picks: [], suggestions: [] };
+      const make = async (title: string, status: "draft" | "booking" | "captured" | "expired") => {
+        const made = await planStore.create({ ...base, groupId, title, memberIds: people.map((p) => p.id) });
+        if (!made.ok) throw new Error(made.error.message);
+        await handle.db.update(plans).set({ status }).where(eq(plans.id, made.value));
+        return made.value;
+      };
+      const paid = await make("Paid trip", "captured");
+      const booking = await make("Booking trip", "booking");
+      await make("Still a draft", "draft");
+      await make("Ended", "expired");
+      const otherMade = await planStore.create({ ...base, briefId: otherStored.id, groupId: other.groupId, title: "Someone else's", memberIds: other.people.map((p) => p.id) });
+      if (!otherMade.ok) throw new Error(otherMade.error.message);
+      await handle.db.update(plans).set({ status: "captured" }).where(eq(plans.id, otherMade.value));
+
+      const trips = await planStore.committedTrips(groupId);
+      expect(trips.map((t) => t.planId).sort()).toEqual([paid, booking].sort());
+      expect(trips.find((t) => t.planId === paid)).toMatchObject({ title: "Paid trip", departDate: TRIP.departDate, returnDate: TRIP.returnDate });
+    }, 60_000);
+
     it("lets a plan be replaced only once, even if two replacements are saved at the same moment", async () => {
       const { groupId, people } = await newGroup();
       const stored = await brief(groupId, people[0].id);

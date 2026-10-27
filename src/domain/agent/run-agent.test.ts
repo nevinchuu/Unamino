@@ -389,14 +389,56 @@ describe("a friend joins", () => {
     expect(world.plans.statusOf("plan-1")).toBe("booking");
   });
 
-  it("tells the model the trip is booked when it is already done", async () => {
+  const searchDates = (departDate: string, returnDate: string) => calls("search_trip", { ...BANGKOK_TRIP, departDate, returnDate });
+
+  it("starts a new trip on other dates when the last one is paid for, and leaves the paid one alone", async () => {
     const world = await groupOfFourWithAPlan();
     world.plans.force("plan-1", "captured");
-    world.groups.members = [...world.groups.members, member("ravi")];
-    world.source.offers = OFFERS_FOR_FIVE;
-    world.script(search(), (request) => proposeFrom(request, FIVE), says("It is already booked."));
-    await callAgent(world, "ana", "@trippy fit Ravi in");
-    expect(toolMessages(world).at(-1)).toContain("already booked");
+    world.script(searchDates("2026-12-16", "2026-12-24"), (request) => proposeFrom(request), says("A new trip is up."));
+    await callAgent(world, "ana", "@trippy another trip please, 16 to 24 Dec");
+    expect(world.plans.records).toHaveLength(2);
+    expect(world.plans.statusOf("plan-1")).toBe("captured");
+    expect(world.plans.records[0].replacedBy).toBeNull();
+    expect(world.plans.records[1].input.recreatedFromPlanId).toBeNull();
+    expect(world.messages.agentMessages.at(-1)?.planId).toBe("plan-2");
+  });
+
+  it("refuses dates that overlap a paid trip, with no new plan", async () => {
+    const world = await groupOfFourWithAPlan();
+    world.plans.force("plan-1", "captured");
+    world.script(searchDates("2026-12-12", "2026-12-15"), (request) => proposeFrom(request), says("Those days are taken."));
+    await callAgent(world, "ana", "@trippy another trip please, 12 to 15 Dec");
+    expect(toolMessages(world).at(-1)).toContain("overlap");
+    expect(toolMessages(world).at(-1)).toContain("2026-12-11 to 2026-12-13");
+    expect(world.plans.records).toHaveLength(1);
+  });
+
+  it("refuses the same dates again once they are paid for", async () => {
+    const world = await groupOfFourWithAPlan();
+    world.plans.force("plan-1", "captured");
+    world.script(search(), (request) => proposeFrom(request), says("That trip is already paid for."));
+    await callAgent(world, "ana", "@trippy do it again");
+    expect(toolMessages(world).at(-1)).toContain("overlap");
+    expect(world.plans.records).toHaveLength(1);
+  });
+
+  it("still protects a paid trip after a newer plan exists", async () => {
+    const world = await groupOfFourWithAPlan();
+    world.plans.force("plan-1", "captured");
+    world.script(searchDates("2026-12-16", "2026-12-24"), (request) => proposeFrom(request), says("Second trip is up."));
+    await callAgent(world, "ana", "@trippy another trip please, 16 to 24 Dec");
+    world.script(searchDates("2026-12-10", "2026-12-12"), (request) => proposeFrom(request), says("Those days are taken."));
+    await callAgent(world, "ben", "@trippy actually 10 to 12 Dec");
+    expect(toolMessages(world).at(-1)).toContain("overlap");
+    expect(world.plans.records).toHaveLength(2);
+    expect(world.plans.statusOf("plan-2")).toBe("reviewing");
+  });
+
+  it("holds the dates of a trip that is being booked", async () => {
+    const world = await groupOfFourWithAPlan();
+    world.plans.force("plan-1", "booking");
+    world.script(searchDates("2026-12-12", "2026-12-14"), (request) => proposeFrom(request), says("Booking is under way."));
+    await callAgent(world, "ana", "@trippy 12 to 14 Dec instead");
     expect(world.plans.records).toHaveLength(1);
   });
 });

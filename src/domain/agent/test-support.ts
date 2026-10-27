@@ -14,7 +14,7 @@ import type { ChatModel, ModelRequest, ModelTurn } from "./loop/model";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { SearchRecord } from "@/domain/trip/search";
-import type { AgentRun, AgentRunRepository, BriefRepository, ConstraintRepository, NewPlan, PlanStore, PlanSummary, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
+import type { AgentRun, AgentRunRepository, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanStore, PlanSummary, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
 import { StaticFxRates } from "./static-fx";
 import type { AgentDeps } from "./run-agent";
 
@@ -255,6 +255,16 @@ export class FakePlans implements PlanStore, PlanRepository {
   /** Makes `latest` report a different state from the real one, to simulate booking starting in between. */
   summaryStatusOverride: PlanStatus | null = null;
 
+  constructor(private readonly briefs: FakeBriefs) {}
+
+  async committedTrips(): Promise<readonly CommittedTrip[]> {
+    return this.records.flatMap((record) => {
+      const { departDate, returnDate } = this.briefs.versions.find((brief) => brief.id === record.input.briefId)?.fields ?? {};
+      const committed = ["booking", "booked", "captured"].includes(record.snapshot.status);
+      return committed && departDate && returnDate ? [{ planId: record.id, title: record.input.title, departDate, returnDate }] : [];
+    });
+  }
+
   async latest(): Promise<PlanSummary | null> {
     const record = this.records.at(-1);
     if (!record) return null;
@@ -340,7 +350,7 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
   const briefs = new FakeBriefs();
   const constraints = new FakeConstraints();
   const searches = new FakeSearches();
-  const plans = new FakePlans();
+  const plans = new FakePlans(briefs);
   const source = new FakeOfferSource();
   const planners: RecordingPlanner[] = [];
   const models: ScriptedChatModel[] = [];

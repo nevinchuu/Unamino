@@ -1,11 +1,14 @@
-import { count, desc, and, eq } from "drizzle-orm";
+import { count, desc, and, eq, inArray } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
-import type { NewPlan, PlanStore, PlanSummary, StoreError } from "@/domain/agent/ports";
+import type { CommittedTrip, NewPlan, PlanStore, PlanSummary, StoreError } from "@/domain/agent/ports";
+import type { PlanStatus } from "@/domain/plan/statuses";
 import type { Database } from "./client";
 import { isUniqueViolation } from "./errors";
-import { planMembers, planPicks, plans, scheduleSuggestions } from "./schema";
+import { planMembers, planPicks, plans, scheduleSuggestions, tripBriefs } from "./schema";
 
 const REPLACED_ONCE = "plans_replaced_once";
+/** Trips whose dates are taken: money is being collected for them or has been. */
+const COMMITTED_STATUSES: PlanStatus[] = ["booking", "booked", "captured"];
 
 /** Creates plans for the agent. Everything a new plan needs is saved together, so it is never half there. */
 export class PostgresPlanStore implements PlanStore {
@@ -16,6 +19,15 @@ export class PostgresPlanStore implements PlanStore {
     if (!plan) return null;
     const [{ agreed }] = await this.db.select({ agreed: count() }).from(planMembers).where(and(eq(planMembers.planId, plan.id), eq(planMembers.planAgreement, "agreed")));
     return { id: plan.id, title: plan.title, status: plan.status, inputsHash: plan.inputsHash, headcount: plan.headcount, agreedCount: agreed };
+  }
+
+  async committedTrips(groupId: string): Promise<readonly CommittedTrip[]> {
+    const rows = await this.db
+      .select({ planId: plans.id, title: plans.title, departDate: tripBriefs.departDate, returnDate: tripBriefs.returnDate })
+      .from(plans)
+      .innerJoin(tripBriefs, eq(tripBriefs.id, plans.briefId))
+      .where(and(eq(plans.groupId, groupId), inArray(plans.status, COMMITTED_STATUSES)));
+    return rows.flatMap((row) => (row.departDate && row.returnDate ? [{ planId: row.planId, title: row.title, departDate: row.departDate, returnDate: row.returnDate }] : []));
   }
 
   async create(plan: NewPlan): Promise<Result<string, StoreError>> {
