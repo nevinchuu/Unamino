@@ -21,12 +21,7 @@ import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-sourc
 import { MuseHttp } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
 import { readServerEnv } from "./env";
-
-/**
- * Prices and the sandbox's offers are in this currency, and real exchange rates are not wired in yet, so every
- * group is in it and everyone pays in it. Creating a group offers no other choice.
- */
-export const GROUP_CURRENCY = "USD";
+import { GROUP_CURRENCY } from "./group-currency";
 
 /** A flight search can take several seconds, and slower when run alongside the hotel searches. */
 const OFFER_TIMEOUT_MS = 45_000;

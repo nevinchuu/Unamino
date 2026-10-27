@@ -1,5 +1,5 @@
 import type { Result } from "@/lib/result";
-import type { Group, GroupError, Member, Message } from "./types";
+import type { Group, GroupError, JoinLinkPreview, Member, Message } from "./types";
 
 export interface NewGroup {
   readonly name: string;
@@ -26,6 +26,8 @@ export interface GroupRepository {
   create(input: NewGroup): Promise<Result<CreatedGroup, GroupError>>;
   /** Anyone holding the link joins by giving a name and a currency, while the link is enabled and the group has room. */
   joinWithLink(joinToken: string, person: { readonly displayName: string; readonly currency: string }): Promise<Result<JoinedGroup, GroupError>>;
+  /** Looks at a join link without using it. Fails with "invalid_link" if it is unknown or switched off. */
+  describeJoinLink(joinToken: string): Promise<Result<JoinLinkPreview, GroupError>>;
   /** Who is acting? Only members who are currently in the group are recognised. */
   authenticate(memberToken: string): Promise<Result<Member, GroupError>>;
   find(groupId: string): Promise<Result<Group, GroupError>>;

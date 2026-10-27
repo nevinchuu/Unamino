@@ -1,10 +1,12 @@
+import { AppBar, Screen } from "@/components/screen";
+import { GROUP_CURRENCY } from "@/server/group-currency";
+import { CreateGroupForm } from "./create-group-form";
+
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-2 p-8">
-      <h1 className="text-2xl font-semibold">Unamino</h1>
-      <p className="text-muted-foreground">
-        Group trip planning where nobody is charged unless everyone is in.
-      </p>
-    </main>
+    <Screen>
+      <AppBar title="New group" subtitle="Plan a trip together" />
+      <CreateGroupForm currency={GROUP_CURRENCY} />
+    </Screen>
   );
 }

@@ -20,6 +20,16 @@ export interface Member {
   readonly isOrganiser: boolean;
 }
 
+/** What someone holding a join link may see before they join: no names beyond who invited them. */
+export interface JoinLinkPreview {
+  readonly groupId: string;
+  readonly groupName: string;
+  /** Who made the group. Null only if they cannot be found, which a group never allows. */
+  readonly inviterName: string | null;
+  readonly memberCount: number;
+  readonly isFull: boolean;
+}
+
 export interface Message {
   readonly id: string;
   /** One increasing number across all groups, so "newer than" is a single comparison. */

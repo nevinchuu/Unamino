@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUuid } from "./ids";
-import { MEMBER_COOKIE_MAX_AGE_SECONDS, memberCookieName, memberCookieOptions } from "./member-cookie";
+import { INVITE_COOKIE_MAX_AGE_SECONDS, inviteCookieName, inviteCookieOptions, MEMBER_COOKIE_MAX_AGE_SECONDS, memberCookieName, memberCookieOptions } from "./member-cookie";
 
 const GROUP = "3f2b8c1e-5a4d-4e0b-9c7a-1d2e3f4a5b6c";
 
@@ -28,5 +28,18 @@ describe("memberCookieOptions", () => {
 describe("isUuid", () => {
   it("accepts either letter case", () => {
     expect(isUuid(GROUP.toUpperCase())).toBe(true);
+  });
+});
+
+describe("invite cookie", () => {
+  it("lasts one hour", () => {
+    expect(INVITE_COOKIE_MAX_AGE_SECONDS).toBe(3600);
+    expect(inviteCookieOptions(true)).toEqual({ httpOnly: true, sameSite: "lax", secure: true, path: "/", maxAge: 3600 });
+  });
+
+  it("is named per group, apart from the member cookie, and only for a real group id", () => {
+    expect(inviteCookieName(GROUP)).toBe(`invite_${GROUP}`);
+    expect(inviteCookieName(GROUP)).not.toBe(memberCookieName(GROUP));
+    expect(inviteCookieName("nope")).toBeNull();
   });
 });

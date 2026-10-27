@@ -84,6 +84,30 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
       }
     }, 30_000);
 
+    it("lets a link be looked at without using it, and shows only the group, the inviter and how many are in", async () => {
+      const { group, joinToken } = await newGroup("Bangkok weekend");
+      const ana = await groupRepo.joinWithLink(joinToken, ME);
+      if (!ana.ok) throw new Error(ana.error.message);
+
+      const preview = await groupRepo.describeJoinLink(joinToken);
+      expect(preview).toEqual({ ok: true, value: { groupId: group.id, groupName: "Bangkok weekend", inviterName: "Nevin", memberCount: 2, isFull: false } });
+      expect(JSON.stringify(preview)).not.toContain("Ana");
+      expect(await groupRepo.joinedMembers(group.id)).toHaveLength(2);
+    }, 30_000);
+
+    it("reports a full group in the preview, and refuses links that are unknown or switched off", async () => {
+      const { group, organiser, joinToken } = await newGroup();
+      for (let i = 1; i < MAX_GROUP_MEMBERS; i += 1) await groupRepo.joinWithLink(joinToken, { displayName: `Friend ${i}`, currency: "USD" });
+      const full = await groupRepo.describeJoinLink(joinToken);
+      expect(full.ok && full.value).toMatchObject({ memberCount: MAX_GROUP_MEMBERS, isFull: true });
+
+      expect((await groupRepo.disableJoinLink(group.id, organiser.id)).ok).toBe(true);
+      const off = await groupRepo.describeJoinLink(joinToken);
+      expect(off.ok ? null : off.error.code).toBe("invalid_link");
+      const unknown = await groupRepo.describeJoinLink("nonsense");
+      expect(unknown.ok ? null : unknown.error.code).toBe("invalid_link");
+    }, 60_000);
+
     it("does not recognise a wrong token", async () => {
       const result = await groupRepo.authenticate("nonsense");
       expect(result.ok ? null : result.error.code).toBe("not_found");

@@ -1,7 +1,7 @@
 import { and, asc, count, eq } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
 import { generateToken, hashToken } from "@/lib/tokens";
-import { MAX_GROUP_MEMBERS, MAX_NAME_LENGTH, type Group, type GroupError, type Member } from "@/domain/group/types";
+import { MAX_GROUP_MEMBERS, MAX_NAME_LENGTH, type Group, type GroupError, type JoinLinkPreview, type Member } from "@/domain/group/types";
 import type { CreatedGroup, GroupRepository, JoinedGroup, NewGroup } from "@/domain/group/repository";
 import type { Database } from "./client";
 import { groups, members } from "./schema";
@@ -80,6 +80,24 @@ export class PostgresGroupRepository implements GroupRepository {
       });
     } catch (error) {
       if (error instanceof Rollback) return err(error.reason);
+      return failure("unavailable", "The database could not be reached");
+    }
+  }
+
+  async describeJoinLink(joinToken: string): Promise<Result<JoinLinkPreview, GroupError>> {
+    try {
+      const [group] = await this.db.select().from(groups).where(eq(groups.joinTokenHash, hashToken(joinToken))).limit(1);
+      if (!group || !group.joinEnabled) return failure("invalid_link", "This join link is not valid any more");
+
+      const joined = await this.db.select({ name: members.displayName, isOrganiser: members.isOrganiser }).from(members).where(and(eq(members.groupId, group.id), eq(members.status, "joined")));
+      return ok({
+        groupId: group.id,
+        groupName: group.name,
+        inviterName: joined.find((member) => member.isOrganiser)?.name ?? null,
+        memberCount: joined.length,
+        isFull: joined.length >= MAX_GROUP_MEMBERS,
+      });
+    } catch {
       return failure("unavailable", "The database could not be reached");
     }
   }

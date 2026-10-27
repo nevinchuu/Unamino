@@ -22,3 +22,14 @@ export const memberCookieOptions = (production: boolean): MemberCookieOptions =>
   path: "/",
   maxAge: MEMBER_COOKIE_MAX_AGE_SECONDS,
 });
+
+/** The invite link is shown to the organiser for this long after it is made, so it can be copied and shared without hurry. */
+export const INVITE_COOKIE_MAX_AGE_SECONDS = 60 * 60;
+
+/** Holds the organiser's invite link secret. One per group. Null for an id that is not a group id. */
+export const inviteCookieName = (groupId: string): string | null => (isUuid(groupId) ? `invite_${groupId}` : null);
+
+export const inviteCookieOptions = (production: boolean): MemberCookieOptions => ({
+  ...memberCookieOptions(production),
+  maxAge: INVITE_COOKIE_MAX_AGE_SECONDS,
+});
