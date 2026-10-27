@@ -1,9 +1,9 @@
 import type { ConstraintSet, MemberConstraints } from "@/domain/constraints/schema";
 import { clockTime } from "@/domain/offers/local-time";
-import type { FlightOffer } from "@/domain/offers/schema";
+import type { FlightOffer, Offer } from "@/domain/offers/schema";
 import type { MemberShare } from "@/domain/split/types";
 import { formatMinor } from "@/lib/format-money";
-import type { ValidatedPlan, ValidatedPick } from "./validate";
+import type { ValidatedPlan } from "./validate";
 
 export type ViolationKind = "departure_window" | "return_window" | "own_room" | "skipped_activity" | "budget_cap";
 
@@ -46,8 +46,8 @@ function checkDeparture(
   };
 }
 
-function checkPick(memberId: string, pick: ValidatedPick, constraints: MemberConstraints): ConstraintViolation[] {
-  const { offer } = pick;
+/** Where one offer breaks what one member asked for, ignoring budget, which depends on the whole plan. */
+export function checkOffer(memberId: string, offer: Offer, constraints: MemberConstraints): ConstraintViolation[] {
   switch (offer.kind) {
     case "flight":
       return [
@@ -89,7 +89,7 @@ export function findConstraintViolations(input: {
   const violations: ConstraintViolation[] = [];
   for (const [memberId, memberConstraints] of Object.entries(constraints)) {
     for (const pick of plan.picks.filter((candidate) => candidate.memberIds.includes(memberId))) {
-      violations.push(...checkPick(memberId, pick, memberConstraints));
+      violations.push(...checkOffer(memberId, pick.offer, memberConstraints));
     }
     const budget = checkBudget(memberId, memberConstraints, shares.find((share) => share.memberId === memberId));
     if (budget) violations.push(budget);
