@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlanSummary } from "@/domain/agent/ports";
+import type { PlanCardSummary } from "@/domain/agent/ports";
 import type { Member, Message } from "@/domain/group/types";
 import { AGENT_NAME, handlePoll, loadChat, POLL_LIMIT, toMessageDto, type PollDeps } from "./chat";
 
@@ -12,16 +12,16 @@ const message = (seq: number, overrides: Partial<Message> = {}): Message => ({
 
 const NAMES = new Map([["ana", "Ana"], ["ben", "Ben"]]);
 const ana: Member = { id: "ana", groupId: GROUP, displayName: "Ana", currency: "USD", isOrganiser: false };
-const PLAN: PlanSummary = { id: "plan-1", title: "Bangkok weekend", status: "reviewing", inputsHash: "secret-hash", headcount: 4, agreedCount: 1 };
+const PLAN: PlanCardSummary = { id: "plan-1", title: "Bangkok weekend", status: "reviewing", headcount: 4, agreedCount: 1, replacedById: null };
 
 interface Setup {
   stored?: Message[];
   running?: boolean;
-  plan?: PlanSummary | null;
+  plans?: PlanCardSummary[];
   member?: Member | null;
 }
 
-function setup({ stored = [], running = false, plan = null, member = ana }: Setup = {}) {
+function setup({ stored = [], running = false, plans = [], member = ana }: Setup = {}) {
   const asked: string[] = [];
   const deps: PollDeps = {
     groups: { memberNames: async () => NAMES, joinedMembers: async () => [ana, { ...ana, id: "ben", displayName: "Ben" }] },
@@ -30,7 +30,7 @@ function setup({ stored = [], running = false, plan = null, member = ana }: Setu
       recent: async (_group, limit) => (asked.push(`recent ${limit}`), stored.slice(-limit)),
     },
     runs: { isRunning: async () => running },
-    plans: { latest: async () => plan },
+    plans: { cards: async () => plans },
     clock: () => NOW,
     memberOf: async () => member,
   };
@@ -71,17 +71,17 @@ describe("loadChat", () => {
     expect((await loadChat(deps, GROUP, { afterSeq: 2, limit: 10 })).messages.map((m) => m.seq)).toEqual([3]);
   });
 
-  it("lists who is in now, whether the agent is working, and the newest plan without its internal fingerprint", async () => {
-    const { deps } = setup({ running: true, plan: PLAN });
+  it("lists who is in now, whether the agent is working, and each plan with its own state and nothing internal", async () => {
+    const paid: PlanCardSummary = { ...PLAN, id: "plan-0", status: "captured", agreedCount: 4 };
+    const { deps } = setup({ running: true, plans: [paid, PLAN] });
     const chat = await loadChat(deps, GROUP, { afterSeq: 0, limit: 10 });
     expect(chat.members).toEqual(["Ana", "Ben"]);
     expect(chat.agentWorking).toBe(true);
-    expect(chat.plan).toEqual({ id: "plan-1", title: "Bangkok weekend", status: "reviewing", headcount: 4, agreedCount: 1 });
-    expect(JSON.stringify(chat)).not.toContain("secret-hash");
+    expect(chat.plans).toEqual([paid, PLAN]);
   });
 
   it("has no plan card before there is a plan", async () => {
-    expect((await loadChat(setup().deps, GROUP, { afterSeq: 0, limit: 10 })).plan).toBeNull();
+    expect((await loadChat(setup().deps, GROUP, { afterSeq: 0, limit: 10 })).plans).toEqual([]);
   });
 });
 
@@ -90,7 +90,7 @@ describe("handlePoll", () => {
     const { deps } = setup({ stored: [message(1), message(2)] });
     const response = await poll(deps, "?after=1");
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ messages: [{ seq: 2, senderName: "Ana" }], members: ["Ana", "Ben"], agentWorking: false, plan: null });
+    expect(await response.json()).toMatchObject({ messages: [{ seq: 2, senderName: "Ana" }], members: ["Ana", "Ben"], agentWorking: false, plans: [] });
   });
 
   it("treats a missing starting point as the beginning", async () => {

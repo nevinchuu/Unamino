@@ -65,11 +65,15 @@ export function mapFlightOffers(
       const fare = journey.cheapestOffer;
       const totalMinor = toMinorUnits(fare.pricing.display.total, fare.pricing.display.currency);
       if (totalMinor === null) continue;
+      // The airports the flight really uses, which can differ from the ones searched (Bangkok has BKK and DMK).
+      const outbound = journey.segments.filter((segment) => segment.direction === "OUTBOUND");
+      const first = outbound[0];
+      const last = outbound[outbound.length - 1];
       const candidate = {
         kind: "flight",
         id: fare.offerId,
         listingId: journey.journeyKey,
-        title: `${query.origin} to ${query.destination}`,
+        title: first && last ? `${first.originCode} to ${last.destinationCode}` : `${query.origin} to ${query.destination}`,
         provider: PROVIDER,
         city: query.city,
         currency: fare.pricing.display.currency,

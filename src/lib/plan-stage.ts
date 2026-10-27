@@ -52,6 +52,9 @@ export function describeStage(view: PlanViewDto): StageView {
   return { step: "Step 1 of 2", headline: "Look over the plan", detail: `${agreed} of ${total} have agreed. Nothing is charged at this step.`, tone: "action" };
 }
 
+/** Has the time the prices were held for run out? The screen then says they are being checked again, not that time is up, because the prices are renewed in the background. */
+export const priceHoldElapsed = (deadline: Date, now: Date): boolean => deadline.getTime() <= now.getTime();
+
 /** "8 min left", "45 sec left", or "Time's up". Rounded up, so the last second is not shown as zero. */
 export function countdownText(deadline: Date, now: Date): string {
   const seconds = Math.ceil((deadline.getTime() - now.getTime()) / 1000);

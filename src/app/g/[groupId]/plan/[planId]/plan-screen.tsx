@@ -7,7 +7,7 @@ import { AppBar } from "@/components/screen";
 import { Button } from "@/components/ui/button";
 import { LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
-import { countdownText, describeStage } from "@/lib/plan-stage";
+import { countdownText, describeStage, priceHoldElapsed } from "@/lib/plan-stage";
 import { cn } from "@/lib/utils";
 import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
@@ -168,7 +168,9 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           <p className="text-sm opacity-90">{stage.detail}</p>
           {live ? (
             <p className="mt-2 text-xs opacity-80" suppressHydrationWarning>
-              Prices held until {deadline.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {countdownText(deadline, new Date(now))}
+              {priceHoldElapsed(deadline, new Date(now))
+                ? "Checking the latest prices again…"
+                : `Prices held until ${deadline.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${countdownText(deadline, new Date(now))}`}
             </p>
           ) : null}
         </section>

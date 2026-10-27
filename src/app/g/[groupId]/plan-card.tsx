@@ -1,15 +1,15 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { describePlanCard, type LatestPlan } from "@/lib/plan-card";
+import { describePlanCard, type CardPlan } from "@/lib/plan-card";
 import { cn } from "@/lib/utils";
 
 /**
- * The card under the agent's plan announcement. It shows where the plan stands and opens the plan. A plan that
- * a newer one replaced points to the newer one, since that is the one the group is working on.
+ * The card under the agent's plan announcement. It shows where that plan stands and opens it. A plan that a newer one
+ * replaced points to the newer one, since that is the one the group is working on.
  */
-export function PlanCard({ groupId, planId, latest }: { readonly groupId: string; readonly planId: string; readonly latest: LatestPlan | null }) {
-  const view = describePlanCard(planId, latest);
-  const target = view.state === "live" ? planId : view.state === "replaced" && latest ? latest.id : null;
+export function PlanCard({ groupId, planId, plans }: { readonly groupId: string; readonly planId: string; readonly plans: readonly CardPlan[] }) {
+  const view = describePlanCard(planId, plans);
+  const target = view.opens;
 
   const content = (
     <>

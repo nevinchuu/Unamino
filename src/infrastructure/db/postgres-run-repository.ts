@@ -1,6 +1,6 @@
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, count, eq, gt, gte, lt } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
-import type { AgentRunRepository, RunOutcome, StartedRun, StoreError } from "@/domain/agent/ports";
+import type { AgentRunRepository, RecentRuns, RunOutcome, StartedRun, StoreError } from "@/domain/agent/ports";
 import type { Database } from "./client";
 import { isUniqueViolation } from "./errors";
 import { agentRuns } from "./schema";
@@ -35,6 +35,18 @@ export class PostgresRunRepository implements AgentRunRepository {
       if (isUniqueViolation(error, ONE_RUNNING_PER_GROUP)) return ok({ status: "busy" });
       // The only other unique rule on a run is one per trigger message.
       if (isUniqueViolation(error)) return ok({ status: "duplicate" });
+      return unavailable();
+    }
+  }
+
+  async countRecent(groupId: string, memberId: string | null, since: Date): Promise<Result<RecentRuns, StoreError>> {
+    try {
+      const inGroup = and(eq(agentRuns.groupId, groupId), gte(agentRuns.startedAt, since));
+      const [group] = await this.db.select({ total: count() }).from(agentRuns).where(inGroup);
+      if (memberId === null) return ok({ group: group.total, member: 0 });
+      const [member] = await this.db.select({ total: count() }).from(agentRuns).where(and(inGroup, eq(agentRuns.requestedByMemberId, memberId)));
+      return ok({ group: group.total, member: member.total });
+    } catch {
       return unavailable();
     }
   }

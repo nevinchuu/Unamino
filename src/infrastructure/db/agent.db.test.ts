@@ -121,6 +121,27 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       expect(third.ok && third.value.status).toBe("started");
     }, 60_000);
 
+    it("counts recent runs for the group and for one person, within the window only", async () => {
+      const { groupId, people } = await newGroup();
+      const other = await newGroup(["Zed"]);
+      const now = new Date();
+      const begin = async (gid: string, memberId: string | null, at: Date, body: string, who = people[0].id) => {
+        const message = await say(gid, who, body);
+        const started = await runRepo.start({ groupId: gid, triggerMessageId: message.id, requestedByMemberId: memberId, now: at, staleAfterMs: 300_000 });
+        if (!started.ok || started.value.status !== "started") throw new Error("expected a started run");
+        await runRepo.finish(started.value.run.id, { status: "done", usage: { calls: 1, promptTokens: 1, completionTokens: 1, reasoningTokens: 0 } }, at);
+      };
+      await begin(groupId, people[0].id, new Date(now.getTime() - 5 * 60_000), "@trippy one");
+      await begin(groupId, people[0].id, new Date(now.getTime() - 4 * 60_000), "@trippy two");
+      await begin(groupId, people[1].id, new Date(now.getTime() - 3 * 60_000), "@trippy three", people[1].id);
+      await begin(groupId, people[0].id, new Date(now.getTime() - 3 * 3_600_000), "@trippy old");
+      await begin(other.groupId, other.people[0].id, new Date(now.getTime() - 60_000), "@trippy elsewhere", other.people[0].id);
+
+      const since = new Date(now.getTime() - 3_600_000);
+      expect(await runRepo.countRecent(groupId, people[0].id, since)).toEqual({ ok: true, value: { group: 3, member: 2 } });
+      expect(await runRepo.countRecent(groupId, null, since)).toEqual({ ok: true, value: { group: 3, member: 0 } });
+    }, 60_000);
+
     it("says whether the agent is working for a group, and stops saying so when the run ends or goes stale", async () => {
       const { groupId, people } = await newGroup();
       const other = await newGroup();
@@ -272,6 +293,26 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       const picks = await handle.db.select().from(planPicks).where(eq(planPicks.planId, created.value));
       expect(picks.map((p) => p.position).sort()).toEqual([0, 1]);
       expect(picks.find((p) => p.position === 0)).toMatchObject({ listingId: flight4.listingId, reason: "Only evening flight" });
+    }, 60_000);
+
+    it("lists every plan of the group with its own state, oldest first, and which plan replaced it", async () => {
+      const { groupId, people } = await newGroup();
+      const stored = await brief(groupId, people[0].id);
+      const base = { groupId, briefId: stored.id, summary: null, deadlineAt: new Date(NOW.getTime() + 540_000), hardDeadlineAt: new Date(NOW.getTime() + 172_800_000), baseCurrency: "USD", fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: 4, inputsHash: "h", offersCheckedAt: NOW, memberIds: people.map((p) => p.id), picks: [], suggestions: [] };
+      const first = await planStore.create({ ...base, title: "First", recreatedFromPlanId: null });
+      if (!first.ok) throw new Error(first.error.message);
+      await handle.db.update(plans).set({ status: "captured" }).where(eq(plans.id, first.value));
+      await handle.db.update(planMembers).set({ planAgreement: "agreed" }).where(eq(planMembers.planId, first.value));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const second = await planStore.create({ ...base, title: "Second", recreatedFromPlanId: null });
+      if (!second.ok) throw new Error(second.error.message);
+      await planStore.markReplaced(second.value, first.value);
+
+      const cards = await planStore.cards(groupId);
+      expect(cards.map((card) => card.title)).toEqual(["First", "Second"]);
+      expect(cards[0]).toEqual({ id: first.value, title: "First", status: "captured", headcount: 4, agreedCount: 4, replacedById: null });
+      expect(cards[1]).toMatchObject({ id: second.value, status: "draft", agreedCount: 0, replacedById: first.value });
+      expect(await planStore.cards((await newGroup()).groupId)).toEqual([]);
     }, 60_000);
 
     it("lists the dates of trips that are being booked or paid for, in this group only", async () => {

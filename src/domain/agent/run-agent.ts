@@ -18,6 +18,8 @@ import type { TraceSink } from "./trace";
 
 const CHAT_WINDOW = 200;
 const DEFAULT_STALE_RUN_MS = 5 * 60_000;
+/** Every call costs real money, so one person, and one group, can only call the agent so often. */
+export const RUN_LIMITS = { windowMs: 60 * 60_000, perMember: 10, perGroup: 30 } as const;
 export const AGENT_DISPLAY_NAME = "Trippy";
 
 export interface AgentDeps {
@@ -71,7 +73,15 @@ export function createUsageMeter(): UsageMeter {
  * in which case the person is told so instead of a second run starting. The caller then runs it in the background.
  */
 export async function startAgentRun(deps: Pick<AgentDeps, "runs" | "messages" | "clock" | "staleRunMs">, message: { readonly id: string; readonly groupId: string; readonly memberId: string | null }): Promise<Result<StartedRun, StoreError>> {
-  const started = await deps.runs.start({ groupId: message.groupId, triggerMessageId: message.id, requestedByMemberId: message.memberId, now: deps.clock(), staleAfterMs: deps.staleRunMs ?? DEFAULT_STALE_RUN_MS });
+  const now = deps.clock();
+  const recent = await deps.runs.countRecent(message.groupId, message.memberId, new Date(now.getTime() - RUN_LIMITS.windowMs));
+  if (!recent.ok) return recent;
+  if (recent.value.member >= RUN_LIMITS.perMember || recent.value.group >= RUN_LIMITS.perGroup) {
+    await deps.messages.postAgent(message.groupId, MESSAGES.limited, { replyToMessageId: message.id });
+    return { ok: true, value: { status: "limited" } };
+  }
+
+  const started = await deps.runs.start({ groupId: message.groupId, triggerMessageId: message.id, requestedByMemberId: message.memberId, now, staleAfterMs: deps.staleRunMs ?? DEFAULT_STALE_RUN_MS });
   if (started.ok && started.value.status === "busy") await deps.messages.postAgent(message.groupId, MESSAGES.busy, { replyToMessageId: message.id });
   return started;
 }

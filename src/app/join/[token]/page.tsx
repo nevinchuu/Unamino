@@ -55,7 +55,12 @@ async function Invite({ params }: { readonly params: PageProps<"/join/[token]">[
             This group already has {MAX_GROUP_MEMBERS} people, so it&apos;s full.
           </p>
         ) : (
-          <JoinForm joinToken={token} />
+          <>
+            <JoinForm joinToken={token} />
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              This group plans trips together with an AI helper. To join a booking you will later give traveller details, and a card is held, not charged, until everyone is in.
+            </p>
+          </>
         )}
       </div>
     </main>

@@ -1,7 +1,6 @@
-import type { AgentRunRepository, PlanStore } from "@/domain/agent/ports";
+import type { AgentRunRepository, PlanCardSummary, PlanStore } from "@/domain/agent/ports";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { Member, Message, MessageKind } from "@/domain/group/types";
-import type { PlanStatus } from "@/domain/plan/statuses";
 import { isUuid } from "./ids";
 
 /** What the agent is called in the chat. */
@@ -29,28 +28,23 @@ export interface ChatMessageDto {
   readonly at: string;
 }
 
-/** The newest plan, which the cards in the chat show the live state of. */
-export interface PlanCardDto {
-  readonly id: string;
-  readonly title: string;
-  readonly status: PlanStatus;
-  readonly headcount: number;
-  readonly agreedCount: number;
-}
+/** One of the group's plans, which the cards in the chat show the live state of. */
+export type PlanCardDto = PlanCardSummary;
 
 export interface ChatSnapshot {
   readonly messages: readonly ChatMessageDto[];
   /** Who is in the group now, in the order they joined. */
   readonly members: readonly string[];
   readonly agentWorking: boolean;
-  readonly plan: PlanCardDto | null;
+  /** Every plan the group has made, oldest first, so each card shows its own plan's state. */
+  readonly plans: readonly PlanCardDto[];
 }
 
 export interface ChatDeps {
   readonly groups: Pick<GroupRepository, "memberNames" | "joinedMembers">;
   readonly messages: Pick<MessageRepository, "listAfter" | "recent">;
   readonly runs: Pick<AgentRunRepository, "isRunning">;
-  readonly plans: Pick<PlanStore, "latest">;
+  readonly plans: Pick<PlanStore, "cards">;
   readonly clock: () => Date;
 }
 
@@ -72,18 +66,18 @@ export function toMessageDto(message: Message, names: ReadonlyMap<string, string
 /** Everything the chat screen shows, for the messages after `afterSeq`, or for the latest ones when `afterSeq` is null. */
 export async function loadChat(deps: ChatDeps, groupId: string, window: { readonly afterSeq: number | null; readonly limit: number }): Promise<ChatSnapshot> {
   const now = deps.clock();
-  const [names, joined, agentWorking, latest, messages] = await Promise.all([
+  const [names, joined, agentWorking, plans, messages] = await Promise.all([
     deps.groups.memberNames(groupId),
     deps.groups.joinedMembers(groupId),
     deps.runs.isRunning(groupId, now, AGENT_STALE_MS),
-    deps.plans.latest(groupId),
+    deps.plans.cards(groupId),
     window.afterSeq === null ? deps.messages.recent(groupId, window.limit) : deps.messages.listAfter(groupId, window.afterSeq, window.limit),
   ]);
   return {
     messages: messages.map((message) => toMessageDto(message, names)),
     members: joined.map((member) => member.displayName),
     agentWorking,
-    plan: latest && { id: latest.id, title: latest.title, status: latest.status, headcount: latest.headcount, agreedCount: latest.agreedCount },
+    plans,
   };
 }
 

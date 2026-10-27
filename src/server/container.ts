@@ -14,6 +14,7 @@ import { SimulatedBookingRunner } from "@/domain/plan/simulated-booking";
 import { SimulatedHoldRunner } from "@/domain/plan/simulated-holds";
 import type { PlanStatusReader } from "@/domain/plan/status-reader";
 import type { PlanViewStore } from "@/domain/plan/view-store";
+import { TravellerCleanupRunner } from "@/domain/travellers/cleanup-runner";
 import { TravellerService } from "@/domain/travellers/service";
 import { connectDatabase } from "@/infrastructure/db/client";
 import { PostgresBriefRepository } from "@/infrastructure/db/postgres-brief-repository";
@@ -141,6 +142,8 @@ function build(): Container {
       demoBooking: bookingSimulation.value,
     }),
   ];
+  // Passport details go as soon as they have done their job: when the trip is booked, or when the plan ends.
+  if (travellers) runners.push(new TravellerCleanupRunner(travellers));
   const effects = new CompositeEffectRunner(runners);
   // Both of these pass on what the last hold sets in motion (booking), so they need the whole set, themselves included.
   if (mode === "demo") runners.push(new SimulatedHoldRunner(planRepository, () => effects, agent.clock));

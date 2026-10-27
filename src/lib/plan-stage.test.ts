@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "@/domain/plan/statuses";
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
-import { countdownText, describeStage } from "./plan-stage";
+import { countdownText, describeStage, priceHoldElapsed } from "./plan-stage";
 
 const person = (id: string, agreement: PlanAgreementStatus = "pending", approval: ApprovalStatus = "pending"): PersonDto => ({ id, name: id, isMe: id === "ana", agreement, approval, holdPlaced: false, shareMinor: 30_000, currency: "USD", approvedMinor: null, lines: [] });
 
@@ -85,6 +85,13 @@ describe("countdownText", () => {
   it("rounds up, so the last moments never read as zero", () => {
     expect(at("2026-10-27T01:09:59.500Z")).toBe("1 sec left");
     expect(at("2026-10-27T01:08:59.500Z")).toBe("2 min left");
+  });
+
+  it("knows when the held prices have run out, at the deadline and after it", () => {
+    const deadline = new Date("2026-10-27T01:10:00Z");
+    expect(priceHoldElapsed(deadline, new Date("2026-10-27T01:09:59Z"))).toBe(false);
+    expect(priceHoldElapsed(deadline, deadline)).toBe(true);
+    expect(priceHoldElapsed(deadline, new Date("2026-10-27T05:00:00Z"))).toBe(true);
   });
 
   it("says time is up at the deadline and after it", () => {

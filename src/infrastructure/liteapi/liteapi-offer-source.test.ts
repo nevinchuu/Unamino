@@ -142,6 +142,15 @@ describe("flight search", () => {
     expect(first.expiresAt).toBe("2026-10-27T01:27:09.481Z");
   });
 
+  it("titles a flight with the airports it really uses, not the ones that were searched", async () => {
+    const response = structuredClone(flightsRoundTrip) as { data: { journeys: { segments: { direction: string; destinationCode: string }[] }[] }[] };
+    for (const segment of response.data[0].journeys[0].segments) if (segment.direction === "OUTBOUND") segment.destinationCode = "DMK";
+    const { source } = sourceWith(() => json(response));
+    const result = await source.search(flightQuery);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.value[0].title).toBe("SIN to DMK");
+  });
+
   it("returns an empty list for a route with no flights", async () => {
     const { source } = sourceWith(() => json({ data: [] }));
     expect(await source.search(flightQuery)).toEqual({ ok: true, value: [] });

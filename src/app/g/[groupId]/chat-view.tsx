@@ -35,7 +35,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const [messages, setMessages] = useState<ChatMessageDto[]>(() => [...initial.messages]);
   const [members, setMembers] = useState<readonly string[]>(initial.members);
   const [agentWorking, setAgentWorking] = useState(initial.agentWorking);
-  const [plan, setPlan] = useState<PlanCardDto | null>(initial.plan);
+  const [plans, setPlans] = useState<readonly PlanCardDto[]>(initial.plans);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [replyTo, setReplyTo] = useState<BubbleModel | null>(null);
   const [signedOut, setSignedOut] = useState(false);
@@ -58,7 +58,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
       }
       setMembers(snapshot.members);
       setAgentWorking(snapshot.agentWorking);
-      setPlan(snapshot.plan);
+      setPlans(snapshot.plans);
     },
     [meId],
   );
@@ -235,7 +235,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
               model={item}
               mine={item.senderId === meId}
               startsRun={startsRun}
-              latestPlan={plan}
+              plans={plans}
               onReply={setReplyTo}
               onRetry={retry}
             />

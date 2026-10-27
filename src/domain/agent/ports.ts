@@ -32,8 +32,14 @@ export interface AgentRun {
   readonly triggerMessageId: string;
 }
 
-/** "busy": the group already has a run going. "duplicate": this message was already handled. */
-export type StartedRun = { readonly status: "started"; readonly run: AgentRun } | { readonly status: "busy" } | { readonly status: "duplicate" };
+/** "busy": the group already has a run going. "duplicate": this message was already handled. "limited": too many calls lately. */
+export type StartedRun = { readonly status: "started"; readonly run: AgentRun } | { readonly status: "busy" } | { readonly status: "duplicate" } | { readonly status: "limited" };
+
+/** How many runs a group, and one person in it, have started since a moment. */
+export interface RecentRuns {
+  readonly group: number;
+  readonly member: number;
+}
 
 export interface RunOutcome {
   readonly status: "done" | "failed";
@@ -46,6 +52,8 @@ export interface AgentRunRepository {
   /** Starts a run unless the group already has one going. A run left going for longer than `staleAfterMs` is written off first. */
   start(input: { groupId: string; triggerMessageId: string; requestedByMemberId: string | null; now: Date; staleAfterMs: number }): Promise<Result<StartedRun, StoreError>>;
   finish(runId: string, outcome: RunOutcome, now: Date): Promise<void>;
+  /** How many runs the group, and this person in it, started since `since`. Every run counts, whatever it came to. */
+  countRecent(groupId: string, memberId: string | null, since: Date): Promise<Result<RecentRuns, StoreError>>;
   /** Is the agent working for this group right now? A run left going for longer than `staleAfterMs` no longer counts. */
   isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean>;
 }
@@ -82,6 +90,16 @@ export interface PlanSummary {
   readonly headcount: number;
   /** How many people have agreed to the plan so far. */
   readonly agreedCount: number;
+}
+
+/** What a plan card in the chat shows about one of the group's plans. */
+export interface PlanCardSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly status: PlanStatus;
+  readonly headcount: number;
+  readonly agreedCount: number;
+  readonly replacedById: string | null;
 }
 
 /** A trip the group has paid for or is paying for now. Its dates are taken, so a new plan cannot overlap them. */
@@ -122,6 +140,8 @@ export interface NewPick {
 export interface PlanStore {
   /** The group's newest plan, whatever state it is in. */
   latest(groupId: string): Promise<PlanSummary | null>;
+  /** Every plan the group has made, oldest first, each with its own state, for the cards in the chat. */
+  cards(groupId: string): Promise<readonly PlanCardSummary[]>;
   /** The group's trips that are being booked or already paid for, whichever plan is newest. */
   committedTrips(groupId: string): Promise<readonly CommittedTrip[]>;
   /** Saves a plan, its people, its picks and its suggestions together, as a draft. */

@@ -1,6 +1,6 @@
-import { count, desc, and, eq, inArray } from "drizzle-orm";
+import { asc, count, desc, and, eq, inArray } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
-import type { CommittedTrip, NewPlan, PlanStore, PlanSummary, StoreError } from "@/domain/agent/ports";
+import type { CommittedTrip, NewPlan, PlanCardSummary, PlanStore, PlanSummary, StoreError } from "@/domain/agent/ports";
 import type { PlanStatus } from "@/domain/plan/statuses";
 import type { Database } from "./client";
 import { isUniqueViolation } from "./errors";
@@ -19,6 +19,18 @@ export class PostgresPlanStore implements PlanStore {
     if (!plan) return null;
     const [{ agreed }] = await this.db.select({ agreed: count() }).from(planMembers).where(and(eq(planMembers.planId, plan.id), eq(planMembers.planAgreement, "agreed")));
     return { id: plan.id, title: plan.title, status: plan.status, inputsHash: plan.inputsHash, headcount: plan.headcount, agreedCount: agreed };
+  }
+
+  async cards(groupId: string): Promise<readonly PlanCardSummary[]> {
+    const rows = await this.db.select().from(plans).where(eq(plans.groupId, groupId)).orderBy(asc(plans.createdAt), asc(plans.id));
+    if (rows.length === 0) return [];
+    const agreed = await this.db
+      .select({ planId: planMembers.planId, agreed: count() })
+      .from(planMembers)
+      .where(and(inArray(planMembers.planId, rows.map((row) => row.id)), eq(planMembers.planAgreement, "agreed")))
+      .groupBy(planMembers.planId);
+    const agreedBy = new Map(agreed.map((row) => [row.planId, row.agreed]));
+    return rows.map((row) => ({ id: row.id, title: row.title, status: row.status, headcount: row.headcount, agreedCount: agreedBy.get(row.id) ?? 0, replacedById: row.replacedByPlanId }));
   }
 
   async committedTrips(groupId: string): Promise<readonly CommittedTrip[]> {

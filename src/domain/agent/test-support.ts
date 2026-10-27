@@ -14,7 +14,7 @@ import type { ChatModel, ModelRequest, ModelTurn } from "./loop/model";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { SearchRecord } from "@/domain/trip/search";
-import type { AgentRun, AgentRunRepository, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanStore, PlanSummary, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
+import type { AgentRun, AgentRunRepository, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanCardSummary, PlanStore, PlanSummary, RecentRuns, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
 import { StaticFxRates } from "./static-fx";
 import type { AgentDeps } from "./run-agent";
 
@@ -192,11 +192,14 @@ export class FakeRuns implements AgentRunRepository {
   readonly started: AgentRun[] = [];
   readonly finished: { runId: string; outcome: RunOutcome }[] = [];
   private readonly triggers = new Set<string>();
+  /** Every run ever started, with who asked and when, for the limits. Tests can add rows to pretend a busy hour. */
+  readonly history: { groupId: string; memberId: string | null; at: Date }[] = [];
 
-  async start(input: { groupId: string; triggerMessageId: string }): Promise<Result<StartedRun, StoreError>> {
+  async start(input: { groupId: string; triggerMessageId: string; requestedByMemberId?: string | null; now?: Date }): Promise<Result<StartedRun, StoreError>> {
     if (this.triggers.has(input.triggerMessageId)) return ok({ status: "duplicate" });
     if (this.running) return ok({ status: "busy" });
     this.triggers.add(input.triggerMessageId);
+    this.history.push({ groupId: input.groupId, memberId: input.requestedByMemberId ?? null, at: input.now ?? new Date() });
     const run: AgentRun = { id: `run-${this.started.length + 1}`, groupId: input.groupId, triggerMessageId: input.triggerMessageId };
     this.running = run;
     this.started.push(run);
@@ -206,6 +209,11 @@ export class FakeRuns implements AgentRunRepository {
   async finish(runId: string, outcome: RunOutcome): Promise<void> {
     this.finished.push({ runId, outcome });
     this.running = null;
+  }
+
+  async countRecent(groupId: string, memberId: string | null, since: Date): Promise<Result<RecentRuns, StoreError>> {
+    const inGroup = this.history.filter((entry) => entry.groupId === groupId && entry.at >= since);
+    return ok({ group: inGroup.length, member: memberId === null ? 0 : inGroup.filter((entry) => entry.memberId === memberId).length });
   }
 
   async isRunning(): Promise<boolean> {
@@ -256,6 +264,10 @@ export class FakePlans implements PlanStore, PlanRepository {
   summaryStatusOverride: PlanStatus | null = null;
 
   constructor(private readonly briefs: FakeBriefs) {}
+
+  async cards(): Promise<readonly PlanCardSummary[]> {
+    return this.records.map((record) => ({ id: record.id, title: record.input.title, status: record.snapshot.status, headcount: record.input.headcount, agreedCount: record.snapshot.members.filter((m) => m.planAgreement === "agreed").length, replacedById: record.replacedBy }));
+  }
 
   async committedTrips(): Promise<readonly CommittedTrip[]> {
     return this.records.flatMap((record) => {

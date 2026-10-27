@@ -3,7 +3,7 @@ import { AgentAvatar, Avatar } from "@/components/avatar";
 import { splitAgentMentions } from "@/domain/group/mention";
 import { avatarColour } from "@/lib/avatar";
 import { clockTime } from "@/lib/chat-format";
-import type { LatestPlan } from "@/lib/plan-card";
+import type { CardPlan } from "@/lib/plan-card";
 import { cn } from "@/lib/utils";
 import { PlanCard } from "./plan-card";
 
@@ -28,7 +28,7 @@ interface MessageBubbleProps {
   readonly model: BubbleModel;
   readonly mine: boolean;
   readonly startsRun: boolean;
-  readonly latestPlan: LatestPlan | null;
+  readonly plans: readonly CardPlan[];
   readonly onReply: (model: BubbleModel) => void;
   readonly onRetry: (model: BubbleModel) => void;
 }
@@ -51,7 +51,7 @@ function Words({ body }: { readonly body: string }) {
   );
 }
 
-export function MessageBubble({ groupId, model, mine, startsRun, latestPlan, onReply, onRetry }: MessageBubbleProps) {
+export function MessageBubble({ groupId, model, mine, startsRun, plans, onReply, onRetry }: MessageBubbleProps) {
   if (model.kind === "system") {
     return (
       <div className="my-2 flex justify-center">
@@ -108,7 +108,7 @@ export function MessageBubble({ groupId, model, mine, startsRun, latestPlan, onR
           </span>
         </p>
 
-        {model.planId ? <PlanCard groupId={groupId} planId={model.planId} latest={latestPlan} /> : null}
+        {model.planId ? <PlanCard groupId={groupId} planId={model.planId} plans={plans} /> : null}
 
         {model.status === "failed" ? (
           <button type="button" onClick={() => onRetry(model)} className="mt-1 block text-left text-xs font-medium text-destructive">

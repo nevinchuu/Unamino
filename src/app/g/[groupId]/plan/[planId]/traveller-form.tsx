@@ -145,7 +145,7 @@ export function TravellerForm({ groupId, planId, passportRequired, onSaved }: Tr
       </Button>
       <p className="flex items-start justify-center gap-1 pt-1 text-center text-xs text-muted-foreground">
         <Lock className="mt-0.5 size-3 shrink-0" />
-        Locked before it is saved. Never shown to the group or the AI. Deleted once the trip is booked.
+        Locked before it is saved. Never shown to the group or the AI. Deleted as soon as the trip is booked, or the plan ends.
       </p>
     </form>
   );
