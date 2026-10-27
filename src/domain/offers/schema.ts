@@ -68,6 +68,8 @@ const activityFields = {
   ...baseFields,
   kind: z.literal("activity"),
   date: isoDate,
+  /** Local start time, "HH:mm". Without it the schedule treats the whole day as taken. */
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected a time as HH:mm").optional(),
   durationMinutes: positiveInteger,
   /** Lowercase label such as "cooking" or "tour", used to match what a member wants to skip. */
   category: z.string().min(1),

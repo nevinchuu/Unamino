@@ -108,7 +108,8 @@
     "date": "2026-12-12",
     "durationMinutes": 240,
     "category": "tour",
-    "expiresInMinutes": 60
+    "expiresInMinutes": 60,
+    "startTime": "08:00"
   },
   {
     "kind": "activity",
@@ -123,6 +124,7 @@
     "date": "2026-12-12",
     "durationMinutes": 180,
     "category": "cooking",
-    "expiresInMinutes": 60
+    "expiresInMinutes": 60,
+    "startTime": "14:00"
   }
 ]

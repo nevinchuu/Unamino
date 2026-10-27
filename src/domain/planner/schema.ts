@@ -47,7 +47,7 @@ export type PlannerOutput = z.infer<typeof plannerOutputSchema>;
 
 const stripCodeFences = (text: string): string => text.trim().replace(CODE_FENCE_START, "").replace(CODE_FENCE_END, "");
 
-function parseWith<T>(schema: z.ZodType<T>, value: unknown, what: string): Result<T, PlanValidationError> {
+export function parseWith<T>(schema: z.ZodType<T>, value: unknown, what: string): Result<T, PlanValidationError> {
   const parsed = schema.safeParse(value);
   if (parsed.success) return ok(parsed.data);
   const summary = parsed.error.issues
@@ -57,7 +57,7 @@ function parseWith<T>(schema: z.ZodType<T>, value: unknown, what: string): Resul
   return err({ code: "invalid_shape", message: `${what} does not match the schema: ${summary}` });
 }
 
-function parseJson(text: string, what: string): Result<unknown, PlanValidationError> {
+export function parseJson(text: string, what: string): Result<unknown, PlanValidationError> {
   try {
     return ok(JSON.parse(stripCodeFences(text)));
   } catch {
