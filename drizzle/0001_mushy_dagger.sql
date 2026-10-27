@@ -1,0 +1,2 @@
+ALTER TABLE "plan_members" ADD COLUMN "hold_placed" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "plan_members" ADD CONSTRAINT "plan_members_hold_has_id_or_is_pending" CHECK ("plan_members"."hold_id" IS NULL OR "plan_members"."hold_placed");

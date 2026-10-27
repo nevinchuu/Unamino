@@ -1,0 +1,1 @@
+ALTER TABLE "plan_members" DROP CONSTRAINT "plan_members_hold_has_id_or_is_pending";
