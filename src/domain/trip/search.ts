@@ -34,7 +34,7 @@ const DEFAULT_RETRY_DELAY_MS = 500;
 const pause = (ms: number): Promise<void> => (ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve());
 
 /** A search can fail for a moment (a timeout, a busy service) and work a second later, so a failed answer is tried again. */
-async function searchWithRetry(source: OfferSource, query: OfferQuery, options: SearchOptions): Promise<Result<readonly Offer[], OfferSourceError>> {
+export async function searchWithRetry(source: OfferSource, query: OfferQuery, options: SearchOptions): Promise<Result<readonly Offer[], OfferSourceError>> {
   const retries = options.retries ?? DEFAULT_RETRIES;
   let result = await source.search(query);
   for (let attempt = 1; attempt <= retries && !result.ok && result.error.code === "source_unavailable"; attempt += 1) {
