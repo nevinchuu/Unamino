@@ -1,0 +1,100 @@
+[
+  {
+    "kind": "flight",
+    "id": "fx-flt-evening",
+    "listingId": "SIN-BKK-TR-868-1",
+    "title": "SIN to BKK, Fri 20:10",
+    "provider": "fixture",
+    "city": "Bangkok",
+    "currency": "USD",
+    "totalMinor": 72000,
+    "guests": 4,
+    "refundable": false,
+    "expiresInMinutes": 9,
+    "legs": [
+      { "origin": "SIN", "destination": "BKK", "departAt": "2026-12-11T20:10:00+08:00", "arriveAt": "2026-12-11T21:35:00+07:00", "carrier": "Scoot" },
+      { "origin": "BKK", "destination": "SIN", "departAt": "2026-12-13T21:30:00+07:00", "arriveAt": "2026-12-14T00:55:00+08:00", "carrier": "Scoot" }
+    ]
+  },
+  {
+    "kind": "flight",
+    "id": "fx-flt-early",
+    "listingId": "SIN-BKK-TR-860-1",
+    "title": "SIN to BKK, Fri 13:05",
+    "provider": "fixture",
+    "city": "Bangkok",
+    "currency": "USD",
+    "totalMinor": 66000,
+    "guests": 4,
+    "refundable": false,
+    "expiresInMinutes": 9,
+    "legs": [
+      { "origin": "SIN", "destination": "BKK", "departAt": "2026-12-11T13:05:00+08:00", "arriveAt": "2026-12-11T14:30:00+07:00", "carrier": "Scoot" },
+      { "origin": "BKK", "destination": "SIN", "departAt": "2026-12-13T18:40:00+07:00", "arriveAt": "2026-12-13T22:05:00+08:00", "carrier": "Scoot" }
+    ]
+  },
+  {
+    "kind": "hotel",
+    "id": "fx-htl-triple",
+    "listingId": "riverside-hotel-triple",
+    "title": "Riverside hotel, 2 nights",
+    "provider": "fixture",
+    "city": "Bangkok",
+    "currency": "USD",
+    "totalMinor": 42000,
+    "guests": 3,
+    "checkIn": "2026-12-11",
+    "checkOut": "2026-12-13",
+    "stars": 4,
+    "roomName": "Triple room",
+    "freeCancellationUntil": "2026-12-10T12:00:00Z",
+    "expiresInMinutes": 30
+  },
+  {
+    "kind": "hotel",
+    "id": "fx-htl-single",
+    "listingId": "riverside-hotel-single",
+    "title": "Riverside hotel, 2 nights",
+    "provider": "fixture",
+    "city": "Bangkok",
+    "currency": "USD",
+    "totalMinor": 20000,
+    "guests": 1,
+    "checkIn": "2026-12-11",
+    "checkOut": "2026-12-13",
+    "stars": 4,
+    "roomName": "Single room",
+    "freeCancellationUntil": "2026-12-10T12:00:00Z",
+    "expiresInMinutes": 30
+  },
+  {
+    "kind": "activity",
+    "id": "fx-act-market",
+    "listingId": "floating-market-tour",
+    "title": "Floating market tour, Sat",
+    "provider": "fixture",
+    "city": "Bangkok",
+    "currency": "USD",
+    "totalMinor": 12000,
+    "guests": 4,
+    "date": "2026-12-12",
+    "durationMinutes": 240,
+    "category": "tour",
+    "expiresInMinutes": 60
+  },
+  {
+    "kind": "activity",
+    "id": "fx-act-cooking",
+    "listingId": "thai-cooking-class",
+    "title": "Thai cooking class, Sat",
+    "provider": "fixture",
+    "city": "Bangkok",
+    "currency": "USD",
+    "totalMinor": 9000,
+    "guests": 2,
+    "date": "2026-12-12",
+    "durationMinutes": 180,
+    "category": "cooking",
+    "expiresInMinutes": 60
+  }
+]
