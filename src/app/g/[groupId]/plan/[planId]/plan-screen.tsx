@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
 import { CardSheet } from "./card-sheet";
+import { ChangeRequestSheet } from "./change-request-sheet";
 import { IdeaCard, ItemCard } from "./plan-items";
 import { BookingProgress } from "./booking-progress";
 import { TripConfirmed } from "./trip-confirmed";
@@ -43,6 +44,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   const [confirming, setConfirming] = useState<"decline" | "declineAmount" | null>(null);
   const [gone, setGone] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const live = LIVE_PLAN_STATUSES.includes(view.status);
@@ -270,9 +272,15 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
               </>
             ) : null}
 
+            {me.actions.requestChanges ? (
+              <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={() => setChangesOpen(true)}>
+                I need changes
+              </Button>
+            ) : null}
+
             {me.actions.decline ? (
-              <button type="button" onClick={() => setConfirming("decline")} className="mx-auto block text-sm font-medium text-muted-foreground hover:text-foreground">
-                {me.agreement === "agreed" ? "Change my mind" : "Not for me"}
+              <button type="button" onClick={() => setConfirming("decline")} className="mx-auto block min-h-11 px-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+                End the plan for everyone
               </button>
             ) : null}
             {me.actions.declineAmount ? (
@@ -281,7 +289,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
               </button>
             ) : null}
 
-            {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount && !me.cardNeeded ? (
+            {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount && !me.actions.requestChanges && !me.cardNeeded ? (
               <Link href={`/g/${view.groupId}`} className="block text-center text-sm font-medium text-primary">
                 Back to the chat
               </Link>
@@ -289,6 +297,17 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           </div>
         )}
       </div>
+
+      <ChangeRequestSheet
+        open={changesOpen && me.actions.requestChanges}
+        onOpenChange={setChangesOpen}
+        groupId={view.groupId}
+        planId={view.id}
+        onSent={(asked) => {
+          setChangesOpen(false);
+          setNotice({ tone: "info", text: asked ? "Sent. Trippy is working on it, and will post the new plan in the chat." : "Sent to the chat. Trippy is busy right now, so ask again in a moment." });
+        }}
+      />
 
       <CardSheet
         // Once the hold is recorded (by this person, or by Stripe telling the server first) there is nothing left to add, so the sheet goes.

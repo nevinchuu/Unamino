@@ -92,6 +92,8 @@ export interface PlanActions {
   readonly decline: boolean;
   readonly approve: boolean;
   readonly declineAmount: boolean;
+  /** Ask Trippy to change the plan, which keeps it alive. Open while people are still deciding. */
+  readonly requestChanges: boolean;
 }
 
 /** What this person still owes the booking in the way of personal details. */
@@ -288,6 +290,7 @@ export function buildPlanView(
     decline: reviewing && mine !== undefined,
     approve: approving && (mine?.approval === "pending" || mine?.approval === "needs_reapproval") && canPrice,
     declineAmount: (approving || raw.status === "held") && mine !== undefined,
+    requestChanges: (reviewing || approving) && mine !== undefined,
   };
 
   // The card and the details are asked for together, once the person has approved their amount.

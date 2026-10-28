@@ -116,15 +116,15 @@ describe("what a person may do", () => {
     view({ status, members: [member("ana", "Ana", { planAgreement: agreement, approval }), member("ben", "Ben")] }).me.actions;
 
   it("can agree or decline while the plan is being reviewed and they have not agreed", () => {
-    expect(actionsFor("reviewing", "pending", "pending")).toEqual({ agree: true, decline: true, approve: false, declineAmount: false });
+    expect(actionsFor("reviewing", "pending", "pending")).toEqual({ agree: true, decline: true, approve: false, declineAmount: false, requestChanges: true });
   });
 
   it("can only decline, to change their mind, once they have agreed", () => {
-    expect(actionsFor("reviewing", "agreed", "pending")).toEqual({ agree: false, decline: true, approve: false, declineAmount: false });
+    expect(actionsFor("reviewing", "agreed", "pending")).toEqual({ agree: false, decline: true, approve: false, declineAmount: false, requestChanges: true });
   });
 
   it("can approve their amount, or decline, once everyone has agreed", () => {
-    expect(actionsFor("approving", "agreed", "pending")).toEqual({ agree: false, decline: false, approve: true, declineAmount: true });
+    expect(actionsFor("approving", "agreed", "pending")).toEqual({ agree: false, decline: false, approve: true, declineAmount: true, requestChanges: true });
   });
 
   it("can approve again after their price rose past their cap", () => {
@@ -132,19 +132,24 @@ describe("what a person may do", () => {
   });
 
   it("has nothing to approve once they have", () => {
-    expect(actionsFor("approving", "agreed", "approved")).toEqual({ agree: false, decline: false, approve: false, declineAmount: true });
+    expect(actionsFor("approving", "agreed", "approved")).toEqual({ agree: false, decline: false, approve: false, declineAmount: true, requestChanges: true });
   });
 
   it("can still back out while the holds are in, but not once booking has started or the plan has ended", () => {
     expect(actionsFor("held", "agreed", "approved").declineAmount).toBe(true);
     for (const status of ["booking", "booked", "captured", "expired"] as const) {
-      expect(actionsFor(status, "agreed", "approved"), status).toEqual({ agree: false, decline: false, approve: false, declineAmount: false });
+      expect(actionsFor(status, "agreed", "approved"), status).toEqual({ agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false });
     }
+  });
+
+  it("can ask for changes only while people are still deciding, not once the holds are in", () => {
+    for (const status of ["reviewing", "approving"] as const) expect(actionsFor(status, "agreed", "approved").requestChanges, status).toBe(true);
+    for (const status of ["held", "booking", "booked", "captured", "expired"] as const) expect(actionsFor(status, "agreed", "approved").requestChanges, status).toBe(false);
   });
 
   it("cannot act on a plan made before they joined, but can look at it", () => {
     const late = view({}, "newcomer");
-    expect(late.me).toMatchObject({ id: "newcomer", inPlan: false, agreement: null, approval: null, shareMinor: null, actions: { agree: false, decline: false, approve: false, declineAmount: false } });
+    expect(late.me).toMatchObject({ id: "newcomer", inPlan: false, agreement: null, approval: null, shareMinor: null, actions: { agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false } });
     expect(late.people.some((p) => p.isMe)).toBe(false);
   });
 });

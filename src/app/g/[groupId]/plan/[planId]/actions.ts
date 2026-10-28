@@ -1,9 +1,12 @@
 "use server";
 
+import { after } from "next/server";
+import { runAgent } from "@/domain/agent/run-agent";
 import { getContainer } from "@/server/container";
 import { runCardForm, runConfirmHold, type CardFormResult, type ConfirmHoldResult } from "@/server/hold-actions";
 import { runSaveTravellerDetails, type SaveDetailsResult } from "@/server/traveller-actions";
 import { runPlanAction, type PlanActionName, type PlanActionResult } from "@/server/plan-actions";
+import { runRequestChanges, type RequestChangesResult } from "@/server/request-changes";
 import { currentMember } from "@/server/session";
 
 async function act(groupId: string, planId: string, action: PlanActionName, seenMinor?: number): Promise<PlanActionResult> {
@@ -47,4 +50,17 @@ export async function confirmCardHold(groupId: string, planId: string): Promise<
 export async function saveTravellerDetails(groupId: string, planId: string, input: unknown): Promise<SaveDetailsResult> {
   const { travellers, views } = getContainer();
   return runSaveTravellerDetails({ travellers, views }, await currentMember(groupId), planId, input);
+}
+
+/**
+ * Asks Trippy to change the plan instead of ending it. The request goes into the chat as the person's own message,
+ * and Trippy answers there; the run is carried out after the person has their answer, because it takes about a minute.
+ */
+export async function requestPlanChanges(groupId: string, planId: string, reason: string, note: string): Promise<RequestChangesResult> {
+  const { views, messages, agent, payments } = getContainer();
+  const sent = await runRequestChanges({ views, send: { messages, agent }, payments: payments.mode }, await currentMember(groupId), { planId, reason, note });
+  if (!sent.ok) return { ok: false, error: sent.error };
+  const { run } = sent.value;
+  if (run) after(() => runAgent(agent, run));
+  return { ok: true, asked: sent.value.asked };
 }
