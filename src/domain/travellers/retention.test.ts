@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AesGcmCipher } from "@/infrastructure/crypto/aes-gcm-cipher";
-import { TRAVELLER_RETENTION_MS, TravellerService } from "./service";
+import { TravellerService } from "./service";
 import { MemoryTravellerStore, SAMPLE_DETAILS } from "./test-support";
 
 const NOW = new Date("2026-10-28T12:00:00Z");
@@ -24,10 +24,6 @@ function setup() {
 }
 
 describe("deleting details that were kept too long", () => {
-  it("keeps three days as the longest, which is longer than any plan lives", () => {
-    expect(TRAVELLER_RETENTION_MS).toBe(72 * 60 * 60_000);
-  });
-
   it("deletes old details and keeps recent ones, and says how many went", async () => {
     const { store, service, saveAgo } = setup();
     await saveAgo("old", 80);

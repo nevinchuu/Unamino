@@ -1,37 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { err, ok, type Result } from "@/lib/result";
 import { ChatEffectRunner, chatLineFor, type ChatEffectDeps } from "./chat-effects";
-import { CompositeEffectRunner, type EffectError, type EffectRunner } from "./effects";
+import { CompositeEffectRunner, type EffectRunner } from "./effects";
 import type { RepositoryError } from "./repository";
 import { SimulatedHoldRunner } from "./simulated-holds";
-import { approved, DEADLINE, MemoryEffectRunner, MemoryPlanRepository, memberSnapshot } from "./test-support";
+import { approved, DEADLINE, MemoryEffectRunner, MemoryPlanRepository, memberSnapshot, RecordingEffectRunner } from "./test-support";
 import type { PlanEffect } from "./types";
 
 const NOW = new Date("2026-10-27T01:00:00.000Z");
-
-/** Remembers what it was asked, and can be made to fail. */
-class Spy implements EffectRunner {
-  readonly calls: { planId: string; version: number; effects: readonly PlanEffect[] }[] = [];
-  constructor(private readonly failure: EffectError | null = null) {}
-  async run(planId: string, version: number, effects: readonly PlanEffect[]): Promise<Result<void, EffectError>> {
-    this.calls.push({ planId, version, effects });
-    return this.failure ? err(this.failure) : ok(undefined);
-  }
-}
 
 describe("CompositeEffectRunner", () => {
   const effects: PlanEffect[] = [{ type: "request_approval", memberIds: ["ana"] }];
 
   it("gives every runner the same effects", async () => {
-    const [a, b] = [new Spy(), new Spy()];
+    const [a, b] = [new RecordingEffectRunner(), new RecordingEffectRunner()];
     expect(await new CompositeEffectRunner([a, b]).run("plan-1", 4, effects)).toEqual({ ok: true, value: undefined });
     expect(a.calls).toEqual([{ planId: "plan-1", version: 4, effects }]);
     expect(b.calls).toEqual(a.calls);
   });
 
   it("keeps going when one fails, and reports every failure", async () => {
-    const [first, last] = [new Spy({ message: "disk full" }), new Spy({ message: "chat down" })];
-    const middle = new Spy();
+    const [first, last] = [new RecordingEffectRunner({ message: "disk full" }), new RecordingEffectRunner({ message: "chat down" })];
+    const middle = new RecordingEffectRunner();
     const result = await new CompositeEffectRunner([first, middle, last]).run("plan-1", 1, effects);
     expect(result).toEqual({ ok: false, error: { message: "disk full; chat down" } });
     expect(middle.calls).toHaveLength(1);
@@ -131,7 +121,7 @@ describe("SimulatedHoldRunner", () => {
 
   it("says the hold was placed, and the plan waits for the others", async () => {
     const repo = plan();
-    const onward = new Spy();
+    const onward = new RecordingEffectRunner();
     expect(await build(repo, onward).run("plan-1", 2, [hold("ana")])).toEqual({ ok: true, value: undefined });
     expect(repo.plan.members[0].holdPlaced).toBe(true);
     expect(repo.plan.status).toBe("approving");
@@ -140,7 +130,7 @@ describe("SimulatedHoldRunner", () => {
 
   it("moves the plan on, and passes on what that sets in motion, when the last hold is in", async () => {
     const repo = plan([approved("ana"), approved("ben", { holdPlaced: true })]);
-    const onward = new Spy();
+    const onward = new RecordingEffectRunner();
     await build(repo, onward).run("plan-1", 2, [hold("ana")]);
     expect(repo.plan.status).toBe("held");
     expect(onward.calls).toEqual([{ planId: "plan-1", version: 2, effects: [{ type: "book" }] }]);
@@ -154,7 +144,7 @@ describe("SimulatedHoldRunner", () => {
 
   it("lets go of a hold the plan no longer needs, such as when the person backed out first", async () => {
     const repo = plan([memberSnapshot("ana", { planAgreement: "agreed", agreedShareMinor: 30_000 }), approved("ben")]);
-    const onward = new Spy();
+    const onward = new RecordingEffectRunner();
     expect(await build(repo, onward).run("plan-1", 2, [hold("ana")])).toEqual({ ok: true, value: undefined });
     expect(repo.saves).toBe(0);
     expect(onward.calls).toEqual([]);

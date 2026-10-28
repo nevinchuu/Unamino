@@ -10,14 +10,26 @@ import type { MemberSnapshot, PlanEffect, PlanSnapshot } from "./types";
 
 /** A plan store in memory that enforces the same version rule as the real one. */
 export class MemoryPlanRepository implements PlanRepository {
+  /** Saves that went through. */
   saves = 0;
+  loads = 0;
+  /** Every save asked for, whether or not it went through. */
+  saveAttempts = 0;
+  /** Runs before each save, to simulate someone else saving first. */
+  beforeSave: (repo: MemoryPlanRepository, attempt: number) => void = () => undefined;
+  /** When set, every save fails with this. */
+  saveFailure: RepositoryError | null = null;
   constructor(public stored: StoredPlan) {}
 
   async load(): Promise<Result<StoredPlan, RepositoryError>> {
+    this.loads += 1;
     return ok(this.stored);
   }
 
   async save(stored: StoredPlan, next: PlanSnapshot): Promise<Result<StoredPlan, RepositoryError>> {
+    this.saveAttempts += 1;
+    this.beforeSave(this, this.saveAttempts);
+    if (this.saveFailure) return err(this.saveFailure);
     if (this.stored.version !== stored.version) return err({ code: "version_conflict", message: "changed" });
     this.saves += 1;
     this.stored = { id: stored.id, version: stored.version + 1, plan: next };
@@ -74,6 +86,17 @@ export class MemoryEffectRunner implements EffectRunner {
 
   get types(): string[] {
     return [...this.ran.values()].map((effect) => effect.type);
+  }
+}
+
+/** Remembers every request it was given, and can be made to fail. */
+export class RecordingEffectRunner implements EffectRunner {
+  readonly calls: { planId: string; version: number; effects: readonly PlanEffect[] }[] = [];
+  constructor(private readonly failure: EffectError | null = null) {}
+
+  async run(planId: string, version: number, effects: readonly PlanEffect[]): Promise<Result<void, EffectError>> {
+    this.calls.push({ planId, version, effects });
+    return this.failure ? err(this.failure) : ok(undefined);
   }
 }
 

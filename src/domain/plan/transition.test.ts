@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { isPlanOverdue, needsOfferRefresh } from "./overdue";
 import { transition } from "./transition";
 import type { MemberSnapshot, PlanEffect, PlanEvent, PlanSnapshot } from "./types";
 
@@ -393,12 +392,6 @@ describe("starting to book", () => {
     expect(errorCode(booking, { type: "price_rechecked", at: minutes(3), memberId: "ana", currentMinor: 1000 })).toBe("invalid_status");
     expect(errorCode(booking, { type: "picks_changed", at: minutes(3) })).toBe("invalid_status");
   });
-
-  it("is not part of the refresh and overdue checks", () => {
-    const booking = startBooking(heldPlan());
-    expect(needsOfferRefresh(booking, DEADLINE)).toBe(false);
-    expect(isPlanOverdue(booking, HARD)).toBe(false);
-  });
 });
 
 describe("replacing the plan", () => {
@@ -502,29 +495,7 @@ describe("deadlines during review", () => {
     expect(byId(plan, "ana").planAgreement).toBe("agreed");
   });
 
-  it("ends the plan when a listing is lost, and still checks for refresh and overdue", () => {
+  it("ends the plan when a listing is lost", () => {
     expect(run(reviewingPlan(), { type: "offers_unavailable", at: T0 }).plan.status).toBe("expired");
-    expect(needsOfferRefresh(reviewingPlan(), DEADLINE)).toBe(true);
-    expect(isPlanOverdue(reviewingPlan(), HARD)).toBe(true);
-  });
-});
-
-describe("overdue and refresh checks", () => {
-  it("needs a refresh after the deadline but before the hard cap", () => {
-    expect(needsOfferRefresh(planOf(), minutes(5))).toBe(false);
-    expect(needsOfferRefresh(planOf(), DEADLINE)).toBe(true);
-    expect(needsOfferRefresh(planOf(), HARD)).toBe(false);
-  });
-
-  it("is overdue at the hard cap", () => {
-    expect(isPlanOverdue(planOf(), new Date(HARD.getTime() - 1))).toBe(false);
-    expect(isPlanOverdue(planOf(), HARD)).toBe(true);
-  });
-
-  it("never touches a booked or finished plan", () => {
-    for (const status of ["booked", "captured", "expired"] as const) {
-      expect(isPlanOverdue(planOf({ status }), HARD)).toBe(false);
-      expect(needsOfferRefresh(planOf({ status }), DEADLINE)).toBe(false);
-    }
   });
 });

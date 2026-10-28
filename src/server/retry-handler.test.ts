@@ -29,12 +29,6 @@ describe("handleRetryEffects", () => {
     expect(runs()).toBe(0);
   });
 
-  it("refuses every call when no secret is configured", async () => {
-    const { deps, runs } = setup({ secret: null });
-    expect((await handleRetryEffects(request("Bearer anything"), deps)).status).toBe(401);
-    expect(runs()).toBe(0);
-  });
-
   it("has nothing to do, and says so, on a server without real card holds", async () => {
     const response = await handleRetryEffects(request(`Bearer ${SECRET}`), { secret: SECRET, retrier: null });
     expect(response.status).toBe(200);

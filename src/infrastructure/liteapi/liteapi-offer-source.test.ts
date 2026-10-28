@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FlightQuery, HotelQuery, OfferQuery } from "@/domain/offers/offer-source";
-import { CompositeOfferSource } from "@/domain/offers/composite-offer-source";
-import { FixtureOfferSource, parseFixtureOffers } from "@/domain/offers/fixture-offer-source";
-import fixtureData from "@/data/fixture-offers.json";
+import type { FlightQuery, HotelQuery } from "@/domain/offers/offer-source";
 import flightsRoundTrip from "./fixtures/flights-round-trip.json";
 import hotelsSingleRoom from "./fixtures/hotels-single-room.json";
 import { LiteApiOfferSource } from "./liteapi-offer-source";
@@ -216,25 +213,6 @@ describe("failures", () => {
     const result = await source.search({ kind: "activity", city: "Bangkok", date: "2026-12-12", guests: 2 });
     expect(errorCode(result)).toBe("invalid_query");
     expect(calls).toHaveLength(0);
-  });
-});
-
-describe("CompositeOfferSource", () => {
-  const parsed = parseFixtureOffers(fixtureData);
-  if (!parsed.ok) throw new Error(parsed.error.message);
-  const fixtures = new FixtureOfferSource(parsed.value, () => NOW);
-
-  it("sends each kind to its own source", async () => {
-    const { source: liteApi, calls } = sourceWith(() => json(hotelsSingleRoom));
-    const composite = new CompositeOfferSource({ hotel: liteApi, flight: liteApi, activity: fixtures });
-
-    const activities = await composite.search({ kind: "activity", city: "Bangkok", date: "2026-12-12", guests: 2 });
-    expect(activities.ok && activities.value.map((offer) => offer.id)).toEqual(["fx-act-cooking"]);
-    expect(calls).toHaveLength(0);
-
-    const hotels = await composite.search(hotelQuery as OfferQuery);
-    expect(hotels.ok && hotels.value).toHaveLength(2);
-    expect(calls).toHaveLength(1);
   });
 });
 

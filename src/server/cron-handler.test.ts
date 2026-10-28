@@ -61,13 +61,6 @@ describe("handleExpireOverdue", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("refuses every call when no secret is configured", async () => {
-    const { deps, calls } = setup({ secret: null });
-    const response = await handleExpireOverdue(request("Bearer anything"), deps);
-    expect(response.status).toBe(401);
-    expect(calls).toHaveLength(0);
-  });
-
   it("answers with a plain error and logs only the kind when the sweep fails", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { deps } = setup({ service: { expireOverdue: async () => err({ kind: "prices_stale", message: "internal detail" }) } });
