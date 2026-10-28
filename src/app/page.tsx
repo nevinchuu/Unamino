@@ -1,12 +1,14 @@
-import { AppBar, Screen } from "@/components/screen";
-import { GROUP_CURRENCY } from "@/server/group-currency";
-import { CreateGroupForm } from "./create-group-form";
+import { Suspense } from "react";
+import { Screen } from "@/components/screen";
+import { TripsHeader, TripsHome } from "./trips-home";
 
 export default function Home() {
   return (
-    <Screen>
-      <AppBar title="New group" subtitle="Plan a trip together" />
-      <CreateGroupForm currency={GROUP_CURRENCY} />
+    <Screen wash>
+      {/* Reading this browser's cookies is per-visitor, so the list streams in behind the title. */}
+      <Suspense fallback={<TripsHeader />}>
+        <TripsHome />
+      </Suspense>
     </Screen>
   );
 }

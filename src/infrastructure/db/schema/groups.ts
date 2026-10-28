@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, check, index, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, currencyCode, id, instant } from "./columns";
 import { memberStatus } from "./enums";
 
@@ -33,6 +33,8 @@ export const members = pgTable(
      * Only the hash is stored, so a leaked table cannot be used to sign in. (Named for the earlier per-person invite idea.)
      */
     inviteTokenHash: text("invite_token_hash").notNull().unique(),
+    /** The `seq` of the newest message this person has had on screen. A message after it is unread. */
+    lastReadSeq: bigint("last_read_seq", { mode: "number" }).notNull().default(0),
     joinedAt: instant("joined_at"),
     leftAt: instant("left_at"),
     createdAt: createdAt(),

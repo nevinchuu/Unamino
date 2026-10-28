@@ -1,4 +1,5 @@
 import type { AgentRunRepository, PlanCardSummary, PlanStore } from "@/domain/agent/ports";
+import type { ReadMarkers } from "@/domain/group/read-markers";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { Member, Message, MessageKind } from "@/domain/group/types";
 import { POLL_LIMIT } from "@/lib/chat-limits";
@@ -49,6 +50,8 @@ export interface ChatDeps {
   readonly plans: Pick<PlanStore, "cards">;
   /** What the cards offer the person asking. */
   readonly viewerCards: Pick<ViewerCards, "forPlan">;
+  /** Where the person has read up to, so the trips list can show a chat with newer messages as unread. */
+  readonly reads: Pick<ReadMarkers, "markRead">;
   readonly clock: () => Date;
 }
 
@@ -74,7 +77,8 @@ function newestOpenPlan(plans: readonly PlanCardSummary[]): PlanCardSummary | nu
 
 /**
  * Everything the chat screen shows, for the messages after `afterSeq`, or for the latest ones when `afterSeq` is null.
- * `viewerId` is who is asking: the newest open plan's card also carries what that person can do next.
+ * `viewerId` is who is asking: the newest open plan's card also carries what that person can do next, and the messages
+ * they are given count as read by them.
  */
 export async function loadChat(deps: ChatDeps, groupId: string, window: { readonly afterSeq: number | null; readonly limit: number }, viewerId: string | null = null): Promise<ChatSnapshot> {
   const now = deps.clock();
@@ -85,6 +89,7 @@ export async function loadChat(deps: ChatDeps, groupId: string, window: { readon
     deps.plans.cards(groupId),
     window.afterSeq === null ? deps.messages.recent(groupId, window.limit) : deps.messages.listAfter(groupId, window.afterSeq, window.limit),
   ]);
+  if (viewerId && messages.length > 0) await deps.reads.markRead(viewerId, Math.max(...messages.map((message) => message.seq)));
   const open = viewerId ? newestOpenPlan(plans) : null;
   const mine = open && viewerId ? await deps.viewerCards.forPlan(open.id, viewerId) : null;
   return {

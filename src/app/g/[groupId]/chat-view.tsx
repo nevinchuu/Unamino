@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowLeft, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentAvatar, AvatarStack } from "@/components/avatar";
@@ -199,13 +199,18 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
 
   return (
     <>
-      <Link href={`/g/${groupId}/info`} className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 py-3 text-foreground">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-lg leading-tight font-extrabold">{groupName}</h1>
-          <p className="truncate text-xs text-muted-foreground">{members.length > 0 ? members.join(", ") : "Tap for group info"}</p>
-        </div>
-        <AvatarStack people={members.map((name) => ({ name }))} max={3} size={28} />
-      </Link>
+      <header className="sticky top-0 z-10 flex items-center gap-1 border-b border-border bg-card py-1.5 pr-4 pl-2 text-foreground">
+        <Link href="/" aria-label="All trips" className="flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted">
+          <ArrowLeft className="size-5" />
+        </Link>
+        <Link href={`/g/${groupId}/info`} className="flex min-w-0 flex-1 items-center gap-3 py-1.5">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg leading-tight font-extrabold">{groupName}</h1>
+            <p className="truncate text-xs text-muted-foreground">{members.length > 0 ? members.join(", ") : "Tap for group info"}</p>
+          </div>
+          <AvatarStack people={members.map((name) => ({ name }))} max={3} size={28} />
+        </Link>
+      </header>
 
       <div ref={scrollBox} onScroll={onScroll} className="relative flex-1 overflow-y-auto bg-background px-4 pt-2 pb-4" aria-live="polite">
         {isEmpty ? (

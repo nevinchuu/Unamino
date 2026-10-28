@@ -34,6 +34,7 @@ import { PostgresPlanRepository } from "@/infrastructure/db/postgres-plan-reposi
 import { PostgresPlanStatusReader } from "@/infrastructure/db/postgres-plan-status-reader";
 import { PostgresPlanStore } from "@/infrastructure/db/postgres-plan-store";
 import { PostgresPlanViewStore } from "@/infrastructure/db/postgres-plan-view-store";
+import { PostgresReadMarkers } from "@/infrastructure/db/postgres-read-markers";
 import { PostgresRunRepository } from "@/infrastructure/db/postgres-run-repository";
 import { PostgresSearchStore } from "@/infrastructure/db/postgres-search-store";
 import { PostgresBookingStore } from "@/infrastructure/db/postgres-booking-store";
@@ -55,6 +56,7 @@ import { DeferredBookingRunner } from "./deferred-runner";
 import { ViewerCards } from "./viewer-card";
 import type { GroupCounter } from "./group-rate";
 import type { ChatDeps } from "./chat";
+import type { TripsDeps } from "./trips";
 import type { StripeEventLike } from "./stripe-webhook";
 import { readServerEnv, resolveBookingSimulation, resolveHoldSimulation, resolvePaymentsMode } from "./env";
 import { GROUP_CURRENCY } from "./group-currency";
@@ -72,6 +74,8 @@ export interface Container {
   readonly agent: AgentDeps;
   /** What the chat screen and its polling read. */
   readonly chat: ChatDeps;
+  /** What the trips list reads. */
+  readonly trips: TripsDeps;
   readonly plans: PlanService;
   readonly planStatus: PlanStatusReader;
   /** What the plan screen reads. */
@@ -141,6 +145,7 @@ function build(): Container {
   };
 
   const views = new PostgresPlanViewStore(db);
+  const reads = new PostgresReadMarkers(db);
 
   // A key that is present but wrong stops the server: running without it would quietly refuse every traveller.
   let travellers: TravellerService | null = null;
@@ -151,6 +156,7 @@ function build(): Container {
   }
 
   const mode = resolvePaymentsMode({ simulateHolds: simulation.value, stripeSecretKey: env.value.stripeSecretKey });
+  const viewerCards = new ViewerCards({ views, payments: mode, clock: agent.clock });
 
   // What follows a change to a plan: it is written down, the group is told in the chat, and the money moves:
   // for real on Stripe when there is a key, or pretended in development when asked for.
@@ -228,7 +234,8 @@ function build(): Container {
     groupCounter: groups,
     messages,
     agent,
-    chat: { groups, messages, runs: agent.runs, plans: agent.plans, viewerCards: new ViewerCards({ views, payments: mode, clock: agent.clock }), clock: agent.clock },
+    chat: { groups, messages, runs: agent.runs, plans: agent.plans, viewerCards, reads, clock: agent.clock },
+    trips: { groups, messages, plans: agent.plans, viewerCards, reads },
     plans: planService,
     planStatus: new PostgresPlanStatusReader(db),
     views,

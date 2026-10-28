@@ -31,7 +31,7 @@ async function Invite({ params }: { readonly params: PageProps<"/join/[token]">[
         <Avatar name="?" size={96} />
         <h2 className="mt-2 text-xl font-semibold">This invite doesn&apos;t work</h2>
         <p className="text-muted-foreground">It may have been reset or switched off. Ask the person who made the group for a new link.</p>
-        <Link href="/" className="mt-4 text-sm font-medium text-primary">
+        <Link href="/new" className="mt-4 text-sm font-medium text-primary">
           Start your own group
         </Link>
       </main>

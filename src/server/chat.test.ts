@@ -26,6 +26,7 @@ const MINE = { canAgree: true, agreed: false, canRequestChanges: true, shareMino
 function setup({ stored = [], running = false, plans = [], member = ana }: Setup = {}) {
   const asked: string[] = [];
   const cardsFor: string[] = [];
+  const marked: string[] = [];
   const deps: PollDeps = {
     groups: { memberNames: async () => NAMES, joinedMembers: async () => [ana, { ...ana, id: "ben", displayName: "Ben" }] },
     messages: {
@@ -35,10 +36,11 @@ function setup({ stored = [], running = false, plans = [], member = ana }: Setup
     runs: { isRunning: async () => running },
     plans: { cards: async () => plans },
     viewerCards: { forPlan: async (planId, memberId) => (cardsFor.push(`${planId}:${memberId}`), MINE) },
+    reads: { markRead: async (memberId, seq) => void marked.push(`${memberId}:${seq}`) },
     clock: () => NOW,
     memberOf: async () => member,
   };
-  return { deps, asked, cardsFor };
+  return { deps, asked, cardsFor, marked };
 }
 
 const poll = (deps: PollDeps, query: string, groupId = GROUP) => handlePoll(new Request(`http://localhost/api/groups/${groupId}/poll${query}`), groupId, deps);
@@ -68,6 +70,19 @@ describe("loadChat", () => {
     const chat = await loadChat(deps, GROUP, { afterSeq: null, limit: 2 });
     expect(chat.messages.map((m) => m.seq)).toEqual([2, 3]);
     expect(asked).toEqual(["recent 2"]);
+  });
+
+  it("counts the messages it hands to a person as read by them, up to the newest", async () => {
+    const { deps, marked } = setup({ stored: [message(1), message(2), message(3)] });
+    await loadChat(deps, GROUP, { afterSeq: null, limit: 2 }, "ana");
+    expect(marked).toEqual(["ana:3"]);
+  });
+
+  it("marks nothing read when there was nothing new, or when nobody is asking", async () => {
+    const { deps, marked } = setup({ stored: [message(1)] });
+    await loadChat(deps, GROUP, { afterSeq: 1, limit: 10 }, "ana");
+    await loadChat(deps, GROUP, { afterSeq: null, limit: 10 });
+    expect(marked).toEqual([]);
   });
 
   it("brings only what is newer when it has a starting point", async () => {

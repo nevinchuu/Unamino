@@ -11,7 +11,7 @@ export function NotAMember() {
         <Avatar name="?" size={96} />
         <h2 className="mt-2 text-xl font-semibold">You&apos;re not in this group</h2>
         <p className="text-muted-foreground">Open the invite link someone sent you to join.</p>
-        <Link href="/" className="mt-4 text-sm font-medium text-primary">
+        <Link href="/new" className="mt-4 text-sm font-medium text-primary">
           Start your own group
         </Link>
       </main>

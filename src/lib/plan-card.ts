@@ -79,6 +79,11 @@ function listOf(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** Has this person done what the plan's stage asks of them: agreed while it is being agreed to, held their card while amounts are approved? Later stages ask nothing more of anyone. */
+export function hasDoneTheirPart(status: PlanStatus, person: CardPerson): boolean {
+  return status === "approving" ? person.held : status === "reviewing" || status === "draft" ? person.agreed : false;
+}
+
 export type SheetStep = "agree" | "approve";
 
 export interface ActionSheetView {
@@ -99,7 +104,7 @@ export interface ActionSheetView {
  */
 export function describeSheet(plan: CardPlan, mine: CardMine): ActionSheetView {
   const step: SheetStep = plan.status === "approving" ? "approve" : "agree";
-  const done = (person: CardPerson): boolean => (step === "approve" ? person.held : person.agreed);
+  const done = (person: CardPerson): boolean => hasDoneTheirPart(plan.status, person);
   const waiting = mine.people.filter((person) => !done(person));
   const waitingNames = waiting.map((person) => (person.isMe ? "you" : person.name));
 

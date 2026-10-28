@@ -33,3 +33,20 @@ export const inviteCookieOptions = (production: boolean): MemberCookieOptions =>
   ...memberCookieOptions(production),
   maxAge: INVITE_COOKIE_MAX_AGE_SECONDS,
 });
+
+const MEMBER_COOKIE_PREFIX = "member_";
+
+export interface Membership {
+  readonly groupId: string;
+  /** The member's secret token. Whether it still opens that group is for the server to check. */
+  readonly token: string;
+}
+
+/** The groups this browser holds a member cookie for, so the trips list knows which chats to show. Cookies that are not member cookies, or have no value, are skipped. */
+export function membershipsFromCookies(cookies: readonly { readonly name: string; readonly value: string }[]): Membership[] {
+  return cookies.flatMap(({ name, value }) => {
+    if (!name.startsWith(MEMBER_COOKIE_PREFIX) || !value) return [];
+    const groupId = name.slice(MEMBER_COOKIE_PREFIX.length);
+    return isUuid(groupId) ? [{ groupId, token: value }] : [];
+  });
+}

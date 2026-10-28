@@ -50,6 +50,13 @@
       "when": 1793153630876,
       "tag": "0006_black_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793200147771,
+      "tag": "0007_dear_scorpion",
+      "breakpoints": true
     }
   ]
 }

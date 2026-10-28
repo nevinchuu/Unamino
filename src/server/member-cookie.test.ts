@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isUuid } from "./ids";
-import { inviteCookieName, inviteCookieOptions, MEMBER_COOKIE_MAX_AGE_SECONDS, memberCookieName, memberCookieOptions } from "./member-cookie";
+import { inviteCookieName, inviteCookieOptions, MEMBER_COOKIE_MAX_AGE_SECONDS, memberCookieName, memberCookieOptions, membershipsFromCookies } from "./member-cookie";
 
 const GROUP = "3f2b8c1e-5a4d-4e0b-9c7a-1d2e3f4a5b6c";
 
@@ -40,5 +40,15 @@ describe("invite cookie", () => {
     expect(inviteCookieName(GROUP)).toBe(`invite_${GROUP}`);
     expect(inviteCookieName(GROUP)).not.toBe(memberCookieName(GROUP));
     expect(inviteCookieName("nope")).toBeNull();
+  });
+});
+
+describe("membershipsFromCookies", () => {
+  it("finds the groups this browser is a member of", () => {
+    expect(membershipsFromCookies([{ name: `member_${GROUP}`, value: "secret" }])).toEqual([{ groupId: GROUP, token: "secret" }]);
+  });
+
+  it("ignores invite cookies, other cookies, a malformed group id and an empty value", () => {
+    expect(membershipsFromCookies([{ name: `invite_${GROUP}`, value: "x" }, { name: "theme", value: "dark" }, { name: "member_not-a-group", value: "x" }, { name: `member_${GROUP}`, value: "" }])).toEqual([]);
   });
 });
