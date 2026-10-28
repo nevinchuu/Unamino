@@ -14,6 +14,8 @@ const FORMER_MEMBER = "Former member";
 export { POLL_LIMIT };
 /** The chat opens on this many of the latest messages. */
 export const INITIAL_MESSAGES = 50;
+/** How many older messages one "load earlier" brings. */
+export const EARLIER_PAGE = 50;
 /** A run still going after this long is treated as dead, the same rule that frees the group for the next call. */
 export const AGENT_STALE_MS = 5 * 60_000;
 
@@ -39,6 +41,8 @@ export interface ChatSnapshot {
   /** Who is in the group now, in the order they joined. */
   readonly members: readonly string[];
   readonly agentWorking: boolean;
+  /** There are messages before the oldest one here, which "load earlier" can fetch. Only meaningful when the chat is first opened. */
+  readonly hasEarlier: boolean;
   /** Every plan the group has made, oldest first, so each card shows its own plan's state. */
   readonly plans: readonly PlanCardDto[];
 }
@@ -82,13 +86,16 @@ function newestOpenPlan(plans: readonly PlanCardSummary[]): PlanCardSummary | nu
  */
 export async function loadChat(deps: ChatDeps, groupId: string, window: { readonly afterSeq: number | null; readonly limit: number }, viewerId: string | null = null): Promise<ChatSnapshot> {
   const now = deps.clock();
-  const [names, joined, agentWorking, plans, messages] = await Promise.all([
+  const [names, joined, agentWorking, plans, fetched] = await Promise.all([
     deps.groups.memberNames(groupId),
     deps.groups.joinedMembers(groupId),
     deps.runs.isRunning(groupId, now, AGENT_STALE_MS),
     deps.plans.cards(groupId),
-    window.afterSeq === null ? deps.messages.recent(groupId, window.limit) : deps.messages.listAfter(groupId, window.afterSeq, window.limit),
+    // One more than asked for, so a chat that holds exactly one page does not claim to have an earlier one.
+    window.afterSeq === null ? deps.messages.recent(groupId, window.limit + 1) : deps.messages.listAfter(groupId, window.afterSeq, window.limit),
   ]);
+  const hasEarlier = window.afterSeq === null && fetched.length > window.limit;
+  const messages = hasEarlier ? fetched.slice(1) : fetched;
   if (viewerId && messages.length > 0) await deps.reads.markRead(viewerId, Math.max(...messages.map((message) => message.seq)));
   const open = viewerId ? newestOpenPlan(plans) : null;
   const mine = open && viewerId ? await deps.viewerCards.forPlan(open.id, viewerId) : null;
@@ -96,6 +103,7 @@ export async function loadChat(deps: ChatDeps, groupId: string, window: { readon
     messages: messages.map((message) => toMessageDto(message, names)),
     members: joined.map((member) => member.displayName),
     agentWorking,
+    hasEarlier,
     plans: plans.map((plan) => ({ ...plan, mine: open && plan.id === open.id ? mine : null })),
   };
 }
@@ -118,4 +126,32 @@ export async function handlePoll(request: Request, groupId: string, deps: PollDe
   if (!/^\d+$/.test(raw) || !Number.isSafeInteger(afterSeq)) return json({ error: "bad_after" }, 400);
 
   return json(await loadChat(deps, groupId, { afterSeq, limit: POLL_LIMIT }, member.id), 200);
+}
+
+export interface EarlierDeps {
+  readonly groups: Pick<GroupRepository, "memberNames">;
+  readonly messages: Pick<MessageRepository, "listBefore">;
+  /** Who is asking, in this group. Null for anyone who is not a member of it. */
+  readonly memberOf: (groupId: string) => Promise<Member | null>;
+}
+
+export interface EarlierPage {
+  readonly messages: readonly ChatMessageDto[];
+  /** There are still older messages after these. */
+  readonly hasEarlier: boolean;
+}
+
+/** Scrolling back: the page of messages just before `before`, which is the oldest the person has. */
+export async function handleEarlier(request: Request, groupId: string, deps: EarlierDeps): Promise<Response> {
+  const member = isUuid(groupId) ? await deps.memberOf(groupId) : null;
+  if (!member) return json({ error: "unauthorized" }, 401);
+
+  const raw = new URL(request.url).searchParams.get("before") ?? "";
+  const before = Number(raw);
+  if (!/^\d+$/.test(raw) || !Number.isSafeInteger(before) || before < 1) return json({ error: "bad_before" }, 400);
+
+  const [names, fetched] = await Promise.all([deps.groups.memberNames(groupId), deps.messages.listBefore(groupId, before, EARLIER_PAGE + 1)]);
+  const hasEarlier = fetched.length > EARLIER_PAGE;
+  const page: EarlierPage = { messages: (hasEarlier ? fetched.slice(1) : fetched).map((message) => toMessageDto(message, names)), hasEarlier };
+  return json(page, 200);
 }

@@ -28,6 +28,8 @@ interface ItemBase {
   /** The price of this item for everyone it covers, in `currency`. */
   readonly totalMinor: number;
   readonly currency: string;
+  /** The airline's or hotel's own booking code, once the trip is booked and the supplier gave one. Null before that. */
+  readonly bookingCode: string | null;
 }
 
 export type PlanItemDto =
@@ -151,7 +153,7 @@ export interface PlanViewDto {
 
 const KIND_ORDER: Record<Offer["kind"], number> = { flight: 0, hotel: 1, activity: 2 };
 
-function itemOf(pick: ViewPick, names: ReadonlyMap<string, string>): PlanItemDto {
+function itemOf(pick: ViewPick, names: ReadonlyMap<string, string>, codes: ReadonlyMap<string, string>): PlanItemDto {
   const { offer } = pick;
   const base: ItemBase = {
     id: pick.id,
@@ -161,6 +163,7 @@ function itemOf(pick: ViewPick, names: ReadonlyMap<string, string>): PlanItemDto
     notes: Object.entries(pick.notes).map(([id, text]) => ({ name: names.get(id) ?? "Someone", text })),
     totalMinor: offer.totalMinor,
     currency: offer.currency,
+    bookingCode: codes.get(pick.id) ?? null,
   };
 
   switch (offer.kind) {
@@ -192,6 +195,14 @@ function itemOf(pick: ViewPick, names: ReadonlyMap<string, string>): PlanItemDto
 function ideaOf(idea: ViewIdea): IdeaDto {
   const start = dayAndTime(`${idea.date}T${idea.startTime}`);
   return { id: idea.id, when: `${start} to ${clock(`${idea.date}T${idea.endTime}`) ?? idea.endTime}`, category: idea.category, name: idea.venue.name, address: idea.venue.address, mapsUrl: httpsUrlOrNull(idea.venue.mapsUrl), why: idea.why };
+}
+
+/** The supplier's code for each pick, once the trip is booked. A pick with several bookings keeps the first that has a code. */
+function bookingCodesOf(raw: PlanViewRaw): Map<string, string> {
+  const codes = new Map<string, string>();
+  if (raw.status !== "booked" && raw.status !== "captured") return codes;
+  for (const booking of raw.bookings) if (booking.confirmation && !codes.has(booking.pickId)) codes.set(booking.pickId, booking.confirmation);
+  return codes;
 }
 
 function confirmationsOf(raw: PlanViewRaw): ConfirmationDto[] {
@@ -296,6 +307,7 @@ export function buildPlanView(
 
   // The card and the details are asked for together, once the person has approved their amount.
   const cardNeeded = options.payments === "stripe" && approving && mine?.approval === "approved" && mine.holdPlaced === false;
+  const bookingCodes = bookingCodesOf(raw);
 
   return {
     id: raw.id,
@@ -313,7 +325,7 @@ export function buildPlanView(
     demoBooking: options.demoBooking ?? false,
     currency: raw.baseCurrency,
     pricesAvailable: priced.ok,
-    items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names)),
+    items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names, bookingCodes)),
     ideas: raw.ideas.map(ideaOf),
     confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],
     progress: bookingProgressOf(raw),

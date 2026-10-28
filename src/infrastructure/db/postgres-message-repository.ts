@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, lt } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
 import { callsAgent } from "@/domain/group/mention";
 import { MAX_MESSAGE_LENGTH, type GroupError, type Message, type MessageKind } from "@/domain/group/types";
@@ -77,6 +77,16 @@ export class PostgresMessageRepository implements MessageRepository {
       .orderBy(asc(messages.seq))
       .limit(Math.min(Math.max(limit, 1), MAX_PAGE));
     return rows.map(toMessage);
+  }
+
+  async listBefore(groupId: string, beforeSeq: number, limit: number): Promise<readonly Message[]> {
+    const rows = await this.db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.groupId, groupId), lt(messages.seq, beforeSeq)))
+      .orderBy(desc(messages.seq))
+      .limit(Math.min(Math.max(limit, 1), MAX_PAGE));
+    return rows.map(toMessage).reverse();
   }
 
   async recent(groupId: string, limit: number): Promise<readonly Message[]> {

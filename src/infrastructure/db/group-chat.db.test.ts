@@ -270,6 +270,21 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
       expect((await messageRepo.recent(groupId, 3)).map((m) => m.body)).toEqual(["b", "c", "d"]);
     }, 30_000);
 
+    it("gives the page of messages just before a point, oldest first, for scrolling back", async () => {
+      const { groupId, nevin } = await groupWithAna();
+      const other = await newGroup("db-test-other-3");
+      const sent = [];
+      for (const body of ["a", "b", "c", "d", "e"]) {
+        const r = await messageRepo.post({ groupId, memberId: nevin.id, body });
+        if (!r.ok) throw new Error(r.error.message);
+        sent.push(r.value);
+      }
+      await messageRepo.postSystem(other.group.id, "not ours");
+      expect((await messageRepo.listBefore(groupId, sent[4].seq, 3)).map((m) => m.body)).toEqual(["b", "c", "d"]);
+      expect((await messageRepo.listBefore(groupId, sent[1].seq, 10)).map((m) => m.body)).toEqual(["a"]);
+      expect(await messageRepo.listBefore(groupId, sent[0].seq, 10)).toEqual([]);
+    }, 30_000);
+
     it("lets the database refuse an agent message that claims to call the agent", async () => {
       const { groupId } = await groupWithAna();
       const attempt = handle.db.insert(messages).values({ groupId, kind: "agent", body: "x", mentionsAgent: true });

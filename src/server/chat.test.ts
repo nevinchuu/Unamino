@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlanCardSummary } from "@/domain/agent/ports";
 import type { Member, Message } from "@/domain/group/types";
-import { AGENT_NAME, handlePoll, loadChat, POLL_LIMIT, toMessageDto, type PollDeps } from "./chat";
+import { AGENT_NAME, EARLIER_PAGE, handleEarlier, handlePoll, loadChat, POLL_LIMIT, toMessageDto, type EarlierDeps, type PollDeps } from "./chat";
 
 const GROUP = "3f2b8c1e-5a4d-4e0b-9c7a-1d2e3f4a5b6c";
 const NOW = new Date("2026-10-27T10:00:00Z");
@@ -69,7 +69,15 @@ describe("loadChat", () => {
     const { deps, asked } = setup({ stored: [message(1), message(2), message(3)] });
     const chat = await loadChat(deps, GROUP, { afterSeq: null, limit: 2 });
     expect(chat.messages.map((m) => m.seq)).toEqual([2, 3]);
-    expect(asked).toEqual(["recent 2"]);
+    // It asks for one more than it shows, to know whether anything came before.
+    expect(asked).toEqual(["recent 3"]);
+  });
+
+  it("says there is an earlier page only when something really comes before what it shows", async () => {
+    const { deps } = setup({ stored: [message(1), message(2), message(3)] });
+    expect((await loadChat(deps, GROUP, { afterSeq: null, limit: 2 })).hasEarlier).toBe(true);
+    expect((await loadChat(deps, GROUP, { afterSeq: null, limit: 3 })).hasEarlier).toBe(false);
+    expect((await loadChat(deps, GROUP, { afterSeq: 1, limit: 10 })).hasEarlier).toBe(false);
   });
 
   it("counts the messages it hands to a person as read by them, up to the newest", async () => {
@@ -169,5 +177,46 @@ describe("handlePoll", () => {
       expect(cardsFor).toEqual(["plan-1:ana"]);
       expect(body.plans[0].mine).toEqual(MINE);
     });
+  });
+});
+
+describe("handleEarlier", () => {
+  const many = Array.from({ length: EARLIER_PAGE + 20 }, (_, index) => message(index + 1));
+
+  function earlier(stored: Message[] = many, member: Member | null = ana) {
+    const deps: EarlierDeps = {
+      groups: { memberNames: async () => NAMES },
+      messages: { listBefore: async (_group, beforeSeq, limit) => stored.filter((m) => m.seq < beforeSeq).slice(-limit) },
+      memberOf: async () => member,
+    };
+    return (query: string, groupId = GROUP) => handleEarlier(new Request(`http://localhost/api/groups/${groupId}/earlier${query}`), groupId, deps);
+  }
+
+  it("brings the page just before the oldest message the person has, oldest first, and says more remain", async () => {
+    const response = await earlier()("?before=71");
+    const page = (await response.json()) as { messages: { seq: number }[]; hasEarlier: boolean };
+    expect(page.messages.map((m) => m.seq)).toEqual(Array.from({ length: EARLIER_PAGE }, (_, index) => 21 + index));
+    expect(page.hasEarlier).toBe(true);
+  });
+
+  it("says nothing more remains when the page reaches the start of the chat", async () => {
+    const page = (await (await earlier()("?before=11")).json()) as { messages: { seq: number }[]; hasEarlier: boolean };
+    expect(page.messages.map((m) => m.seq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(page.hasEarlier).toBe(false);
+  });
+
+  it("puts names on the messages and keeps internals out", async () => {
+    const page = (await (await earlier()("?before=3")).json()) as { messages: Record<string, unknown>[] };
+    expect(page.messages[0]).toMatchObject({ senderName: "Ana" });
+    expect(Object.keys(page.messages[0])).not.toContain("groupId");
+  });
+
+  it.each(["", "?before=abc", "?before=-1", "?before=0", "?before=1.5"])("refuses a bad starting point %j", async (query) => {
+    expect((await earlier()(query)).status).toBe(400);
+  });
+
+  it("answers someone who is not in the group, or a malformed group id, the same way", async () => {
+    expect((await earlier(many, null)("?before=5")).status).toBe(401);
+    expect((await earlier()("?before=5", "not-a-group")).status).toBe(401);
   });
 });

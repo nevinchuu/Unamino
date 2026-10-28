@@ -223,6 +223,16 @@ describe("a paid trip", () => {
       ]);
     });
 
+    it("puts each code on its own flight or hotel too, so it can be read where the booking is shown", () => {
+      const dto = view({ status: "captured", bookings });
+      expect(dto.items.map((item) => [item.kind, item.bookingCode])).toEqual([["flight", "FL123"], ["hotel", "HC9"]]);
+    });
+
+    it("leaves a booking code off an item until the trip is booked, and when the supplier gave none", () => {
+      expect(view({ status: "booking", bookings }).items.map((item) => item.bookingCode)).toEqual([null, null]);
+      expect(view({ status: "captured", bookings: [{ pickId: "pick-hotel", confirmation: null }] }).items.map((item) => item.bookingCode)).toEqual([null, null]);
+    });
+
     it("shows nothing before the trip is booked, even if a booking exists", () => {
       expect(view({ status: "booking", bookings }).confirmations).toEqual([]);
     });

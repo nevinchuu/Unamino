@@ -29,6 +29,17 @@ function Card({ icon, title, subtitle, price, sandbox = false, children }: { rea
   );
 }
 
+/** The airline's or hotel's own code, to quote at the desk. Shown once the trip is booked and the supplier gave one. */
+function BookingCode({ label, code }: { readonly label: string; readonly code: string | null }) {
+  if (!code) return null;
+  return (
+    <div className="mt-3 flex items-baseline justify-between gap-3 rounded-lg bg-success/10 px-3 py-2 text-sm">
+      <span className="font-medium text-success">{label}</span>
+      <span className="font-mono font-semibold select-all">{code}</span>
+    </div>
+  );
+}
+
 const DIRECTION_LABEL = { outbound: "Going", inbound: "Coming back" } as const;
 
 function Who({ names }: { readonly names: readonly string[] }) {
@@ -65,6 +76,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
   if (item.kind === "flight") {
     return (
       <Card icon={<Plane className="size-5" />} title={item.title} subtitle={item.refundable ? "Refundable" : "Not refundable"} price={price} sandbox>
+        <BookingCode label="Flight booking code" code={item.bookingCode} />
         <ul className="mt-3 space-y-2">
           {item.legs.map((leg, index) => (
             <li key={index} className="rounded-lg bg-muted px-3 py-2 text-sm">
@@ -87,6 +99,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
   if (item.kind === "hotel") {
     return (
       <Card icon={<BedDouble className="size-5" />} title={item.title} subtitle={`${item.roomName}${item.stars ? ` · ${"★".repeat(item.stars)}` : ""}`} price={price} sandbox>
+        <BookingCode label="Hotel confirmation code" code={item.bookingCode} />
         <p className="mt-3 text-sm">{item.stay}</p>
         {item.freeCancellationUntil ? <p className="mt-1 text-sm font-medium text-success">Free cancellation until {item.freeCancellationUntil}</p> : <p className="mt-1 text-sm text-muted-foreground">No free cancellation</p>}
         {item.extraCharges.map((charge) => (

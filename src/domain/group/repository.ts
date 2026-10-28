@@ -56,6 +56,8 @@ export interface MessageRepository {
   postSystem(groupId: string, body: string): Promise<Result<Message, GroupError>>;
   /** Messages newer than `afterSeq`, oldest first. For polling. */
   listAfter(groupId: string, afterSeq: number, limit: number): Promise<readonly Message[]>;
+  /** Up to `limit` messages just before `beforeSeq`, oldest first. For scrolling back through a long chat. */
+  listBefore(groupId: string, beforeSeq: number, limit: number): Promise<readonly Message[]>;
   /** The latest messages, oldest first. For the agent to read. */
   recent(groupId: string, limit: number): Promise<readonly Message[]>;
 }

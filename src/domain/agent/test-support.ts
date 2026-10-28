@@ -182,6 +182,7 @@ export class FakeMessages implements MessageRepository {
   async postAgent(groupId: string, body: string, options: { replyToMessageId?: string; planId?: string } = {}) { return ok(this.push("agent", groupId, body, { replyToMessageId: options.replyToMessageId ?? null, planId: options.planId ?? null })); }
   async postSystem(groupId: string, body: string) { return ok(this.push("system", groupId, body)); }
   async listAfter(groupId: string, afterSeq: number, limit: number) { return this.all.filter((m) => m.groupId === groupId && m.seq > afterSeq).slice(0, limit); }
+  async listBefore(groupId: string, beforeSeq: number, limit: number) { return this.all.filter((m) => m.groupId === groupId && m.seq < beforeSeq).slice(-limit); }
   async recent(groupId: string, limit: number) { return this.all.filter((m) => m.groupId === groupId).slice(-limit); }
 
   get agentMessages(): Message[] { return this.all.filter((m) => m.kind === "agent"); }

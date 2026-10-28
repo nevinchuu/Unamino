@@ -1,18 +1,20 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Loader2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentAvatar, AvatarStack } from "@/components/avatar";
 import { mentionsAgent } from "@/domain/group/mention";
 import { layoutMessages, snippet } from "@/lib/chat-format";
 import { lastSeq, mergeMessages, visiblePending, type PendingMessage } from "@/lib/chat-state";
-import type { ChatMessageDto, ChatSnapshot, PlanCardDto } from "@/server/chat";
+import { latestPlan } from "@/lib/trip-list";
+import type { ChatMessageDto, ChatSnapshot, EarlierPage, PlanCardDto } from "@/server/chat";
 import { POLL_LIMIT } from "@/lib/chat-limits";
 import { sendMessage } from "./actions";
 import { ActionSheet } from "./action-sheet";
 import { Composer } from "./composer";
 import { MessageRow, type RowModel } from "./message-row";
+import { PlanStrip } from "./plan-strip";
 
 const POLL_MS = 2_000;
 /** A hidden tab does not poll, but looks again this often in case it was shown without the browser saying so. */
@@ -42,6 +44,9 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const [signedOut, setSignedOut] = useState(false);
   const [unseen, setUnseen] = useState(0);
   const [typing, setTyping] = useState(false);
+  const [hasEarlier, setHasEarlier] = useState(initial.hasEarlier);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [earlierFailed, setEarlierFailed] = useState(false);
   /** What a screen reader is told when something new arrives, instead of reading out the whole chat each time. */
   const [announcement, setAnnouncement] = useState("");
 
@@ -49,6 +54,8 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const stickToBottom = useRef(true);
   const newestSeq = useRef(lastSeq(initial.messages));
   const tempCounter = useRef(0);
+  /** Where the list was before older messages were added above it, so the reader stays on the same message. */
+  const scrollAnchor = useRef<{ readonly height: number; readonly top: number } | null>(null);
 
   useEffect(() => {
     newestSeq.current = lastSeq(messages);
@@ -170,6 +177,15 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
 
   const laid = layoutMessages(models, new Date());
 
+  // Older messages are added above what the reader is looking at, so the scroll position moves down by what was added.
+  useLayoutEffect(() => {
+    const box = scrollBox.current;
+    const anchor = scrollAnchor.current;
+    if (!box || !anchor) return;
+    box.scrollTop = anchor.top + (box.scrollHeight - anchor.height);
+    scrollAnchor.current = null;
+  }, [messages]);
+
   // Keeps the newest message in view while the person is reading the latest, and leaves them where they are when they have scrolled up.
   useLayoutEffect(() => {
     const box = scrollBox.current;
@@ -181,6 +197,28 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
     if (!box) return;
     stickToBottom.current = box.scrollHeight - box.scrollTop - box.clientHeight < NEAR_BOTTOM_PX;
     if (stickToBottom.current) setUnseen(0);
+  }
+
+  async function loadEarlier() {
+    const box = scrollBox.current;
+    const oldest = messages[0]?.seq;
+    if (!box || oldest === undefined || loadingEarlier) return;
+    setLoadingEarlier(true);
+    setEarlierFailed(false);
+    try {
+      const response = await fetch(`/api/groups/${groupId}/earlier?before=${oldest}`, { cache: "no-store" });
+      if (response.status === 401) return setSignedOut(true);
+      if (!response.ok) throw new Error(`earlier answered ${response.status}`);
+      const page = (await response.json()) as EarlierPage;
+      scrollAnchor.current = { height: box.scrollHeight, top: box.scrollTop };
+      stickToBottom.current = false;
+      setMessages((held) => mergeMessages(held, page.messages));
+      setHasEarlier(page.hasEarlier);
+    } catch {
+      setEarlierFailed(true);
+    } finally {
+      setLoadingEarlier(false);
+    }
   }
 
   function jumpToLatest() {
@@ -201,6 +239,8 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const isEmpty = models.length === 0;
   // The server gives the person's own next step only on the group's newest open plan, so that is the plan the sheet is about.
   const decidingOn = plans.find((plan) => plan.mine) ?? null;
+  // When the sheet is not about the current plan (it is booked, or the person is not in it), a strip keeps it one tap away.
+  const current = latestPlan(plans);
 
   return (
     <>
@@ -220,7 +260,23 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
         {announcement}
       </p>
 
+      {current && current.status !== "expired" && !decidingOn ? <PlanStrip groupId={groupId} plan={current} /> : null}
+
       <div ref={scrollBox} onScroll={onScroll} className="relative flex-1 overflow-y-auto bg-background px-4 pt-2 pb-4">
+        {hasEarlier ? (
+          <div className="flex justify-center pt-1 pb-1">
+            <button
+              type="button"
+              onClick={() => void loadEarlier()}
+              disabled={loadingEarlier}
+              className="inline-flex min-h-11 items-center gap-2 rounded-full bg-card px-4 text-sm font-semibold text-link shadow-soft disabled:opacity-60"
+            >
+              {loadingEarlier ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
+              {earlierFailed ? "Couldn’t load. Try again" : "Load earlier messages"}
+            </button>
+          </div>
+        ) : null}
+
         {isEmpty ? (
           <div className="mx-auto mt-10 flex max-w-xs flex-col items-center gap-3 rounded-3xl bg-card px-5 py-6 text-center shadow-soft">
             <AgentAvatar size={48} />
