@@ -274,4 +274,10 @@ describe("a paid trip", () => {
     expect([...FAST_POLL_STATUSES].sort()).toEqual(["approving", "booked", "booking", "draft", "held", "reviewing"]);
     expect(LIVE_PLAN_STATUSES.includes("booking")).toBe(false);
   });
+
+  it("shows a place's map link only when it is a plain https address", () => {
+    const idea = (mapsUrl: string | null) => ({ ...IDEA, venue: { ...IDEA.venue, mapsUrl } });
+    expect(view({ ideas: [idea("https://maps.google.com/?cid=1")] }).ideas[0].mapsUrl).toBe("https://maps.google.com/?cid=1");
+    expect(view({ ideas: [idea("javascript:alert(1)")] }).ideas[0].mapsUrl).toBeNull();
+  });
 });

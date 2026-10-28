@@ -1,6 +1,7 @@
 import type { AgentRunRepository, PlanCardSummary, PlanStore } from "@/domain/agent/ports";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { Member, Message, MessageKind } from "@/domain/group/types";
+import { POLL_LIMIT } from "@/lib/chat-limits";
 import type { CardMine } from "@/lib/plan-card";
 import { isUuid } from "./ids";
 import type { ViewerCards } from "./viewer-card";
@@ -9,8 +10,7 @@ import type { ViewerCards } from "./viewer-card";
 export const AGENT_NAME = "Trippy";
 const FORMER_MEMBER = "Former member";
 
-/** How many messages one poll may bring. A poll that hits it is simply followed by another straight away. */
-export const POLL_LIMIT = 100;
+export { POLL_LIMIT };
 /** The chat opens on this many of the latest messages. */
 export const INITIAL_MESSAGES = 50;
 /** A run still going after this long is treated as dead, the same rule that frees the group for the next call. */

@@ -8,7 +8,7 @@ import { mentionsAgent } from "@/domain/group/mention";
 import { layoutMessages, snippet } from "@/lib/chat-format";
 import { lastSeq, mergeMessages, visiblePending, type PendingMessage } from "@/lib/chat-state";
 import type { ChatMessageDto, ChatSnapshot, PlanCardDto } from "@/server/chat";
-import { POLL_LIMIT } from "@/server/chat";
+import { POLL_LIMIT } from "@/lib/chat-limits";
 import { sendMessage } from "./actions";
 import { Composer } from "./composer";
 import { MessageBubble, type BubbleModel } from "./message-bubble";

@@ -85,7 +85,7 @@ describe("sendChatMessage", () => {
 
   it("keeps the message posted when the run cannot start", async () => {
     const { deps } = setup();
-    const failing: SendDeps = { ...deps, agent: { ...deps.agent, runs: { ...deps.agent.runs, countRecent: deps.agent.runs.countRecent.bind(deps.agent.runs), start: async () => err({ code: "unavailable", message: "db down" }) } } };
+    const failing: SendDeps = { ...deps, agent: { ...deps.agent, runs: { ...deps.agent.runs, countRecent: deps.agent.runs.countRecent.bind(deps.agent.runs), countAll: deps.agent.runs.countAll.bind(deps.agent.runs), start: async () => err({ code: "unavailable", message: "db down" }) } } };
     const sent = await send(failing, ana, "@trippy plan Bangkok");
     expect(sent).toMatchObject({ ok: true, value: { run: null, message: { body: "@trippy plan Bangkok" } } });
   });

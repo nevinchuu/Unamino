@@ -19,7 +19,14 @@ import type { TraceSink } from "./trace";
 const CHAT_WINDOW = 200;
 const DEFAULT_STALE_RUN_MS = 5 * 60_000;
 /** Every call costs real money, so one person, and one group, can only call the agent so often. */
-export const RUN_LIMITS = { windowMs: 60 * 60_000, perMember: 10, perGroup: 30 } as const;
+export const RUN_LIMITS = {
+  windowMs: 60 * 60_000,
+  perMember: 10,
+  perGroup: 30,
+  /** A ceiling on the whole service, because every run costs real model calls and groups cost nothing to make. */
+  everyone: { perHour: 100, perDay: 500 },
+} as const;
+const DAY_MS = 24 * 60 * 60_000;
 export const AGENT_DISPLAY_NAME = "Trippy";
 
 export interface AgentDeps {
@@ -76,7 +83,12 @@ export async function startAgentRun(deps: Pick<AgentDeps, "runs" | "messages" | 
   const now = deps.clock();
   const recent = await deps.runs.countRecent(message.groupId, message.memberId, new Date(now.getTime() - RUN_LIMITS.windowMs));
   if (!recent.ok) return recent;
-  if (recent.value.member >= RUN_LIMITS.perMember || recent.value.group >= RUN_LIMITS.perGroup) {
+  const lastHour = await deps.runs.countAll(new Date(now.getTime() - RUN_LIMITS.windowMs));
+  if (!lastHour.ok) return lastHour;
+  const lastDay = await deps.runs.countAll(new Date(now.getTime() - DAY_MS));
+  if (!lastDay.ok) return lastDay;
+  const busy = lastHour.value >= RUN_LIMITS.everyone.perHour || lastDay.value >= RUN_LIMITS.everyone.perDay;
+  if (busy || recent.value.member >= RUN_LIMITS.perMember || recent.value.group >= RUN_LIMITS.perGroup) {
     await deps.messages.postAgent(message.groupId, MESSAGES.limited, { replyToMessageId: message.id });
     return { ok: true, value: { status: "limited" } };
   }

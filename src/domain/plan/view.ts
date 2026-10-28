@@ -3,6 +3,7 @@ import type { PaymentsMode } from "@/domain/payments/types";
 import { passportRequiredFor } from "@/domain/travellers/requirements";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
 import { planReference } from "@/lib/plan-reference";
+import { httpsUrlOrNull } from "@/lib/safe-url";
 import { currentShares } from "./pricing";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import type { PlanViewRaw, ViewIdea, ViewPick } from "./view-store";
@@ -190,7 +191,7 @@ function itemOf(pick: ViewPick, names: ReadonlyMap<string, string>): PlanItemDto
 
 function ideaOf(idea: ViewIdea): IdeaDto {
   const start = dayAndTime(`${idea.date}T${idea.startTime}`);
-  return { id: idea.id, when: `${start} to ${clock(`${idea.date}T${idea.endTime}`) ?? idea.endTime}`, category: idea.category, name: idea.venue.name, address: idea.venue.address, mapsUrl: idea.venue.mapsUrl, why: idea.why };
+  return { id: idea.id, when: `${start} to ${clock(`${idea.date}T${idea.endTime}`) ?? idea.endTime}`, category: idea.category, name: idea.venue.name, address: idea.venue.address, mapsUrl: httpsUrlOrNull(idea.venue.mapsUrl), why: idea.why };
 }
 
 function confirmationsOf(raw: PlanViewRaw): ConfirmationDto[] {

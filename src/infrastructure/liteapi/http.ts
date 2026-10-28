@@ -1,3 +1,4 @@
+import "server-only";
 import { err, ok, type Result } from "@/lib/result";
 import type { OfferSourceError } from "@/domain/offers/offer-source";
 

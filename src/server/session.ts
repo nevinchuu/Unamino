@@ -1,3 +1,4 @@
+import "server-only";
 import { cookies } from "next/headers";
 import type { Member } from "@/domain/group/types";
 import { authenticateInGroup } from "./authenticate";

@@ -1,3 +1,4 @@
+import "server-only";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { CipherError, TravellerCipher } from "@/domain/travellers/ports";
 import { err, ok, type Result } from "@/lib/result";

@@ -1,3 +1,5 @@
+import "server-only";
+import { httpsUrlOrNull } from "@/lib/safe-url";
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import { toOpeningHours } from "@/domain/schedule/opening-hours";
@@ -48,7 +50,7 @@ function toVenueFacts(place: z.infer<typeof placeSchema>): VenueFacts {
     placeId: place.id,
     name: place.displayName.text,
     address: place.formattedAddress ?? null,
-    mapsUrl: place.googleMapsUri ?? null,
+    mapsUrl: httpsUrlOrNull(place.googleMapsUri),
     businessStatus: STATUSES[place.businessStatus ?? ""] ?? "other",
     // No periods field means Google lists no hours; an empty list would mean never open.
     hours: periods === undefined ? null : toOpeningHours(periods),

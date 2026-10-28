@@ -1,3 +1,4 @@
+import "server-only";
 import { err, ok, type Result } from "@/lib/result";
 import { museConfigFromEnv } from "@/infrastructure/muse/muse-config";
 import type { PaymentsMode } from "@/domain/payments/types";

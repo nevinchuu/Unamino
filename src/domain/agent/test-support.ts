@@ -216,6 +216,10 @@ export class FakeRuns implements AgentRunRepository {
     return ok({ group: inGroup.length, member: memberId === null ? 0 : inGroup.filter((entry) => entry.memberId === memberId).length });
   }
 
+  async countAll(since: Date): Promise<Result<number, StoreError>> {
+    return ok(this.history.filter((entry) => entry.at >= since).length);
+  }
+
   async isRunning(): Promise<boolean> {
     return this.running !== null;
   }

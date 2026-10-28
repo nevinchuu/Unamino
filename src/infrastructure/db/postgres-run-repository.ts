@@ -51,6 +51,15 @@ export class PostgresRunRepository implements AgentRunRepository {
     }
   }
 
+  async countAll(since: Date): Promise<Result<number, StoreError>> {
+    try {
+      const [all] = await this.db.select({ total: count() }).from(agentRuns).where(gte(agentRuns.startedAt, since));
+      return ok(all.total);
+    } catch {
+      return unavailable();
+    }
+  }
+
   async isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean> {
     const [row] = await this.db
       .select({ id: agentRuns.id })

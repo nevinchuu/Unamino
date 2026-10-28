@@ -54,6 +54,8 @@ export interface AgentRunRepository {
   finish(runId: string, outcome: RunOutcome, now: Date): Promise<void>;
   /** How many runs the group, and this person in it, started since `since`. Every run counts, whatever it came to. */
   countRecent(groupId: string, memberId: string | null, since: Date): Promise<Result<RecentRuns, StoreError>>;
+  /** How many runs started anywhere since `since`. The whole service's ceiling is measured with this. */
+  countAll(since: Date): Promise<Result<number, StoreError>>;
   /** Is the agent working for this group right now? A run left going for longer than `staleAfterMs` no longer counts. */
   isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean>;
 }

@@ -55,4 +55,31 @@ describe("calling the agent too often", () => {
     busyHour(RUN_LIMITS.perMember, null);
     expect(await call("m-6", null)).toMatchObject({ ok: true, value: { status: "started" } });
   });
+
+  describe("the ceiling on the whole service", () => {
+    it("stops every group once the service has done too much in an hour, even a group that has done almost nothing", async () => {
+      const { call, busyHour, runs } = setup();
+      for (let group = 0; group < RUN_LIMITS.everyone.perHour; group += 1) busyHour(1, `person-${group}`, minutesAgo(10), `group-${group}`);
+      expect(await call("m-7", "ana", "a-new-group")).toEqual({ ok: true, value: { status: "limited" } });
+      expect(runs.started).toHaveLength(0);
+    });
+
+    it("lets the next call through just under the hourly ceiling", async () => {
+      const { call, busyHour } = setup();
+      for (let group = 0; group < RUN_LIMITS.everyone.perHour - 1; group += 1) busyHour(1, `person-${group}`, minutesAgo(10), `group-${group}`);
+      expect(await call("m-8", "ana", "a-new-group")).toMatchObject({ ok: true, value: { status: "started" } });
+    });
+
+    it("also stops at the daily ceiling, which an hourly pace would otherwise get past", async () => {
+      const { call, busyHour } = setup();
+      for (let group = 0; group < RUN_LIMITS.everyone.perDay; group += 1) busyHour(1, `person-${group}`, minutesAgo(180), `group-${group}`);
+      expect(await call("m-9", "ana", "a-new-group")).toEqual({ ok: true, value: { status: "limited" } });
+    });
+
+    it("forgets runs from more than a day ago", async () => {
+      const { call, busyHour } = setup();
+      for (let group = 0; group < RUN_LIMITS.everyone.perDay; group += 1) busyHour(1, `person-${group}`, minutesAgo(25 * 60), `group-${group}`);
+      expect(await call("m-10", "ana", "a-new-group")).toMatchObject({ ok: true, value: { status: "started" } });
+    });
+  });
 });
