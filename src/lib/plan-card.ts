@@ -1,5 +1,17 @@
 import type { PlanStatus } from "@/domain/plan/statuses";
 
+/** What the plan means for the person looking at the chat, so the card can offer them the next step. */
+export interface CardMine {
+  /** They have not agreed yet, and may. */
+  readonly canAgree: boolean;
+  readonly agreed: boolean;
+  /** Their share, in `currency`'s minor units. The price the Agree button shows, and that the server checks again. */
+  readonly shareMinor: number | null;
+  readonly currency: string;
+  /** Everyone agreed and it is this person's turn to approve their amount or add their card. */
+  readonly needsAmount: boolean;
+}
+
 /** One of the group's plans, as the chat knows it. */
 export interface CardPlan {
   readonly id: string;
@@ -9,6 +21,8 @@ export interface CardPlan {
   readonly agreedCount: number;
   /** The plan that took this one over, when a newer plan replaced it. */
   readonly replacedById: string | null;
+  /** Only on the group's newest open plan, and only for the person asking. Null everywhere else. */
+  readonly mine?: CardMine | null;
 }
 
 export interface PlanCardView {

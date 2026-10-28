@@ -3,7 +3,12 @@ import type { ReactNode } from "react";
 import type { IdeaDto, PlanItemDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
 
-function Card({ icon, title, subtitle, price, children }: { readonly icon: ReactNode; readonly title: string; readonly subtitle?: string; readonly price?: ReactNode; readonly children?: ReactNode }) {
+/** Flights and hotels come only from a test sandbox, so their cards say so: nobody should take the prices for real ones. */
+function SandboxTag() {
+  return <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Sandbox listing</span>;
+}
+
+function Card({ icon, title, subtitle, price, sandbox = false, children }: { readonly icon: ReactNode; readonly title: string; readonly subtitle?: string; readonly price?: ReactNode; readonly sandbox?: boolean; readonly children?: ReactNode }) {
   return (
     <article className="rounded-xl bg-card p-4 shadow-sm">
       <header className="flex items-start gap-3">
@@ -12,7 +17,12 @@ function Card({ icon, title, subtitle, price, children }: { readonly icon: React
           <h3 className="font-semibold break-words">{title}</h3>
           {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
         </div>
-        {price ? <div className="shrink-0 text-right">{price}</div> : null}
+        {price ? (
+          <div className="shrink-0 text-right">
+            {price}
+            {sandbox ? <SandboxTag /> : null}
+          </div>
+        ) : null}
       </header>
       {children}
     </article>
@@ -54,7 +64,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
 
   if (item.kind === "flight") {
     return (
-      <Card icon={<Plane className="size-5" />} title={item.title} subtitle={item.refundable ? "Refundable" : "Not refundable"} price={price}>
+      <Card icon={<Plane className="size-5" />} title={item.title} subtitle={item.refundable ? "Refundable" : "Not refundable"} price={price} sandbox>
         <ul className="mt-3 space-y-2">
           {item.legs.map((leg, index) => (
             <li key={index} className="rounded-lg bg-muted px-3 py-2 text-sm">
@@ -76,7 +86,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
 
   if (item.kind === "hotel") {
     return (
-      <Card icon={<BedDouble className="size-5" />} title={item.title} subtitle={`${item.roomName}${item.stars ? ` · ${"★".repeat(item.stars)}` : ""}`} price={price}>
+      <Card icon={<BedDouble className="size-5" />} title={item.title} subtitle={`${item.roomName}${item.stars ? ` · ${"★".repeat(item.stars)}` : ""}`} price={price} sandbox>
         <p className="mt-3 text-sm">{item.stay}</p>
         {item.freeCancellationUntil ? <p className="mt-1 text-sm font-medium text-success">Free cancellation until {item.freeCancellationUntil}</p> : <p className="mt-1 text-sm text-muted-foreground">No free cancellation</p>}
         {item.extraCharges.map((charge) => (

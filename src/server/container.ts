@@ -50,6 +50,7 @@ import { traceSinkFromEnv } from "@/infrastructure/trace/file-trace";
 import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
 import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
 import { DeferredBookingRunner } from "./deferred-runner";
+import { ViewerCards } from "./viewer-card";
 import type { ChatDeps } from "./chat";
 import type { StripeEventLike } from "./stripe-webhook";
 import { readServerEnv, resolveBookingSimulation, resolveHoldSimulation, resolvePaymentsMode } from "./env";
@@ -220,7 +221,7 @@ function build(): Container {
     groups,
     messages,
     agent,
-    chat: { groups, messages, runs: agent.runs, plans: agent.plans, clock: agent.clock },
+    chat: { groups, messages, runs: agent.runs, plans: agent.plans, viewerCards: new ViewerCards({ views, payments: mode, clock: agent.clock }), clock: agent.clock },
     plans: planService,
     planStatus: new PostgresPlanStatusReader(db),
     views,

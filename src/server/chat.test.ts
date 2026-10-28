@@ -21,8 +21,11 @@ interface Setup {
   member?: Member | null;
 }
 
+const MINE = { canAgree: true, agreed: false, shareMinor: 32_000, currency: "USD", needsAmount: false };
+
 function setup({ stored = [], running = false, plans = [], member = ana }: Setup = {}) {
   const asked: string[] = [];
+  const cardsFor: string[] = [];
   const deps: PollDeps = {
     groups: { memberNames: async () => NAMES, joinedMembers: async () => [ana, { ...ana, id: "ben", displayName: "Ben" }] },
     messages: {
@@ -31,10 +34,11 @@ function setup({ stored = [], running = false, plans = [], member = ana }: Setup
     },
     runs: { isRunning: async () => running },
     plans: { cards: async () => plans },
+    viewerCards: { forPlan: async (planId, memberId) => (cardsFor.push(`${planId}:${memberId}`), MINE) },
     clock: () => NOW,
     memberOf: async () => member,
   };
-  return { deps, asked };
+  return { deps, asked, cardsFor };
 }
 
 const poll = (deps: PollDeps, query: string, groupId = GROUP) => handlePoll(new Request(`http://localhost/api/groups/${groupId}/poll${query}`), groupId, deps);
@@ -77,7 +81,7 @@ describe("loadChat", () => {
     const chat = await loadChat(deps, GROUP, { afterSeq: 0, limit: 10 });
     expect(chat.members).toEqual(["Ana", "Ben"]);
     expect(chat.agentWorking).toBe(true);
-    expect(chat.plans).toEqual([paid, PLAN]);
+    expect(chat.plans).toEqual([{ ...paid, mine: null }, { ...PLAN, mine: null }]);
   });
 
   it("has no plan card before there is a plan", async () => {
@@ -118,5 +122,37 @@ describe("handlePoll", () => {
 
   it("never lets a response be cached, because it is different every time", async () => {
     expect((await poll(setup().deps, "?after=0")).headers.get("cache-control")).toBe("no-store");
+  });
+
+  describe("what the plan cards offer the person asking", () => {
+    const later: PlanCardSummary = { ...PLAN, id: "plan-2", title: "Later plan" };
+
+    it("puts it on the newest open plan only, and on none of the others", async () => {
+      const { deps, cardsFor } = setup({ plans: [{ ...PLAN, replacedById: "plan-2" }, later, { ...PLAN, id: "plan-0", status: "captured" }] });
+      const chat = await loadChat(deps, GROUP, { afterSeq: 0, limit: 10 }, "ana");
+
+      expect(chat.plans.map((plan) => [plan.id, plan.mine])).toEqual([["plan-1", null], ["plan-2", MINE], ["plan-0", null]]);
+      expect(cardsFor).toEqual(["plan-2:ana"]);
+    });
+
+    it("also works while the plan waits for amounts to be approved", async () => {
+      const { deps } = setup({ plans: [{ ...PLAN, status: "approving" }] });
+      expect((await loadChat(deps, GROUP, { afterSeq: 0, limit: 10 }, "ana")).plans[0].mine).toEqual(MINE);
+    });
+
+    it("reads nothing, and offers nothing, when there is no person asking or no plan is open", async () => {
+      const nobody = setup({ plans: [PLAN] });
+      expect((await loadChat(nobody.deps, GROUP, { afterSeq: 0, limit: 10 })).plans[0].mine).toBeNull();
+      const finished = setup({ plans: [{ ...PLAN, status: "expired" }] });
+      expect((await loadChat(finished.deps, GROUP, { afterSeq: 0, limit: 10 }, "ana")).plans[0].mine).toBeNull();
+      expect([...nobody.cardsFor, ...finished.cardsFor]).toEqual([]);
+    });
+
+    it("asks about the person who made the poll, not anyone else", async () => {
+      const { deps, cardsFor } = setup({ plans: [PLAN] });
+      const body = (await (await poll(deps, "?after=0")).json()) as { plans: { mine: unknown }[] };
+      expect(cardsFor).toEqual(["plan-1:ana"]);
+      expect(body.plans[0].mine).toEqual(MINE);
+    });
   });
 });

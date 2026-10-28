@@ -25,7 +25,7 @@ async function Chat({ params }: { readonly params: PageProps<"/g/[groupId]">["pa
   if (!me) return <NotAMember />;
 
   const { groups, chat } = getContainer();
-  const [group, initial] = await Promise.all([groups.find(groupId), loadChat(chat, groupId, { afterSeq: null, limit: INITIAL_MESSAGES })]);
+  const [group, initial] = await Promise.all([groups.find(groupId), loadChat(chat, groupId, { afterSeq: null, limit: INITIAL_MESSAGES }, me.id)]);
   if (!group.ok) return <NotAMember />;
 
   return <ChatView groupId={groupId} groupName={group.value.name} meId={me.id} isOrganiser={me.isOrganiser} initial={initial} />;

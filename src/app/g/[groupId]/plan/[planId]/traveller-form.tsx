@@ -98,7 +98,7 @@ export function TravellerForm({ groupId, planId, passportRequired, onSaved }: Tr
         <TextField label="Last name" name="lastName" autoComplete="family-name" error={errors.lastName} />
       </div>
       <div className="grid grid-cols-2 gap-x-4">
-        <TextField label="Date of birth" name="birthday" type="date" autoComplete="bday" error={errors.birthday} />
+        <TextField label="Date of birth (day / month / year)" name="birthday" type="date" autoComplete="bday" error={errors.birthday} />
         <SelectField label="Gender on passport" name="gender" error={errors.gender}>
           <option value="" disabled>
             Choose

@@ -1,7 +1,9 @@
 import type { AgentRunRepository, PlanCardSummary, PlanStore } from "@/domain/agent/ports";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { Member, Message, MessageKind } from "@/domain/group/types";
+import type { CardMine } from "@/lib/plan-card";
 import { isUuid } from "./ids";
+import type { ViewerCards } from "./viewer-card";
 
 /** What the agent is called in the chat. */
 export const AGENT_NAME = "Trippy";
@@ -29,7 +31,7 @@ export interface ChatMessageDto {
 }
 
 /** One of the group's plans, which the cards in the chat show the live state of. */
-export type PlanCardDto = PlanCardSummary;
+export type PlanCardDto = PlanCardSummary & { readonly mine: CardMine | null };
 
 export interface ChatSnapshot {
   readonly messages: readonly ChatMessageDto[];
@@ -45,6 +47,8 @@ export interface ChatDeps {
   readonly messages: Pick<MessageRepository, "listAfter" | "recent">;
   readonly runs: Pick<AgentRunRepository, "isRunning">;
   readonly plans: Pick<PlanStore, "cards">;
+  /** What the cards offer the person asking. */
+  readonly viewerCards: Pick<ViewerCards, "forPlan">;
   readonly clock: () => Date;
 }
 
@@ -63,8 +67,16 @@ export function toMessageDto(message: Message, names: ReadonlyMap<string, string
   };
 }
 
-/** Everything the chat screen shows, for the messages after `afterSeq`, or for the latest ones when `afterSeq` is null. */
-export async function loadChat(deps: ChatDeps, groupId: string, window: { readonly afterSeq: number | null; readonly limit: number }): Promise<ChatSnapshot> {
+/** The plan the group is working on now: the newest one that is still open and has not been replaced. */
+function newestOpenPlan(plans: readonly PlanCardSummary[]): PlanCardSummary | null {
+  return [...plans].reverse().find((plan) => (plan.status === "reviewing" || plan.status === "approving") && plan.replacedById === null) ?? null;
+}
+
+/**
+ * Everything the chat screen shows, for the messages after `afterSeq`, or for the latest ones when `afterSeq` is null.
+ * `viewerId` is who is asking: the newest open plan's card also carries what that person can do next.
+ */
+export async function loadChat(deps: ChatDeps, groupId: string, window: { readonly afterSeq: number | null; readonly limit: number }, viewerId: string | null = null): Promise<ChatSnapshot> {
   const now = deps.clock();
   const [names, joined, agentWorking, plans, messages] = await Promise.all([
     deps.groups.memberNames(groupId),
@@ -73,11 +85,13 @@ export async function loadChat(deps: ChatDeps, groupId: string, window: { readon
     deps.plans.cards(groupId),
     window.afterSeq === null ? deps.messages.recent(groupId, window.limit) : deps.messages.listAfter(groupId, window.afterSeq, window.limit),
   ]);
+  const open = viewerId ? newestOpenPlan(plans) : null;
+  const mine = open && viewerId ? await deps.viewerCards.forPlan(open.id, viewerId) : null;
   return {
     messages: messages.map((message) => toMessageDto(message, names)),
     members: joined.map((member) => member.displayName),
     agentWorking,
-    plans,
+    plans: plans.map((plan) => ({ ...plan, mine: open && plan.id === open.id ? mine : null })),
   };
 }
 
@@ -91,11 +105,12 @@ const json = (body: unknown, status: number): Response => Response.json(body, { 
 /** The browser's regular question: what is new since the last message I have? */
 export async function handlePoll(request: Request, groupId: string, deps: PollDeps): Promise<Response> {
   // A malformed id and a group the caller is not in get the same answer, so the route does not reveal which groups exist.
-  if (!isUuid(groupId) || !(await deps.memberOf(groupId))) return json({ error: "unauthorized" }, 401);
+  const member = isUuid(groupId) ? await deps.memberOf(groupId) : null;
+  if (!member) return json({ error: "unauthorized" }, 401);
 
   const raw = new URL(request.url).searchParams.get("after") ?? "0";
   const afterSeq = Number(raw);
   if (!/^\d+$/.test(raw) || !Number.isSafeInteger(afterSeq)) return json({ error: "bad_after" }, 400);
 
-  return json(await loadChat(deps, groupId, { afterSeq, limit: POLL_LIMIT }), 200);
+  return json(await loadChat(deps, groupId, { afterSeq, limit: POLL_LIMIT }, member.id), 200);
 }
