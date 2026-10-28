@@ -3,7 +3,7 @@
 import { ArrowDown, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { AgentAvatar, Avatar } from "@/components/avatar";
+import { AgentAvatar, AvatarStack } from "@/components/avatar";
 import { mentionsAgent } from "@/domain/group/mention";
 import { layoutMessages, snippet } from "@/lib/chat-format";
 import { lastSeq, mergeMessages, visiblePending, type PendingMessage } from "@/lib/chat-state";
@@ -11,7 +11,7 @@ import type { ChatMessageDto, ChatSnapshot, PlanCardDto } from "@/server/chat";
 import { POLL_LIMIT } from "@/lib/chat-limits";
 import { sendMessage } from "./actions";
 import { Composer } from "./composer";
-import { MessageBubble, type BubbleModel } from "./message-bubble";
+import { MessageRow, type RowModel } from "./message-row";
 
 const POLL_MS = 2_000;
 /** A hidden tab does not poll, but looks again this often in case it was shown without the browser saying so. */
@@ -28,7 +28,7 @@ interface ChatViewProps {
   readonly initial: ChatSnapshot;
 }
 
-const quoteOf = (referenced: ChatMessageDto | undefined): BubbleModel["quote"] =>
+const quoteOf = (referenced: ChatMessageDto | undefined): RowModel["quote"] =>
   referenced ? { name: referenced.senderName, text: snippet(referenced.body) } : { name: null, text: "Earlier message" };
 
 export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: ChatViewProps) {
@@ -37,7 +37,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const [agentWorking, setAgentWorking] = useState(initial.agentWorking);
   const [plans, setPlans] = useState<readonly PlanCardDto[]>(initial.plans);
   const [pending, setPending] = useState<PendingMessage[]>([]);
-  const [replyTo, setReplyTo] = useState<BubbleModel | null>(null);
+  const [replyTo, setReplyTo] = useState<RowModel | null>(null);
   const [signedOut, setSignedOut] = useState(false);
   const [unseen, setUnseen] = useState(0);
 
@@ -132,9 +132,9 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
 
   const shown = useMemo(() => visiblePending(pending, messages, meId), [pending, messages, meId]);
 
-  const models = useMemo<BubbleModel[]>(() => {
+  const models = useMemo<RowModel[]>(() => {
     const byId = new Map(messages.map((message) => [message.id, message]));
-    const confirmed = messages.map<BubbleModel>((message) => ({
+    const confirmed = messages.map<RowModel>((message) => ({
       key: message.id,
       kind: message.kind,
       senderId: message.senderId,
@@ -146,7 +146,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
       status: "sent",
       replyId: message.kind === "agent" ? message.id : null,
     }));
-    const unconfirmed = shown.map<BubbleModel>((item) => ({
+    const unconfirmed = shown.map<RowModel>((item) => ({
       key: item.tempId,
       kind: "human",
       senderId: meId,
@@ -185,7 +185,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
     setUnseen(0);
   }
 
-  function retry(model: BubbleModel) {
+  function retry(model: RowModel) {
     const failed = pending.find((item) => item.tempId === model.key);
     if (!failed) return;
     setPending((held) => held.filter((item) => item.tempId !== model.key));
@@ -196,21 +196,21 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
 
   return (
     <>
-      <Link href={`/g/${groupId}/info`} className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-primary px-4 py-2.5 text-primary-foreground">
-        <Avatar name={groupName} size={40} className="ring-2 ring-white/30" />
-        <div className="min-w-0">
-          <h1 className="truncate text-lg leading-tight font-semibold">{groupName}</h1>
-          <p className="truncate text-xs text-primary-foreground/80">{members.length > 0 ? members.join(", ") : "Tap for group info"}</p>
+      <Link href={`/g/${groupId}/info`} className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 py-3 text-foreground">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg leading-tight font-extrabold">{groupName}</h1>
+          <p className="truncate text-xs text-muted-foreground">{members.length > 0 ? members.join(", ") : "Tap for group info"}</p>
         </div>
+        <AvatarStack people={members.map((name) => ({ name }))} max={3} size={28} />
       </Link>
 
-      <div ref={scrollBox} onScroll={onScroll} className="relative flex-1 overflow-y-auto bg-secondary/60 px-3 pt-2 pb-3" aria-live="polite">
+      <div ref={scrollBox} onScroll={onScroll} className="relative flex-1 overflow-y-auto bg-background px-4 pt-2 pb-4" aria-live="polite">
         {isEmpty ? (
-          <div className="mx-auto mt-10 flex max-w-xs flex-col items-center gap-3 rounded-2xl bg-card px-5 py-6 text-center shadow-sm">
+          <div className="mx-auto mt-10 flex max-w-xs flex-col items-center gap-3 rounded-3xl bg-card px-5 py-6 text-center shadow-soft">
             <AgentAvatar size={48} />
-            <h2 className="font-semibold">Say hi to your group</h2>
+            <h2 className="font-extrabold">Say hi to your group</h2>
             <p className="text-sm text-muted-foreground">
-              When you&apos;re ready to plan a trip, mention <span className="font-semibold text-primary">@trippy</span>, like &ldquo;@trippy plan Bangkok, 11 to 13 Dec&rdquo;.
+              When you&apos;re ready to plan a trip, mention <span className="font-semibold text-link">@trippy</span>, like &ldquo;@trippy plan Bangkok, 11 to 13 Dec&rdquo;.
             </p>
             {isOrganiser ? (
               <Link href={`/g/${groupId}/info`} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
@@ -224,13 +224,15 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
         {laid.map(({ item, dayLabel, startsRun }) => (
           <div key={item.key}>
             {dayLabel ? (
-              <div className="my-3 flex justify-center">
-                <span className="rounded-full bg-card px-3 py-1 text-xs text-muted-foreground shadow-sm" suppressHydrationWarning>
+              <div className="mt-4 flex items-center gap-3" role="separator">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                   {dayLabel}
                 </span>
+                <span className="h-px flex-1 bg-border" />
               </div>
             ) : null}
-            <MessageBubble
+            <MessageRow
               groupId={groupId}
               model={item}
               mine={item.senderId === meId}
@@ -243,15 +245,18 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
         ))}
 
         {agentWorking ? (
-          <div className="mt-3 flex items-end gap-2" role="status">
-            <AgentAvatar size={32} />
-            <div className="rounded-2xl rounded-tl-md bg-card px-3 py-2 text-sm text-muted-foreground shadow-sm">
-              Trippy is thinking
-              <span className="ml-1 inline-flex gap-0.5" aria-hidden="true">
-                <span className="size-1 animate-pulse rounded-full bg-muted-foreground" />
-                <span className="size-1 animate-pulse rounded-full bg-muted-foreground [animation-delay:200ms]" />
-                <span className="size-1 animate-pulse rounded-full bg-muted-foreground [animation-delay:400ms]" />
-              </span>
+          <div className="mt-4 flex items-start gap-3" role="status">
+            <AgentAvatar size={34} />
+            <div className="min-w-0 flex-1">
+              <p className="mb-0.5 text-xs font-bold text-success">Trippy</p>
+              <p className="text-[15px] leading-snug text-muted-foreground">
+                Thinking
+                <span className="ml-1 inline-flex gap-0.5" aria-hidden="true">
+                  <span className="size-1 animate-pulse rounded-full bg-muted-foreground" />
+                  <span className="size-1 animate-pulse rounded-full bg-muted-foreground [animation-delay:200ms]" />
+                  <span className="size-1 animate-pulse rounded-full bg-muted-foreground [animation-delay:400ms]" />
+                </span>
+              </p>
             </div>
           </div>
         ) : null}
@@ -266,7 +271,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
           <button
             type="button"
             onClick={jumpToLatest}
-            className="sticky bottom-2 left-full mt-2 -mr-1 ml-auto flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-lg"
+            className="sticky bottom-2 left-full mt-2 -mr-1 ml-auto flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-lift"
           >
             <ArrowDown className="size-3.5" />
             {unseen} new
