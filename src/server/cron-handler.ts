@@ -1,5 +1,6 @@
 import type { BookingSweeper } from "@/domain/booking/sweeper";
 import type { PlanService } from "@/domain/plan/service";
+import type { TravellerService } from "@/domain/travellers/service";
 import { isCronAuthorized } from "./cron-auth";
 
 /** How many overdue plans one run looks at. The next run picks up the rest. */
@@ -10,6 +11,8 @@ export interface CronDeps {
   readonly service: Pick<PlanService, "expireOverdue">;
   /** Null when this server does not book for real, so no booking can be stuck. */
   readonly bookings?: Pick<BookingSweeper, "sweep"> | null;
+  /** Null when this server does not take traveller details. */
+  readonly travellers?: Pick<TravellerService, "purgeStale"> | null;
   readonly now: () => Date;
 }
 
@@ -26,5 +29,7 @@ export async function handleExpireOverdue(request: Request, deps: CronDeps): Pro
     return json({ error: "sweep_failed" }, 500);
   }
   const booking = deps.bookings ? await deps.bookings.sweep(OVERDUE_BATCH) : null;
-  return json(booking ? { ...swept.value, booking } : swept.value, 200);
+  // Details kept past any plan's life are deleted here whatever else the sweep found, so they never wait on a plan being swept.
+  const purged = deps.travellers ? await deps.travellers.purgeStale(deps.now()) : null;
+  return json({ ...swept.value, ...(booking && { booking }), ...(purged?.ok && { travellersPurged: purged.value }) }, 200);
 }

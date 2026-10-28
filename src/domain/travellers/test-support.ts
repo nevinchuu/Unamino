@@ -4,6 +4,9 @@ import type { TravellerStore, TravellerStoreError } from "./ports";
 /** A store held in memory for tests. `down` makes every call fail, as when the database cannot be reached. */
 export class MemoryTravellerStore implements TravellerStore {
   readonly rows = new Map<string, string>();
+  /** When each row was last saved, for the age-based deletion. Tests move the clock to make details old. */
+  readonly savedAt = new Map<string, Date>();
+  clock: () => Date = () => new Date();
   down = false;
 
   private check(): Result<void, TravellerStoreError> {
@@ -14,6 +17,7 @@ export class MemoryTravellerStore implements TravellerStore {
     const up = this.check();
     if (!up.ok) return up;
     this.rows.set(memberId, ciphertext);
+    this.savedAt.set(memberId, this.clock());
     return ok(undefined);
   }
 
@@ -32,6 +36,14 @@ export class MemoryTravellerStore implements TravellerStore {
     if (!up.ok) return up;
     for (const id of memberIds) this.rows.delete(id);
     return ok(undefined);
+  }
+
+  async removeOlderThan(before: Date): Promise<Result<number, TravellerStoreError>> {
+    const up = this.check();
+    if (!up.ok) return up;
+    const old = [...this.rows.keys()].filter((id) => (this.savedAt.get(id) ?? new Date(0)) < before);
+    for (const id of old) this.rows.delete(id);
+    return ok(old.length);
   }
 }
 

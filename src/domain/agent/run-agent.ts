@@ -24,7 +24,7 @@ export const RUN_LIMITS = {
   perMember: 10,
   perGroup: 30,
   /** A ceiling on the whole service, because every run costs real model calls and groups cost nothing to make. */
-  everyone: { perHour: 100, perDay: 500 },
+  everyone: { perHour: 100, perDay: 200 },
 } as const;
 const DAY_MS = 24 * 60 * 60_000;
 export const AGENT_DISPLAY_NAME = "Trippy";

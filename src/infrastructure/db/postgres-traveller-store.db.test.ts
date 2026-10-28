@@ -69,4 +69,23 @@ describe.skipIf(!ENABLED)("PostgresTravellerStore on the real database", () => {
     await handle.db.delete(members).where(eq(members.id, carl));
     expect(await store.get(carl)).toEqual({ ok: true, value: null });
   }, 30_000);
+
+  it("deletes only the details saved before a moment, and giving them again starts the age over", async () => {
+    const [oldMember, freshMember] = [ana, ben];
+    await store.remove([oldMember, freshMember]);
+    await store.put(oldMember, "old");
+    await store.put(freshMember, "fresh");
+    await handle.db.update(travellerDetails).set({ createdAt: new Date("2026-01-01T00:00:00Z") }).where(eq(travellerDetails.memberId, oldMember));
+
+    // The cutoff is before this project existed, so only the rows this test aged by hand can match it.
+    const removed = await store.removeOlderThan(new Date("2026-02-01T00:00:00Z"));
+    expect(removed).toEqual({ ok: true, value: 1 });
+    expect(await store.get(oldMember)).toEqual({ ok: true, value: null });
+    expect(await store.get(freshMember)).toEqual({ ok: true, value: "fresh" });
+
+    // Saved again, an old row is young again.
+    await handle.db.update(travellerDetails).set({ createdAt: new Date("2026-01-01T00:00:00Z") }).where(eq(travellerDetails.memberId, freshMember));
+    await store.put(freshMember, "fresh again");
+    expect(await store.removeOlderThan(new Date("2026-02-01T00:00:00Z"))).toEqual({ ok: true, value: 0 });
+  }, 30_000);
 });

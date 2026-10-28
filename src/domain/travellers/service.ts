@@ -10,6 +10,13 @@ export type SaveTravellerError =
 /** "unreadable": what is stored cannot be opened (changed, or made with another key). "unavailable": try again in a moment. */
 export type LoadTravellerError = { readonly kind: "unreadable" } | { readonly kind: "unavailable" };
 
+/**
+ * How long details are kept at most. A plan lives 48 hours at the longest, so details older than this belong to no
+ * plan that can still be booked. They are normally deleted when the trip is booked or the plan ends; this is the
+ * backstop for when nothing got the chance to (a plan abandoned and never swept).
+ */
+export const TRAVELLER_RETENTION_MS = 72 * 60 * 60_000;
+
 export interface TravellerServiceDeps {
   readonly store: TravellerStore;
   readonly cipher: TravellerCipher;
@@ -49,6 +56,12 @@ export class TravellerService {
   async haveDetails(memberIds: readonly string[]): Promise<Result<ReadonlySet<string>, { readonly kind: "unavailable" }>> {
     const have = await this.deps.store.haveDetails(memberIds);
     return have.ok ? ok(new Set(have.value)) : err({ kind: "unavailable" });
+  }
+
+  /** Deletes details kept longer than they are ever needed, whoever they are for. Returns how many were deleted. */
+  async purgeStale(now: Date): Promise<Result<number, { readonly kind: "unavailable" }>> {
+    const removed = await this.deps.store.removeOlderThan(new Date(now.getTime() - TRAVELLER_RETENTION_MS));
+    return removed.ok ? ok(removed.value) : err({ kind: "unavailable" });
   }
 
   /** Deletes these members' details. Run once the trip is booked, and when a plan ends. */

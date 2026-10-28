@@ -39,6 +39,21 @@ describe("handleExpireOverdue", () => {
     expect(sweeps).toEqual([OVERDUE_BATCH]);
   });
 
+  it("also deletes details kept too long, and says how many", async () => {
+    const calls: Date[] = [];
+    const { deps } = setup({ travellers: { purgeStale: async (now) => (calls.push(now), ok(3)) } });
+    const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
+    expect(await response.json()).toEqual({ ...SUMMARY, travellersPurged: 3 });
+    expect(calls).toEqual([NOW]);
+  });
+
+  it("still answers when the purge could not run", async () => {
+    const { deps } = setup({ travellers: { purgeStale: async () => err({ kind: "unavailable" }) } });
+    const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(SUMMARY);
+  });
+
   it.each([undefined, "Bearer wrong"])("refuses %j without running anything", async (header) => {
     const { deps, calls } = setup();
     const response = await handleExpireOverdue(request(header), deps);

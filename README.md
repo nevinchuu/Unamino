@@ -122,5 +122,5 @@ Tests that call real services (Muse, Stripe, liteAPI, the database) are opt-in a
 - Sandbox and test mode only, as described above.
 - Everyone pays in USD.
 - Anyone in a group can end a plan for everyone, though **I need changes** offers a softer route.
-- The scheduled routes (`/api/cron/expire-overdue`, `/api/cron/retry-effects`) need a scheduler and `CRON_SECRET`. They are not scheduled locally.
+- Two scheduled routes (`/api/cron/expire-overdue`, `/api/cron/retry-effects`) end overdue plans, settle stuck bookings, retry failed charges and delete traveller details kept longer than 72 hours. `vercel.json` schedules them daily on Vercel (the free plan's limit), and they need `CRON_SECRET` set there. Nothing runs them locally.
 - Security headers are partial: there is no script policy yet.

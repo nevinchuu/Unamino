@@ -16,6 +16,8 @@ export interface TravellerStore {
   haveDetails(memberIds: readonly string[]): Promise<Result<readonly string[], TravellerStoreError>>;
   /** Deletes the details of these members. Deleting ones that are not there is fine. */
   remove(memberIds: readonly string[]): Promise<Result<void, TravellerStoreError>>;
+  /** Deletes every set of details last given before `before`, whoever they belong to. Returns how many went. */
+  removeOlderThan(before: Date): Promise<Result<number, TravellerStoreError>>;
 }
 
 /** "tampered": the text was changed, belongs to someone else, or was made with another key. */

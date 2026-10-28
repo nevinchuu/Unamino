@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, lt } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
 import type { TravellerStore, TravellerStoreError } from "@/domain/travellers/ports";
 import type { Database } from "./client";
@@ -12,7 +12,8 @@ export class PostgresTravellerStore implements TravellerStore {
 
   async put(memberId: string, ciphertext: string): Promise<Result<void, TravellerStoreError>> {
     try {
-      await this.db.insert(travellerDetails).values({ memberId, ciphertext }).onConflictDoUpdate({ target: travellerDetails.memberId, set: { ciphertext } });
+      // Saving again counts as giving them again, so the age that retention goes by starts over.
+      await this.db.insert(travellerDetails).values({ memberId, ciphertext }).onConflictDoUpdate({ target: travellerDetails.memberId, set: { ciphertext, createdAt: new Date() } });
       return ok(undefined);
     } catch {
       return unavailable();
@@ -43,6 +44,15 @@ export class PostgresTravellerStore implements TravellerStore {
     try {
       await this.db.delete(travellerDetails).where(inArray(travellerDetails.memberId, [...memberIds]));
       return ok(undefined);
+    } catch {
+      return unavailable();
+    }
+  }
+
+  async removeOlderThan(before: Date): Promise<Result<number, TravellerStoreError>> {
+    try {
+      const removed = await this.db.delete(travellerDetails).where(lt(travellerDetails.createdAt, before)).returning({ memberId: travellerDetails.memberId });
+      return ok(removed.length);
     } catch {
       return unavailable();
     }
