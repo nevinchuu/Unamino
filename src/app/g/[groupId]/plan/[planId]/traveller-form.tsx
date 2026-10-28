@@ -3,6 +3,7 @@
 import { Loader2, Lock } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { TextField } from "@/components/text-field";
+import { StickyFooter } from "@/components/sticky-footer";
 import { Button } from "@/components/ui/button";
 import { countryOptions } from "@/lib/countries";
 import { saveTravellerDetails } from "./actions";
@@ -135,18 +136,20 @@ export function TravellerForm({ groupId, planId, passportRequired, onSaved }: Tr
         </>
       ) : null}
 
-      {message ? (
-        <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {message}
+      <StickyFooter>
+        {message ? (
+          <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {message}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={busy} className="h-12 w-full rounded-full text-base font-semibold">
+          {busy ? <Loader2 className="size-5 animate-spin" /> : "Save and continue"}
+        </Button>
+        <p className="flex items-start justify-center gap-1 text-center text-xs text-muted-foreground">
+          <Lock className="mt-0.5 size-3 shrink-0" />
+          Locked before it is saved. Never shown to the group or the AI. Deleted as soon as the trip is booked, or the plan ends.
         </p>
-      ) : null}
-      <Button type="submit" disabled={busy} className="mt-2 h-12 w-full rounded-full text-base font-semibold">
-        {busy ? <Loader2 className="size-5 animate-spin" /> : "Save and continue"}
-      </Button>
-      <p className="flex items-start justify-center gap-1 pt-1 text-center text-xs text-muted-foreground">
-        <Lock className="mt-0.5 size-3 shrink-0" />
-        Locked before it is saved. Never shown to the group or the AI. Deleted as soon as the trip is booked, or the plan ends.
-      </p>
+      </StickyFooter>
     </form>
   );
 }

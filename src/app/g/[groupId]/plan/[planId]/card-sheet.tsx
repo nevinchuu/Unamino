@@ -4,6 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Loader2, Lock, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { StickyFooter } from "@/components/sticky-footer";
 import { Button } from "@/components/ui/button";
 import { getStripe, isTestKey, outcomeOfCardEntry, TEST_CARD_HINT } from "@/lib/stripe-browser";
 import { confirmCardHold, openCardForm } from "./actions";
@@ -153,18 +154,20 @@ function PaymentForm({ groupId, planId, amountText, testMode, onPlaced }: { read
     <form onSubmit={submit} className="mt-4 space-y-4">
       <PaymentElement options={{ layout: "tabs" }} />
       {testMode ? <p className="rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">{TEST_CARD_HINT}</p> : null}
-      {message ? (
-        <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {message}
+      <StickyFooter>
+        {message ? (
+          <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {message}
+          </p>
+        ) : null}
+        <Button type="submit" disabled={!stripe || !elements || busy} className="h-12 w-full rounded-full text-base font-semibold">
+          {busy ? <Loader2 className="size-5 animate-spin" /> : `Place hold · ${amountText}`}
+        </Button>
+        <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+          <Lock className="size-3" />
+          Your card goes straight to Stripe. We never see it.
         </p>
-      ) : null}
-      <Button type="submit" disabled={!stripe || !elements || busy} className="h-12 w-full rounded-full text-base font-semibold">
-        {busy ? <Loader2 className="size-5 animate-spin" /> : `Place hold · ${amountText}`}
-      </Button>
-      <p className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-        <Lock className="size-3" />
-        Your card goes straight to Stripe. We never see it.
-      </p>
+      </StickyFooter>
     </form>
   );
 }

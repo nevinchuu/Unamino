@@ -273,7 +273,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
             ) : null}
 
             {me.actions.requestChanges ? (
-              <Button type="button" variant="outline" className="h-11 w-full rounded-full" onClick={() => setChangesOpen(true)}>
+              <Button type="button" variant="outline" className="h-11 w-full rounded-full border-foreground/30" onClick={() => setChangesOpen(true)}>
                 I need changes
               </Button>
             ) : null}
