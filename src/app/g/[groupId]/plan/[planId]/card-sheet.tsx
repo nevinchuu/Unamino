@@ -32,7 +32,7 @@ type Loaded = { readonly state: "loading" } | { readonly state: "ready"; readonl
 
 const APPEARANCE = {
   theme: "stripe",
-  variables: { colorPrimary: "#2347D6", colorText: "#17181C", borderRadius: "10px", fontFamily: "Plus Jakarta Sans, system-ui, sans-serif" },
+  variables: { colorPrimary: "#0E1B3D", colorText: "#0E1B3D", borderRadius: "10px", fontFamily: "Plus Jakarta Sans, system-ui, sans-serif" },
 } as const;
 
 /** The card form for one person's hold, in a sheet over the plan. The card number goes straight to Stripe's own fields. */

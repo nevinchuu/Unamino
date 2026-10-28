@@ -10,6 +10,16 @@
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-sans);
   --color-success: var(--success);
+  --color-action: var(--action);
+  --color-action-foreground: var(--action-foreground);
+  --color-link: var(--link);
+  --color-pending: var(--pending);
+  --color-pending-foreground: var(--pending-foreground);
+  --color-unread: var(--unread);
+  --color-presence: var(--presence);
+  --shadow-soft: 0 10px 26px rgb(14 27 61 / 0.07);
+  --shadow-lift: 0 8px 18px rgb(14 27 61 / 0.25);
+  --shadow-sheet: 0 -12px 32px rgb(14 27 61 / 0.12);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,25 +59,37 @@
 }
 
 :root {
-  --background: #F6F5F1;
-  --foreground: #17181C;
+  --background: #F6FBFA;
+  --foreground: #0E1B3D;
   --card: #FFFFFF;
-  --card-foreground: #17181C;
+  --card-foreground: #0E1B3D;
   --popover: #FFFFFF;
-  --popover-foreground: #17181C;
-  --primary: #2347D6;
+  --popover-foreground: #0E1B3D;
+  --primary: #0E1B3D;
   --primary-foreground: #FFFFFF;
-  --secondary: #ECEAE3;
-  --secondary-foreground: #17181C;
-  --muted: #ECEAE3;
-  --muted-foreground: #6B6E76;
-  --accent: #E8ECFB;
-  --accent-foreground: #1B3AAE;
-  --success: #12805C;
+  --secondary: #EEF3F2;
+  --secondary-foreground: #0E1B3D;
+  --muted: #EEF3F2;
+  --muted-foreground: #4F5B7A;
+  --accent: #D9F5EA;
+  --accent-foreground: #0B6B57;
+  --success: #0B7A68;
   --destructive: #C2321F;
-  --border: #E3E1D9;
-  --input: #CFCCC2;
-  --ring: #2347D6;
+  --border: #E1ECE9;
+  --input: #C9D6D2;
+  --ring: #1D5FA8;
+  /* The main action of a screen (Agree, Approve): mint with navy letters, because white on mint is too faint to read. */
+  --action: #62D9AD;
+  --action-foreground: #0E1B3D;
+  /* @mentions and links: a cyan dark enough for text on white. */
+  --link: #0E7490;
+  --pending: #FFEBCB;
+  --pending-foreground: #8A4B00;
+  --unread: #E5484D;
+  --presence: #2DBE7E;
+  --wash-from: #D7F4EA;
+  --wash-via: #EAF8F4;
+  --wash-to: #F6FBFA;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -75,13 +97,18 @@
   --chart-5: oklch(0.269 0 0);
   --radius: 0.75rem;
   --sidebar: #FFFFFF;
-  --sidebar-foreground: #17181C;
-  --sidebar-primary: #2347D6;
+  --sidebar-foreground: #0E1B3D;
+  --sidebar-primary: #0E1B3D;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #E8ECFB;
-  --sidebar-accent-foreground: #1B3AAE;
-  --sidebar-border: #E3E1D9;
-  --sidebar-ring: #2347D6;
+  --sidebar-accent: #D9F5EA;
+  --sidebar-accent-foreground: #0B6B57;
+  --sidebar-border: #E1ECE9;
+  --sidebar-ring: #1D5FA8;
+}
+
+/* The pale mint gradient behind the trips list and other screens made of cards. */
+@utility bg-wash {
+  background-image: linear-gradient(170deg, var(--wash-from) 0%, var(--wash-via) 38%, var(--wash-to) 100%);
 }
 
 .dark {

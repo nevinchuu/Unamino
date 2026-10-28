@@ -8,7 +8,7 @@ export function initialsOf(name: string): string {
 }
 
 /** A few calm colours, with enough contrast for white letters on top. */
-const AVATAR_COLOURS = ["#2347D6", "#12805C", "#B4531A", "#7B3FB5", "#B0285D", "#1F7A8C", "#6B6F1A", "#3F51A3"] as const;
+const AVATAR_COLOURS = ["#1D5FA8", "#0B7A68", "#B4531A", "#7B3FB5", "#B0285D", "#0F7B8A", "#6B6F1A", "#3F51A3"] as const;
 
 /** The same name always gets the same colour, so a person looks the same in every list and message. */
 export function avatarColour(seed: string): string {
