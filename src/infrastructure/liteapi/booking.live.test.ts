@@ -15,7 +15,8 @@ import { LiteApiOfferSource } from "./liteapi-offer-source";
  */
 const LIVE = process.env.BOOKING_LIVE === "1";
 const OUT = process.env.BOOKING_LIVE_OUT;
-const QUERY: HotelQuery = { kind: "hotel", city: "Bangkok", countryCode: "TH", checkIn: "2026-12-11", checkOut: "2026-12-13", guests: 2 };
+// Other dates than the renewal live test uses: this one books the first room it finds, and the two must not take each other's rooms.
+const QUERY: HotelQuery = { kind: "hotel", city: "Bangkok", countryCode: "TH", checkIn: "2026-12-18", checkOut: "2026-12-20", guests: 2 };
 
 const note = (line: string): void => {
   if (OUT) appendFileSync(OUT, `${line}\n`);
@@ -33,16 +34,21 @@ describe.skipIf(!LIVE)("booking a hotel on the real liteAPI sandbox", () => {
     const source = new LiteApiOfferSource({ apiKey, currency: "USD", guestNationality: "SG", timeoutMs: 45_000 });
     const found = await source.search(QUERY);
     if (!found.ok) throw new Error(`search failed: ${found.error.message}`);
-    const room = found.value.find((offer) => offer.kind === "hotel");
-    if (!room || room.kind !== "hotel") throw new Error("no hotel offers came back");
-    note(`room: ${room.title} | ${room.totalMinor} ${room.currency} | guests ${room.guests}`);
+    const rooms = found.value.filter((offer) => offer.kind === "hotel").slice(0, 4);
+    if (rooms.length === 0) throw new Error("no hotel offers came back");
 
     const supplier = new LiteApiHotelSupplier(new LiteApiBookingHttp({ apiKey }));
-    const reference = `live-check:${Date.now()}`;
-    const booked = await supplier.book({ offer: room, reference, lead: { memberId: "live", details: GUEST }, maxTotalMinor: room.totalMinor });
-    note(`book: ${JSON.stringify(booked.ok ? { ok: true, bookingId: booked.value.bookingId, confirmation: booked.value.confirmation } : booked)}`);
-    expect(booked.ok).toBe(true);
-    if (!booked.ok) return;
+    // A sandbox rate can price out between the search and the booking. That is the supplier's say, so the next room is tried.
+    let booked: Awaited<ReturnType<LiteApiHotelSupplier["book"]>> | null = null;
+    for (const room of rooms) {
+      if (room.kind !== "hotel") continue;
+      note(`room: ${room.title} | ${room.totalMinor} ${room.currency} | guests ${room.guests}`);
+      booked = await supplier.book({ offer: room, reference: `live-check:${Date.now()}:${room.id}`, lead: { memberId: "live", details: GUEST }, maxTotalMinor: room.totalMinor });
+      note(`book: ${JSON.stringify(booked.ok ? { ok: true, bookingId: booked.value.bookingId, confirmation: booked.value.confirmation } : booked)}`);
+      if (booked.ok || booked.error.code !== "price_changed") break;
+    }
+    expect(booked?.ok).toBe(true);
+    if (!booked?.ok) return;
 
     const cancelled = await supplier.cancel(booked.value.bookingId);
     note(`cancel: ${JSON.stringify(cancelled)}`);

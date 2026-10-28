@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ok } from "@/lib/result";
 import type { Planner } from "@/domain/planner/planner";
 import { ScriptedPlanner } from "@/domain/planner/scripted-planner";
@@ -13,11 +13,16 @@ const MEMBER_IDS = [ANA, BEN];
 const PEOPLE = [{ id: ANA, displayName: "Ana" }, { id: BEN, displayName: "Ben" }];
 
 describe("showing the model stand-ins for member ids", () => {
-  const scripted = new ScriptedPlanner({
-    constraints: ok({ m1: { ownRoom: true }, m2: { budgetCap: { amountMinor: 35000, currency: "USD" } }, m9: { ownRoom: true } }),
-    plans: [ok({ title: "t", picks: [{ offerId: "o1", reason: "r", members: [{ memberId: "m1", note: "n" }, { memberId: "m2", note: "n" }] }], compromises: [{ memberId: "m2", note: "c" }] })],
+  // Made again for every test: the tests read the calls the planner recorded, and must not see each other's.
+  let scripted: ScriptedPlanner;
+  let planner: Planner;
+  beforeEach(() => {
+    scripted = new ScriptedPlanner({
+      constraints: ok({ m1: { ownRoom: true }, m2: { budgetCap: { amountMinor: 35000, currency: "USD" } }, m9: { ownRoom: true } }),
+      plans: [ok({ title: "t", picks: [{ offerId: "o1", reason: "r", members: [{ memberId: "m1", note: "n" }, { memberId: "m2", note: "n" }] }], compromises: [{ memberId: "m2", note: "c" }] })],
+    });
+    planner = new AliasingPlanner(scripted, PEOPLE);
   });
-  const planner: Planner = new AliasingPlanner(scripted, PEOPLE);
 
   it("turns real ids into m1, m2 in what the model is asked, and back in what it answers", async () => {
     const constraints = await planner.extractConstraints({ memberIds: MEMBER_IDS, messages: [{ memberId: BEN, text: "hello" }] });

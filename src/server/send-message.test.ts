@@ -6,6 +6,13 @@ import type { Member, Message } from "@/domain/group/types";
 import type { NewHumanMessage } from "@/domain/group/repository";
 import { sendChatMessage, type SendDeps } from "./send-message";
 
+/** Runs that cannot start, as when the database is down. */
+class FailingRuns extends FakeRuns {
+  override async start(): ReturnType<FakeRuns["start"]> {
+    return err({ code: "unavailable", message: "db down" });
+  }
+}
+
 const GROUP = "3f2b8c1e-5a4d-4e0b-9c7a-1d2e3f4a5b6c";
 const ana: Member = { id: "ana", groupId: GROUP, displayName: "Ana", currency: "USD", isOrganiser: false };
 const NOW = new Date("2026-10-27T10:00:00Z");
@@ -85,7 +92,7 @@ describe("sendChatMessage", () => {
 
   it("keeps the message posted when the run cannot start", async () => {
     const { deps } = setup();
-    const failing: SendDeps = { ...deps, agent: { ...deps.agent, runs: { ...deps.agent.runs, countRecent: deps.agent.runs.countRecent.bind(deps.agent.runs), countAll: deps.agent.runs.countAll.bind(deps.agent.runs), start: async () => err({ code: "unavailable", message: "db down" }) } } };
+    const failing: SendDeps = { ...deps, agent: { ...deps.agent, runs: new FailingRuns() } };
     const sent = await send(failing, ana, "@trippy plan Bangkok");
     expect(sent).toMatchObject({ ok: true, value: { run: null, message: { body: "@trippy plan Bangkok" } } });
   });

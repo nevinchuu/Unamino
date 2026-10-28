@@ -43,6 +43,8 @@ export function classifyFailure(reply: LiteApiReply): SupplierError {
   const code = errorCodeOf(reply.body);
   const message = `liteAPI answered ${reply.status}${code === null ? "" : ` (${code})`}: ${errorTextOf(reply.body)}`;
   if (code !== null && PRICE_CODES.has(code)) return { code: "price_changed", message };
+  // The hotel side words it in text: the price it would cost now is above the one it quoted, which is the same news.
+  if ((reply.status === 409 || code === 2001) && /price/i.test(errorTextOf(reply.body))) return { code: "price_changed", message };
   if (code !== null && GONE_CODES.has(code)) return { code: "unavailable", message };
   if (code !== null && REFUSED_CODES.has(code)) return { code: "rejected", message };
   if (reply.status === 404 || reply.status === 410) return { code: "unavailable", message };

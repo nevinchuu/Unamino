@@ -60,6 +60,16 @@ describe("LiteApiHotelSupplier", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("reads the hotel's own words about a price that moved as a price change, not as a passing hiccup", async () => {
+    const { http } = fakeLiteApi({ "/rates/prebook": hotelPrebook(), "/rates/book": { status: 409, body: { error: { code: 2001, message: "provider price exceeds locked selling price, please search again" } } } });
+    expect(await new LiteApiHotelSupplier(http).book(request())).toMatchObject({ ok: false, error: { code: "price_changed" } });
+  });
+
+  it("still treats a 409 that says nothing about price as temporary", async () => {
+    const { http } = fakeLiteApi({ "/rates/prebook": hotelPrebook(), "/rates/book": { status: 409, body: { error: { code: 45035, message: "another request is booking this" } } } });
+    expect(await new LiteApiHotelSupplier(http).book(request())).toMatchObject({ ok: false, error: { code: "temporary" } });
+  });
+
   it("accepts a lower price", async () => {
     const { http } = fakeLiteApi({ "/rates/prebook": hotelPrebook(380), "/rates/book": hotelBooked() });
     expect((await new LiteApiHotelSupplier(http).book(request())).ok).toBe(true);
