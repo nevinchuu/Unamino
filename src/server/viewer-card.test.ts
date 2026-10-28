@@ -33,6 +33,13 @@ describe("ViewerCards", () => {
     expect(card?.shareMinor).toBeGreaterThan(0);
   });
 
+  it("also carries what the sheet shows: where each person stands, the parts of the price, and whether changes can be asked for", async () => {
+    const card = await setup().cards.forPlan(PLAN, "ana");
+    expect(card?.people).toEqual([{ name: "Ana", isMe: true, agreed: false, approved: false, held: false }]);
+    expect(card?.canRequestChanges).toBe(true);
+    expect(card?.lines.map((line) => line.minor).reduce((sum, minor) => sum + minor, 0)).toBe(card?.shareMinor);
+  });
+
   it("says a person has agreed once they have, and offers them nothing more to agree to", async () => {
     expect(await setup(raw("reviewing", "agreed")).cards.forPlan(PLAN, "ana")).toMatchObject({ canAgree: false, agreed: true });
   });

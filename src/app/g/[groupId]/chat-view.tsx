@@ -10,6 +10,7 @@ import { lastSeq, mergeMessages, visiblePending, type PendingMessage } from "@/l
 import type { ChatMessageDto, ChatSnapshot, PlanCardDto } from "@/server/chat";
 import { POLL_LIMIT } from "@/lib/chat-limits";
 import { sendMessage } from "./actions";
+import { ActionSheet } from "./action-sheet";
 import { Composer } from "./composer";
 import { MessageRow, type RowModel } from "./message-row";
 
@@ -193,6 +194,8 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   }
 
   const isEmpty = models.length === 0;
+  // The server gives the person's own next step only on the group's newest open plan, so that is the plan the sheet is about.
+  const decidingOn = plans.find((plan) => plan.mine) ?? null;
 
   return (
     <>
@@ -278,6 +281,8 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
           </button>
         ) : null}
       </div>
+
+      {decidingOn?.mine && !signedOut ? <ActionSheet groupId={groupId} plan={decidingOn} mine={decidingOn.mine} onChangesSent={(asked) => asked && setAgentWorking(true)} /> : null}
 
       <Composer
         disabled={signedOut}

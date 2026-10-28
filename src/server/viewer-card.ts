@@ -37,13 +37,16 @@ export class ViewerCards {
   private async read(planId: string, memberId: string): Promise<CardMine | null> {
     const raw = await this.deps.views.load(planId);
     if (!raw.ok) return null;
-    const { me, currency } = buildPlanView(raw.value, memberId, { payments: this.deps.payments });
+    const { me, currency, people } = buildPlanView(raw.value, memberId, { payments: this.deps.payments });
     if (!me.inPlan) return null;
     return {
       canAgree: me.actions.agree,
       agreed: me.agreement === "agreed",
+      canRequestChanges: me.actions.requestChanges,
       shareMinor: me.shareMinor,
       currency,
+      lines: people.find((person) => person.isMe)?.lines ?? [],
+      people: people.map((person) => ({ name: person.name, isMe: person.isMe, agreed: person.agreement === "agreed", approved: person.approval === "approved", held: person.holdPlaced })),
       needsAmount: me.actions.approve || me.cardNeeded,
     };
   }

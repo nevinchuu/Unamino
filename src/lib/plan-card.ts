@@ -1,13 +1,28 @@
 import type { PlanStatus } from "@/domain/plan/statuses";
 
+/** Where one person in the plan stands, for the list of who has done what. */
+export interface CardPerson {
+  readonly name: string;
+  readonly isMe: boolean;
+  readonly agreed: boolean;
+  /** They approved an amount; their card may still be to add. */
+  readonly approved: boolean;
+  readonly held: boolean;
+}
+
 /** What the plan means for the person looking at the chat, so the card can offer them the next step. */
 export interface CardMine {
   /** They have not agreed yet, and may. */
   readonly canAgree: boolean;
   readonly agreed: boolean;
+  /** They may still ask Trippy to change the plan. */
+  readonly canRequestChanges: boolean;
   /** Their share, in `currency`'s minor units. The price the Agree button shows, and that the server checks again. */
   readonly shareMinor: number | null;
   readonly currency: string;
+  /** The parts of their share, such as the flight and the hotel. Empty when the plan cannot be priced in their currency. */
+  readonly lines: readonly { readonly label: string; readonly minor: number }[];
+  readonly people: readonly CardPerson[];
   /** Everyone agreed and it is this person's turn to approve their amount or add their card. */
   readonly needsAmount: boolean;
 }
@@ -56,4 +71,51 @@ export function describePlanCard(planId: string, plans: readonly CardPlan[]): Pl
   if (!plan) return { state: "gone", title: "Trip plan", detail: "This plan is no longer available", people: null, opens: null };
   if (plan.replacedById) return { state: "replaced", title: "Earlier plan", detail: "Replaced by a newer plan", people: null, opens: plan.replacedById };
   return { state: "live", title: plan.title, detail: STATUS_DETAIL[plan.status](plan), people: `${plan.headcount} ${plan.headcount === 1 ? "person" : "people"}`, opens: plan.id };
+}
+
+/** "Ana", "Ana and Ben", "Ana, Ben and Jia". */
+function listOf(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+export type SheetStep = "agree" | "approve";
+
+export interface ActionSheetView {
+  readonly step: SheetStep;
+  /** Which of the three steps (agree, approve, book) this is, for the dots. */
+  readonly stepNumber: 1 | 2;
+  /** "2/4 agreed" or "1/4 held". */
+  readonly pill: string;
+  /** One quiet line of who is done and who the plan is waiting for. */
+  readonly note: string;
+  /** Something for this person to do now, as opposed to waiting. */
+  readonly actionable: boolean;
+}
+
+/**
+ * What the sheet above the composer says about the plan being decided: which step it is on and who is still to act.
+ * Only plans being agreed to or paid for have a sheet; the chat never asks for one for any other status.
+ */
+export function describeSheet(plan: CardPlan, mine: CardMine): ActionSheetView {
+  const step: SheetStep = plan.status === "approving" ? "approve" : "agree";
+  const done = (person: CardPerson): boolean => (step === "approve" ? person.held : person.agreed);
+  const waiting = mine.people.filter((person) => !done(person));
+  const waitingNames = waiting.map((person) => (person.isMe ? "you" : person.name));
+
+  const finished = mine.people.filter((person) => done(person) && !person.isMe).map((person) => person.name);
+  const verb = step === "approve" ? "held" : "agreed";
+  const parts = [
+    finished.length > 0 ? `${listOf(finished)} ${verb}.` : "",
+    waitingNames.length > 0 ? `Waiting for ${listOf(waitingNames)}.` : "",
+  ].filter((part) => part !== "");
+
+  const count = mine.people.filter(done).length;
+  return {
+    step,
+    stepNumber: step === "approve" ? 2 : 1,
+    pill: `${count}/${plan.headcount} ${verb}`,
+    note: parts.join(" "),
+    actionable: step === "approve" ? mine.needsAmount : mine.canAgree && !mine.agreed,
+  };
 }
