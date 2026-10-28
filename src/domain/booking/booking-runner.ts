@@ -27,6 +27,11 @@ export interface BookingRunnerDeps {
   /** Where the effects of the booking going well or badly go (charging the holds, or letting them go). */
   readonly onward: () => EffectRunner;
   readonly clock: () => Date;
+  /**
+   * Prices the plan's offers again just before booking, so the airline and hotel are asked for offers that are still
+   * good. It can move the plan on (a price past someone's cap sends them back to approve), which stops the booking.
+   */
+  readonly renew?: (planId: string) => Promise<void>;
 }
 
 /** Why a booking was given up on. For logs and the chat's fixed lines, never shown with supplier detail. */
@@ -77,6 +82,8 @@ export class SupplierBookingRunner implements EffectRunner {
   }
 
   private async bookPlan(planId: string): Promise<Result<void, EffectError>> {
+    await this.deps.renew?.(planId);
+
     // Claim the plan first: from here it can no longer be replaced or expired by the deadline.
     const started = await applyPlanEvent(this.deps.plans, planId, { type: "booking_started", at: this.deps.clock() });
     if (!started.ok) {

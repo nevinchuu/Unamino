@@ -6,7 +6,7 @@ import { bookingSetup } from "./test-support";
 
 const BOOK = [{ type: "book" }] as const;
 
-function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = () => NOW) {
+function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = () => NOW, renew?: (planId: string) => Promise<void>) {
   return new SupplierBookingRunner({
     plans: world.plans,
     details: world.details,
@@ -17,6 +17,7 @@ function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = (
     bookings: world.bookings,
     onward: () => world.onward,
     clock,
+    renew,
   });
 }
 
@@ -148,6 +149,22 @@ describe("SupplierBookingRunner", () => {
 
     expect(world.hotels.booked).toHaveLength(1);
     expect(world.flights.booked).toHaveLength(1);
+  });
+
+  it("prices the offers again before it books anything", async () => {
+    const world = bookingSetup();
+    await runnerFor(world, () => NOW, async () => { world.log.push("renew"); }).run("plan-1", 5, BOOK);
+
+    expect(world.log).toEqual(["renew", "book H", "book F"]);
+  });
+
+  it("does not book when renewing the prices sent someone back to approve", async () => {
+    const world = bookingSetup();
+    const renew = async () => { world.plans.stored = { ...world.plans.stored, version: world.plans.stored.version + 1, plan: { ...world.plans.plan, status: "approving" } }; };
+    await runnerFor(world, () => NOW, renew).run("plan-1", 5, BOOK);
+
+    expect(world.log).toEqual([]);
+    expect(world.plans.plan.status).toBe("approving");
   });
 
   it("leaves every other kind of effect alone", async () => {

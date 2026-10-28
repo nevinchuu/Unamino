@@ -1,11 +1,12 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, text, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import type { SupplierBookingStatus } from "@/domain/booking/ports";
 import type { Offer } from "@/domain/offers/schema";
 import type { SeenQuote } from "@/domain/quote/types";
 import type { VenueFacts } from "@/domain/schedule/venue";
 import type { FxRateTable } from "@/domain/split/types";
 import { createdAt, currencyCode, id, instant, minor } from "./columns";
-import { approvalStatus, effectStatus, planAgreement, planStatus } from "./enums";
+import { approvalStatus, effectStatus, offerKind, planAgreement, planStatus } from "./enums";
 import { groups, members } from "./groups";
 import { offerSearches, tripBriefs } from "./trips";
 
@@ -129,3 +130,25 @@ export const effectLog = pgTable("effect_log", {
   createdAt: createdAt(),
   completedAt: instant("completed_at"),
 }).enableRLS();
+
+/**
+ * A booking made with an airline or hotel for one pick of a plan. Kept so it can be cancelled if the plan fails,
+ * and so the confirmation can show the supplier's own reference. One per pick.
+ */
+export const supplierBookings = pgTable(
+  "supplier_bookings",
+  {
+    planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
+    pickId: uuid("pick_id").notNull().references(() => planPicks.id, { onDelete: "cascade" }),
+    kind: offerKind("kind").notNull(),
+    bookingId: text("booking_id").notNull(),
+    confirmation: text("confirmation"),
+    status: text("status").$type<SupplierBookingStatus>().notNull().default("booked"),
+    createdAt: createdAt(),
+    updatedAt: instant("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.planId, table.pickId] }),
+    check("supplier_bookings_status", sql`${table.status} IN ('booked', 'cancelling', 'cancelled')`),
+  ],
+).enableRLS();

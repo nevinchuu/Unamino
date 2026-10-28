@@ -1,8 +1,11 @@
+import { after } from "next/server";
 import type { AgentDeps } from "@/domain/agent/run-agent";
 import { StaticFxRates } from "@/domain/agent/static-fx";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { OfferSource } from "@/domain/offers/offer-source";
+import { SupplierBookingRunner } from "@/domain/booking/booking-runner";
 import { EffectRetrier, giveUpLine } from "@/domain/payments/effect-retrier";
+import { ProviderHoldReadiness } from "@/domain/payments/hold-readiness";
 import { HoldService } from "@/domain/payments/hold-service";
 import type { HoldStore } from "@/domain/payments/hold-store";
 import { PaymentEffectRunner } from "@/domain/payments/payment-effects";
@@ -31,9 +34,13 @@ import { PostgresPlanStore } from "@/infrastructure/db/postgres-plan-store";
 import { PostgresPlanViewStore } from "@/infrastructure/db/postgres-plan-view-store";
 import { PostgresRunRepository } from "@/infrastructure/db/postgres-run-repository";
 import { PostgresSearchStore } from "@/infrastructure/db/postgres-search-store";
+import { PostgresBookingStore } from "@/infrastructure/db/postgres-booking-store";
 import { PostgresTravellerStore } from "@/infrastructure/db/postgres-traveller-store";
 import { AesGcmCipher } from "@/infrastructure/crypto/aes-gcm-cipher";
 import { GooglePlacesLookup } from "@/infrastructure/google-places/places-lookup";
+import { LiteApiBookingHttp } from "@/infrastructure/liteapi/booking-http";
+import { LiteApiFlightSupplier } from "@/infrastructure/liteapi/flight-booking";
+import { LiteApiHotelSupplier } from "@/infrastructure/liteapi/hotel-booking";
 import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-source";
 import { MuseHttp, type MuseCall } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
@@ -41,6 +48,7 @@ import { MuseChatModel } from "@/infrastructure/muse/muse-chat-model";
 import { traceSinkFromEnv } from "@/infrastructure/trace/file-trace";
 import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
 import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
+import { DeferredBookingRunner } from "./deferred-runner";
 import type { ChatDeps } from "./chat";
 import type { StripeEventLike } from "./stripe-webhook";
 import { readServerEnv, resolveBookingSimulation, resolveHoldSimulation, resolvePaymentsMode } from "./env";
@@ -145,6 +153,7 @@ function build(): Container {
   // Passport details go as soon as they have done their job: when the trip is booked, or when the plan ends.
   if (travellers) runners.push(new TravellerCleanupRunner(travellers));
   const effects = new CompositeEffectRunner(runners);
+  const planService = new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects });
   // Both of these pass on what the last hold sets in motion (booking), so they need the whole set, themselves included.
   if (mode === "demo") runners.push(new SimulatedHoldRunner(planRepository, () => effects, agent.clock));
   if (bookingSimulation.value) runners.push(new SimulatedBookingRunner(planRepository, () => effects, agent.clock));
@@ -155,10 +164,31 @@ function build(): Container {
   let webhook: Container["payments"]["webhook"] = null;
   if (mode === "stripe" && env.value.stripeSecretKey) {
     const stripe = createStripeClient(env.value.stripeSecretKey);
-    holds = new HoldService({ provider: new StripePaymentProvider(stripe), store: holdStore, plans: planRepository, effects: () => effects, clock: agent.clock });
+    const provider = new StripePaymentProvider(stripe);
+    holds = new HoldService({ provider, store: holdStore, plans: planRepository, effects: () => effects, clock: agent.clock });
     const log = new PostgresEffectLog(db);
     const paymentRunner = new PaymentEffectRunner(holds, log);
     runners.push(paymentRunner);
+    // Real booking with the airline and hotel needs the travellers' details, so without the encryption key the plan waits at "held".
+    if (!bookingSimulation.value && travellers) {
+      const bookingHttp = new LiteApiBookingHttp({ apiKey: env.value.liteApiKey });
+      const booking = new SupplierBookingRunner({
+        plans: planRepository,
+        details: new PostgresPlanDetailsStore(db),
+        travellers,
+        holds: new ProviderHoldReadiness(holdStore, provider),
+        hotels: new LiteApiHotelSupplier(bookingHttp),
+        flights: new LiteApiFlightSupplier(bookingHttp),
+        bookings: new PostgresBookingStore(db),
+        onward: () => effects,
+        clock: agent.clock,
+        renew: async (planId) => {
+          await planService.refresh(planId, agent.clock());
+        },
+      });
+      // The last card hold is placed inside a request; booking takes far longer than a person should wait.
+      runners.push(new DeferredBookingRunner(booking, (task) => after(task)));
+    }
     retrier = new EffectRetrier({
       log,
       runner: paymentRunner,
@@ -177,7 +207,7 @@ function build(): Container {
     messages,
     agent,
     chat: { groups, messages, runs: agent.runs, plans: agent.plans, clock: agent.clock },
-    plans: new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects }),
+    plans: planService,
     planStatus: new PostgresPlanStatusReader(db),
     views,
     payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, webhook },
