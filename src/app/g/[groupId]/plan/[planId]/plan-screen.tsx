@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AppBar } from "@/components/screen";
 import { Button } from "@/components/ui/button";
-import { LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
+import { FAST_POLL_STATUSES, LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
 import { countdownText, describeStage, priceHoldElapsed } from "@/lib/plan-stage";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
 import { CardSheet } from "./card-sheet";
 import { IdeaCard, ItemCard } from "./plan-items";
+import { BookingProgress } from "./booking-progress";
 import { TripConfirmed } from "./trip-confirmed";
 import { WhoPays } from "./who-pays";
 
@@ -45,6 +46,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   const [now, setNow] = useState(() => Date.now());
 
   const live = LIVE_PLAN_STATUSES.includes(view.status);
+  // Booking is quick but not instant, so the screen keeps asking while it happens, though it has no prices to count down.
+  const fastPoll = FAST_POLL_STATUSES.includes(view.status);
   const planId = initial.id;
 
   const refetch = useCallback(
@@ -67,7 +70,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let failures = 0;
     const controller = new AbortController();
-    const interval = live ? POLL_LIVE_MS : POLL_FINISHED_MS;
+    const interval = fastPoll ? POLL_LIVE_MS : POLL_FINISHED_MS;
 
     const schedule = (ms: number) => {
       if (!cancelled) timer = setTimeout(() => void tick(), ms);
@@ -98,7 +101,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
       controller.abort();
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [live, refetch]);
+  }, [fastPoll, refetch]);
 
   // The countdown ticks once a second, and only while it means something.
   useEffect(() => {
@@ -179,6 +182,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
             ) : null}
           </section>
         )}
+
+        {!view.reference && view.progress.length > 0 ? <BookingProgress steps={view.progress} /> : null}
 
         {view.demoBooking && view.status === "booked" ? (
           <p className="px-1 text-xs text-muted-foreground">Demo: no flights or hotel were really booked.</p>

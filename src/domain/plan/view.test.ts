@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import { flight, hotel } from "./test-support";
-import { buildPlanView, LIVE_PLAN_STATUSES } from "./view";
+import { buildPlanView, FAST_POLL_STATUSES, LIVE_PLAN_STATUSES } from "./view";
 import type { PlanViewRaw, ViewIdea, ViewMember } from "./view-store";
 
 const DEADLINE = new Date("2026-10-27T01:09:00.000Z");
@@ -225,5 +225,48 @@ describe("a paid trip", () => {
     it("leaves out a booking whose pick is gone", () => {
       expect(view({ status: "captured", bookings: [{ pickId: "nope", confirmation: "X" }] }).confirmations).toEqual([]);
     });
+  });
+
+  describe("the booking progress", () => {
+    const hotelOnly = { picks: [raw().picks[0]] };
+    const states = (dto: ReturnType<typeof view>) => dto.progress.map((step) => `${step.id}:${step.state}`);
+
+    it("shows nothing outside the time the trip is being booked", () => {
+      for (const status of ["draft", "reviewing", "approving", "captured", "expired"] as const) expect(view({ status }).progress).toEqual([]);
+    });
+
+    it("says the holds are in, and that booking is next, once everyone is in but booking has not started", () => {
+      expect(states(view({ status: "held" }))).toEqual(["holds:done", "hotel:waiting", "flight:waiting", "charge:waiting"]);
+    });
+
+    it("works on the hotel first, as the hotel is booked first, and names what it is doing", () => {
+      const dto = view({ status: "booking" });
+      expect(states(dto)).toEqual(["holds:done", "hotel:active", "flight:waiting", "charge:waiting"]);
+      expect(dto.progress[1].label).toBe("Booking your hotel…");
+    });
+
+    it("moves on to the flight when the hotel has a booking, and shows the hotel as done", () => {
+      const dto = view({ status: "booking", bookings: [{ pickId: "pick-hotel", confirmation: "HC1" }] });
+      expect(states(dto)).toEqual(["holds:done", "hotel:done", "flight:active", "charge:waiting"]);
+      expect(dto.progress.map((step) => step.label)).toEqual(["Every card hold is in place", "Hotel booked", "Booking your flight…", "Charge your cards"]);
+    });
+
+    it("leaves out the flight for a trip with only a hotel", () => {
+      expect(states(view({ status: "booking", ...hotelOnly }))).toEqual(["holds:done", "hotel:active", "charge:waiting"]);
+    });
+
+    it("is charging the cards once the plan is booked, with every booking shown as done even without a record of it", () => {
+      expect(states(view({ status: "booked" }))).toEqual(["holds:done", "hotel:done", "flight:done", "charge:active"]);
+    });
+
+    it("counts a booking only for the pick it belongs to", () => {
+      const dto = view({ status: "booking", bookings: [{ pickId: "pick-flight", confirmation: null }] });
+      expect(states(dto)).toEqual(["holds:done", "hotel:active", "flight:done", "charge:waiting"]);
+    });
+  });
+
+  it("asks for fresh news quickly while live and while booking, but only counts prices down while live", () => {
+    expect([...FAST_POLL_STATUSES].sort()).toEqual(["approving", "booked", "booking", "draft", "held", "reviewing"]);
+    expect(LIVE_PLAN_STATUSES.includes("booking")).toBe(false);
   });
 });

@@ -10,6 +10,12 @@ import type { PlanViewRaw, ViewIdea, ViewPick } from "./view-store";
 /** The states in which people are still deciding, so the clock matters and the screen keeps checking. */
 export const LIVE_PLAN_STATUSES: readonly PlanStatus[] = ["draft", "reviewing", "approving", "held"];
 
+/**
+ * The statuses in which the screen asks for fresh news every few seconds. It adds the two booking statuses to the live
+ * ones: booking takes tens of seconds, and the screen should show it move rather than wait for the slow poll.
+ */
+export const FAST_POLL_STATUSES: readonly PlanStatus[] = [...LIVE_PLAN_STATUSES, "booking", "booked"];
+
 interface ItemBase {
   readonly id: string;
   readonly title: string;
@@ -55,6 +61,13 @@ export interface ConfirmationDto {
   readonly kind: "flight" | "hotel";
   readonly title: string;
   readonly code: string;
+}
+
+/** One line of the booking progress. "active" is the one being worked on right now. */
+export interface ProgressStepDto {
+  readonly id: "holds" | "hotel" | "flight" | "charge";
+  readonly label: string;
+  readonly state: "done" | "active" | "waiting";
 }
 
 export interface PersonDto {
@@ -127,6 +140,8 @@ export interface PlanViewDto {
   readonly ideas: readonly IdeaDto[];
   /** The suppliers own codes, once the trip is booked. Empty when none were given. */
   readonly confirmations: readonly ConfirmationDto[];
+  /** The steps of booking the trip, while it is being booked. Empty at any other time. */
+  readonly progress: readonly ProgressStepDto[];
   readonly people: readonly PersonDto[];
   readonly me: MeDto;
 }
@@ -176,10 +191,6 @@ function ideaOf(idea: ViewIdea): IdeaDto {
   return { id: idea.id, when: `${start} to ${clock(`${idea.date}T${idea.endTime}`) ?? idea.endTime}`, category: idea.category, name: idea.venue.name, address: idea.venue.address, mapsUrl: idea.venue.mapsUrl, why: idea.why };
 }
 
-/**
- * What one person sees of a plan, worked out from what is stored. Prices are today's, from the stored offers, and
- * what the person may do is decided here from the plan's state and their own, so the screen never has to guess.
- */
 function confirmationsOf(raw: PlanViewRaw): ConfirmationDto[] {
   return raw.bookings.flatMap((booking) => {
     const pick = raw.picks.find((candidate) => candidate.id === booking.pickId);
@@ -188,6 +199,55 @@ function confirmationsOf(raw: PlanViewRaw): ConfirmationDto[] {
   });
 }
 
+/**
+ * Where the booking has got to, for the lines under the banner while the trip is being booked. Hotels come first
+ * because that is the order they are booked in. A step that has nothing to book (a hotel-only trip has no flight)
+ * is left out. Once the plan is "booked" every booking is done, whether or not a supplier gave a record of it.
+ */
+function bookingProgressOf(raw: PlanViewRaw): ProgressStepDto[] {
+  if (raw.status !== "held" && raw.status !== "booking" && raw.status !== "booked") return [];
+
+  const bookedPickIds = new Set(raw.bookings.map((booking) => booking.pickId));
+  const steps: { readonly id: ProgressStepDto["id"]; readonly doing: string; readonly done: string; readonly waiting: string; readonly finished: boolean }[] = [];
+  for (const kind of ["hotel", "flight"] as const) {
+    const picks = raw.picks.filter((pick) => pick.offer.kind === kind);
+    if (picks.length === 0) continue;
+    const word = kind === "hotel" ? "hotel" : "flight";
+    steps.push({
+      id: kind,
+      doing: `Booking your ${word}…`,
+      done: kind === "hotel" ? "Hotel booked" : "Flight booked",
+      waiting: kind === "hotel" ? "Hotel" : "Flight",
+      finished: raw.status === "booked" || picks.every((pick) => bookedPickIds.has(pick.id)),
+    });
+  }
+
+  const supplierDone = steps.every((step) => step.finished);
+  const working = raw.status !== "held";
+  let activeTaken = false;
+  const lines: ProgressStepDto[] = [{ id: "holds", label: "Every card hold is in place", state: "done" }];
+  for (const step of steps) {
+    if (step.finished) {
+      lines.push({ id: step.id, label: step.done, state: "done" });
+    } else if (working && !activeTaken) {
+      activeTaken = true;
+      lines.push({ id: step.id, label: step.doing, state: "active" });
+    } else {
+      lines.push({ id: step.id, label: step.waiting, state: "waiting" });
+    }
+  }
+  lines.push(
+    raw.status === "booked" && supplierDone
+      ? { id: "charge", label: "Charging your cards…", state: "active" }
+      : { id: "charge", label: "Charge your cards", state: "waiting" },
+  );
+  return lines;
+}
+
+/**
+ * What one person sees of a plan, worked out from what is stored. Prices are today's, from the stored offers, and
+ * what the person may do is decided here from the plan's state and their own, so the screen never has to guess.
+ */
 export function buildPlanView(
   raw: PlanViewRaw,
   viewerId: string,
@@ -252,6 +312,7 @@ export function buildPlanView(
     items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names)),
     ideas: raw.ideas.map(ideaOf),
     confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],
+    progress: bookingProgressOf(raw),
     people,
     me: {
       id: viewerId,
