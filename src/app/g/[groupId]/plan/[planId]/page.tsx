@@ -35,7 +35,7 @@ async function Plan({ params }: { readonly params: PageProps<"/g/[groupId]/plan/
         <AppBar title="Plan" backHref={`/g/${groupId}`} />
         <main className="flex flex-1 flex-col items-center gap-3 px-8 pt-20 text-center">
           <h2 className="text-xl font-semibold">We couldn&apos;t find this plan</h2>
-          <Link href={`/g/${groupId}`} className="text-sm font-medium text-primary">
+          <Link href={`/g/${groupId}`} className="inline-flex min-h-11 items-center text-sm font-medium text-primary">
             Back to the chat
           </Link>
         </main>

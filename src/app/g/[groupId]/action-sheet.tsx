@@ -19,6 +19,8 @@ interface ActionSheetProps {
   readonly mine: CardMine;
   /** Called when a request for changes reached Trippy, with whether it could start on it right away. */
   readonly onChangesSent: (asked: boolean) => void;
+  /** The person is typing, so the sheet folds up and leaves the room to the chat and the keyboard. */
+  readonly folded?: boolean;
 }
 
 /**
@@ -26,13 +28,13 @@ interface ActionSheetProps {
  * and offers this person their next step: agree to it, ask for changes, or approve their amount. It opens by itself
  * while there is something to do and folds away while the person is only waiting, and either can be changed by tapping the handle.
  */
-export function ActionSheet({ groupId, plan, mine, onChangesSent }: ActionSheetProps) {
+export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false }: ActionSheetProps) {
   const view = describeSheet(plan, mine);
   const [chosen, setChosen] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [changesOpen, setChangesOpen] = useState(false);
-  const open = chosen ?? view.actionable;
+  const open = !folded && (chosen ?? view.actionable);
 
   async function agree() {
     if (mine.shareMinor === null) return;
@@ -53,7 +55,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent }: ActionSheetP
 
   const share = mine.shareMinor !== null ? formatMinor(mine.shareMinor, mine.currency) : null;
   return (
-    <section aria-label="Plan decision" className="flex flex-col gap-3 rounded-t-[26px] bg-card px-5 pt-2.5 pb-4 shadow-sheet">
+    <section aria-label="Plan decision" className="flex max-h-[55dvh] flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-card px-5 pt-2.5 pb-4 shadow-sheet">
       <button type="button" onClick={() => setChosen(!open)} aria-expanded={open} className="flex min-h-9 items-center justify-between gap-3">
         <span className="flex w-11 justify-start text-muted-foreground">{open ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}</span>
         <span className="h-[5px] w-11 rounded-full bg-border" aria-hidden="true" />

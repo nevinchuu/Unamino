@@ -13,10 +13,12 @@ interface ComposerProps {
   readonly replyingTo: { readonly name: string | null; readonly text: string } | null;
   readonly onCancelReply: () => void;
   readonly disabled?: boolean;
+  /** Told when the box gains or loses focus, so the screen can make room for the keyboard. */
+  readonly onFocusChange?: (focused: boolean) => void;
 }
 
 /** The bar at the bottom: a box that grows as you type, a shortcut for @trippy, and a round send button. */
-export function Composer({ onSend, replyingTo, onCancelReply, disabled = false }: ComposerProps) {
+export function Composer({ onSend, replyingTo, onCancelReply, disabled = false, onFocusChange }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const box = useRef<HTMLTextAreaElement>(null);
   const canSend = !disabled && draft.trim().length > 0;
@@ -74,7 +76,7 @@ export function Composer({ onSend, replyingTo, onCancelReply, disabled = false }
       ) : null}
 
       <div className="flex items-end gap-2">
-        <div className="flex min-w-0 flex-1 items-end rounded-3xl bg-secondary px-4 py-2 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="flex min-w-0 flex-1 items-end rounded-3xl bg-secondary px-4 focus-within:ring-2 focus-within:ring-ring/40">
           <textarea
             ref={box}
             value={draft}
@@ -89,14 +91,16 @@ export function Composer({ onSend, replyingTo, onCancelReply, disabled = false }
               grow();
             }}
             onKeyDown={onKeyDown}
-            className="max-h-[120px] min-w-0 flex-1 resize-none bg-transparent py-1 text-[15px] leading-snug outline-none placeholder:text-muted-foreground"
+            onFocus={() => onFocusChange?.(true)}
+            onBlur={() => onFocusChange?.(false)}
+            className="max-h-[120px] min-w-0 flex-1 resize-none bg-transparent py-3 text-[15px] leading-snug outline-none placeholder:text-muted-foreground"
           />
           <button
             type="button"
             onClick={insertMention}
             disabled={disabled}
             aria-label="Mention Trippy"
-            className="mb-0.5 ml-1 inline-flex min-h-7 shrink-0 items-center gap-0.5 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-foreground disabled:opacity-50"
+            className="relative mb-2.5 ml-1 inline-flex min-h-7 shrink-0 before:absolute before:-inset-2 before:content-[''] items-center gap-0.5 rounded-full bg-accent px-2.5 py-1 text-xs font-bold text-accent-foreground disabled:opacity-50"
           >
             <AtSign className="size-3" />
             trippy

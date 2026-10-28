@@ -155,7 +155,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
         <AppBar title="Plan" backHref={`/g/${view.groupId}`} />
         <main className="flex flex-1 flex-col items-center gap-3 px-8 pt-20 text-center">
           <h2 className="text-xl font-semibold">We couldn&apos;t find this plan</h2>
-          <Link href={`/g/${view.groupId}`} className="text-sm font-medium text-primary">
+          <Link href={`/g/${view.groupId}`} className="inline-flex min-h-11 items-center text-sm font-medium text-primary">
             Back to the chat
           </Link>
         </main>
@@ -290,7 +290,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
             ) : null}
 
             {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount && !me.actions.requestChanges && !me.cardNeeded ? (
-              <Link href={`/g/${view.groupId}`} className="block text-center text-sm font-medium text-primary">
+              <Link href={`/g/${view.groupId}`} className="flex min-h-11 items-center justify-center text-sm font-medium text-primary">
                 Back to the chat
               </Link>
             ) : null}

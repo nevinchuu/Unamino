@@ -41,6 +41,9 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const [replyTo, setReplyTo] = useState<RowModel | null>(null);
   const [signedOut, setSignedOut] = useState(false);
   const [unseen, setUnseen] = useState(0);
+  const [typing, setTyping] = useState(false);
+  /** What a screen reader is told when something new arrives, instead of reading out the whole chat each time. */
+  const [announcement, setAnnouncement] = useState("");
 
   const scrollBox = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -57,6 +60,8 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
         setMessages((held) => mergeMessages(held, snapshot.messages));
         if (!stickToBottom.current) setUnseen((count) => count + snapshot.messages.filter((message) => message.senderId !== meId).length);
       }
+      const incoming = snapshot.messages.filter((message) => message.senderId !== meId).at(-1);
+      if (incoming) setAnnouncement(incoming.kind === "system" ? incoming.body : `${incoming.senderName ?? "Someone"}: ${snippet(incoming.body, 160)}`);
       setMembers(snapshot.members);
       setAgentWorking(snapshot.agentWorking);
       setPlans(snapshot.plans);
@@ -211,8 +216,11 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
           <AvatarStack people={members.map((name) => ({ name }))} max={3} size={28} />
         </Link>
       </header>
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
 
-      <div ref={scrollBox} onScroll={onScroll} className="relative flex-1 overflow-y-auto bg-background px-4 pt-2 pb-4" aria-live="polite">
+      <div ref={scrollBox} onScroll={onScroll} className="relative flex-1 overflow-y-auto bg-background px-4 pt-2 pb-4">
         {isEmpty ? (
           <div className="mx-auto mt-10 flex max-w-xs flex-col items-center gap-3 rounded-3xl bg-card px-5 py-6 text-center shadow-soft">
             <AgentAvatar size={48} />
@@ -287,10 +295,11 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
         ) : null}
       </div>
 
-      {decidingOn?.mine && !signedOut ? <ActionSheet groupId={groupId} plan={decidingOn} mine={decidingOn.mine} onChangesSent={(asked) => asked && setAgentWorking(true)} /> : null}
+      {decidingOn?.mine && !signedOut ? <ActionSheet groupId={groupId} plan={decidingOn} mine={decidingOn.mine} onChangesSent={(asked) => asked && setAgentWorking(true)} folded={typing} /> : null}
 
       <Composer
         disabled={signedOut}
+        onFocusChange={setTyping}
         replyingTo={replyTo ? { name: replyTo.senderName, text: snippet(replyTo.body) } : null}
         onCancelReply={() => setReplyTo(null)}
         onSend={(body) => {

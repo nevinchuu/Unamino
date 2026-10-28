@@ -13,5 +13,5 @@ const TONES: Record<ChipTone, string> = {
 
 /** A small rounded label for a status, like "2 of 4 agreed" or "Booked". */
 export function StatusChip({ tone = "neutral", children, className }: { readonly tone?: ChipTone; readonly children: ReactNode; readonly className?: string }) {
-  return <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] leading-none font-bold", TONES[tone], className)}>{children}</span>;
+  return <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs leading-none font-bold", TONES[tone], className)}>{children}</span>;
 }

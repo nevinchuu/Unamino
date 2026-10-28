@@ -5,7 +5,7 @@ import { formatMinor } from "@/lib/format-money";
 
 /** Flights and hotels come only from a test sandbox, so their cards say so: nobody should take the prices for real ones. */
 function SandboxTag() {
-  return <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Sandbox listing</span>;
+  return <span className="mt-1 inline-block rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Sandbox listing</span>;
 }
 
 function Card({ icon, title, subtitle, price, sandbox = false, children }: { readonly icon: ReactNode; readonly title: string; readonly subtitle?: string; readonly price?: ReactNode; readonly sandbox?: boolean; readonly children?: ReactNode }) {
@@ -119,7 +119,7 @@ export function IdeaCard({ idea }: { readonly idea: IdeaDto }) {
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold break-words">
             {idea.mapsUrl ? (
-              <a href={idea.mapsUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-2 hover:underline">
+              <a href={idea.mapsUrl} target="_blank" rel="noopener noreferrer" className="-my-3 inline-block py-3 text-primary underline-offset-2 hover:underline">
                 {idea.name}
               </a>
             ) : (

@@ -28,7 +28,7 @@ export function AppBar({ title, subtitle, leading, backHref }: AppBarProps) {
   return (
     <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-4 py-3 text-foreground">
       {backHref ? (
-        <Link href={backHref} aria-label="Back" className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-muted">
+        <Link href={backHref} aria-label="Back" className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-muted">
           <ArrowLeft className="size-5" />
         </Link>
       ) : null}

@@ -20,7 +20,7 @@ export function TextField({ label, error, className, ...input }: TextFieldProps)
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         className={cn(
-          "w-full border-0 border-b-2 border-input bg-transparent px-0 py-2 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary aria-invalid:border-destructive",
+          "w-full border-0 border-b-2 border-muted-foreground/70 bg-transparent px-0 py-2 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary aria-invalid:border-destructive",
           className,
         )}
         {...input}

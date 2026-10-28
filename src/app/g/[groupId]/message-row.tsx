@@ -74,7 +74,7 @@ export function MessageRow({ groupId, model, mine, startsRun, plans, onReply, on
               {name}
             </span>
             {/* Shown in the reader's own time zone, which the server cannot know, so the first draw may differ. */}
-            <time dateTime={model.at.toISOString()} className="text-[11px] text-muted-foreground" suppressHydrationWarning>
+            <time dateTime={model.at.toISOString()} className="text-xs text-muted-foreground" suppressHydrationWarning>
               {clockTime(model.at)}
             </time>
             {model.status === "sending" ? <Clock className="size-3 text-muted-foreground" aria-label="Sending" /> : null}
@@ -101,7 +101,7 @@ export function MessageRow({ groupId, model, mine, startsRun, plans, onReply, on
         ) : null}
 
         {model.replyId ? (
-          <button type="button" onClick={() => onReply(model)} className="mt-1 inline-flex min-h-8 items-center gap-1 text-xs font-medium text-link">
+          <button type="button" onClick={() => onReply(model)} className="-mb-1.5 inline-flex min-h-11 min-w-11 items-center gap-1 text-xs font-medium text-link">
             <CornerUpLeft className="size-3" />
             Reply
           </button>
