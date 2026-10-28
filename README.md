@@ -62,6 +62,7 @@ You need Node 24 and pnpm 12, and your own accounts for the services below. All 
 | Variable | What it is |
 |---|---|
 | `DATABASE_URL` | A Postgres database. It was built on Supabase (use the session pooler, port 5432, locally). |
+| `DATABASE_SSL_CA` | The CA certificate that signed your database's certificate, as PEM (a Supabase project: Database settings, SSL configuration). With it the app checks who it is talking to. Optional for local development, **required in production**: the server refuses to start without it. |
 | `MUSE_SPARK_API_KEY` | Meta Model API key for Muse Spark. |
 | `LITEAPI_KEY` | liteAPI **sandbox** key. |
 | `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe **test** keys. |

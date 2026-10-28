@@ -111,7 +111,7 @@ function build(): Container {
   const bookingSimulation = resolveBookingSimulation(env.value.simulateBooking, process.env.NODE_ENV);
   if (!bookingSimulation.ok) throw new Error(bookingSimulation.error.message);
 
-  const { db } = connectDatabase(env.value.databaseUrl, MAX_CONNECTIONS);
+  const { db } = connectDatabase(env.value.databaseUrl, MAX_CONNECTIONS, { caCertificate: env.value.databaseCaCertificate, requireVerification: process.env.NODE_ENV === "production" });
   const groups = new PostgresGroupRepository(db);
   const messages = new PostgresMessageRepository(db);
   const planRepository = new PostgresPlanRepository(db);
