@@ -12,7 +12,8 @@ import { runConversation } from "./loop/conversation";
 import type { ChatModel } from "./loop/model";
 import { buildOpening, SYSTEM_PROMPT } from "./loop/prompt";
 import { newSession, type RosterEntry, type ToolEnv } from "./loop/session";
-import { runTool, TOOL_SPECS } from "./loop/tools";
+import type { WebResearcher } from "./loop/research";
+import { runTool, toolSpecsFor } from "./loop/tools";
 import type { AgentRun, AgentRunRepository, BriefRepository, ConstraintRepository, FxRates, PlanStore, SearchStore, StartedRun, StoreError, UsageMeter, UsageTotals } from "./ports";
 import type { TraceSink } from "./trace";
 
@@ -46,6 +47,8 @@ export interface AgentDeps {
   readonly makePlanner: (meter: UsageMeter) => Planner;
   /** Makes the conversational model for one run, wired to that run's usage meter. */
   readonly makeChatModel: (meter: UsageMeter) => ChatModel;
+  /** Makes the web researcher for one run, wired to that run's usage meter. Unset when web search is switched off. */
+  readonly makeResearcher?: (meter: UsageMeter) => WebResearcher;
   /** Where the run writes what it did and why. Unset in production. */
   readonly trace?: TraceSink;
   readonly clock: () => Date;
@@ -141,7 +144,8 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
   const limits = readConstraints(deps, planner, memberIds, humanChat, group.value.baseCurrency, note);
 
   const session = newSession();
-  const env: ToolEnv = { deps, run, group: group.value, roster, now, constraints: () => limits, planner, session, note };
+  const researcher = deps.makeResearcher?.(meter) ?? null;
+  const env: ToolEnv = { deps, run, group: group.value, roster, now, constraints: () => limits, planner, session, researcher, note };
   const say = async (text: string, kind: "status" | "final"): Promise<void> => {
     await deps.messages.postAgent(run.groupId, text, { replyToMessageId: run.triggerMessageId, planId: kind === "final" && session.planId !== null ? session.planId : undefined });
   };
@@ -150,7 +154,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
     model: deps.makeChatModel(meter),
     system: SYSTEM_PROMPT,
     opening: buildOpening({ today: now.toISOString().slice(0, 10), members: roster.map((entry) => ({ alias: entry.alias, name: entry.member.displayName })), currentPlan, chat }),
-    tools: TOOL_SPECS,
+    tools: toolSpecsFor(researcher !== null),
     runTool: (name, argumentsJson) => runTool(env, name, argumentsJson),
     say,
     note,

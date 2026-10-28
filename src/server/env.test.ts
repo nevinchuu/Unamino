@@ -34,6 +34,17 @@ describe("readServerEnv", () => {
   });
 });
 
+describe("web search setting", () => {
+  const base = { DATABASE_URL: "postgres://x", LITEAPI_KEY: "k", MUSE_SPARK_API_KEY: "m" };
+
+  it("is on unless it is switched off, whatever case it is written in", () => {
+    expect(readServerEnv(base)).toMatchObject({ ok: true, value: { webSearch: true } });
+    expect(readServerEnv({ ...base, MUSE_WEB_SEARCH: "on" })).toMatchObject({ value: { webSearch: true } });
+    expect(readServerEnv({ ...base, MUSE_WEB_SEARCH: "off" })).toMatchObject({ value: { webSearch: false } });
+    expect(readServerEnv({ ...base, MUSE_WEB_SEARCH: " OFF " })).toMatchObject({ value: { webSearch: false } });
+  });
+});
+
 describe("hold simulation", () => {
   it("is off unless SIMULATE_HOLDS is exactly 1", () => {
     expect(readServerEnv(FULL)).toMatchObject({ ok: true, value: { simulateHolds: false } });

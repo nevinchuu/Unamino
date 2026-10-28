@@ -47,6 +47,7 @@ import { LiteApiOfferSource } from "@/infrastructure/liteapi/liteapi-offer-sourc
 import { MuseHttp, type MuseCall } from "@/infrastructure/muse/muse-http";
 import { MusePlanner } from "@/infrastructure/muse/muse-planner";
 import { MuseChatModel } from "@/infrastructure/muse/muse-chat-model";
+import { MuseResearcher } from "@/infrastructure/muse/muse-researcher";
 import { traceSinkFromEnv } from "@/infrastructure/trace/file-trace";
 import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
 import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
@@ -134,6 +135,7 @@ function build(): Container {
     fx: new StaticFxRates(),
     makePlanner: (meter) => new MusePlanner(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })),
     makeChatModel: (meter) => new MuseChatModel(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })),
+    ...(env.value.webSearch && { makeResearcher: (meter) => new MuseResearcher(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })) }),
     trace,
     clock: () => new Date(),
   };

@@ -7,6 +7,8 @@ import type { MuseConfig } from "@/infrastructure/muse/muse-http";
 export interface ServerEnv {
   readonly databaseUrl: string;
   readonly liteApiKey: string;
+  /** Whether Trippy may search the web. On unless MUSE_WEB_SEARCH=off: every search is a paid call. */
+  readonly webSearch: boolean;
   /** The CA certificate that signed the database's certificate (PEM). With it the database's identity is checked; production requires it. */
   readonly databaseCaCertificate: string | null;
   readonly muse: MuseConfig;
@@ -45,7 +47,7 @@ export function readServerEnv(env: Readonly<Record<string, string | undefined>>)
   const databaseUrl = clean(env.DATABASE_URL);
   const liteApiKey = clean(env.LITEAPI_KEY);
   if (missing.length > 0 || !muse.ok || !databaseUrl || !liteApiKey) return err({ missing });
-  return ok({ databaseUrl, liteApiKey, databaseCaCertificate: clean(env.DATABASE_SSL_CA), muse: muse.value, placesApiKey: clean(env.GOOGLE_PLACES_API_KEY), cronSecret: clean(env.CRON_SECRET), simulateHolds: clean(env.SIMULATE_HOLDS) === "1", simulateBooking: clean(env.SIMULATE_BOOKING) === "1", stripeSecretKey: clean(env.STRIPE_SECRET_KEY), stripeWebhookSecret: clean(env.STRIPE_WEBHOOK_SECRET), travellerEncryptionKey: clean(env.TRAVELLER_ENCRYPTION_KEY) });
+  return ok({ databaseUrl, liteApiKey, databaseCaCertificate: clean(env.DATABASE_SSL_CA), webSearch: clean(env.MUSE_WEB_SEARCH)?.toLowerCase() !== "off", muse: muse.value, placesApiKey: clean(env.GOOGLE_PLACES_API_KEY), cronSecret: clean(env.CRON_SECRET), simulateHolds: clean(env.SIMULATE_HOLDS) === "1", simulateBooking: clean(env.SIMULATE_BOOKING) === "1", stripeSecretKey: clean(env.STRIPE_SECRET_KEY), stripeWebhookSecret: clean(env.STRIPE_WEBHOOK_SECRET), travellerEncryptionKey: clean(env.TRAVELLER_ENCRYPTION_KEY) });
 }
 
 /**

@@ -6,6 +6,7 @@ import type { CompleteTrip } from "@/domain/trip/brief";
 import type { SearchRecord } from "@/domain/trip/search";
 import type { AgentDeps } from "../run-agent";
 import type { AgentRun } from "../ports";
+import type { WebResearcher } from "./research";
 
 export interface RosterEntry {
   /** What the model calls this person: m1, m2, ... */
@@ -23,6 +24,8 @@ export interface Session {
   flyerIds: readonly string[] | null;
   /** The plan this turn made or found, so the reply carries its card. */
   planId: string | null;
+  /** How many times the web has been searched this turn, which is limited. */
+  researchCalls: number;
 }
 
 /** Everything a tool needs, gathered once per turn. */
@@ -37,9 +40,11 @@ export interface ToolEnv {
   /** For the free-time ideas, which still use structured answers. */
   readonly planner: Planner;
   readonly session: Session;
+  /** Null when web search is switched off, in which case the model is not offered the tool. */
+  readonly researcher: WebResearcher | null;
   readonly note: (stage: string, data: unknown) => void;
 }
 
-export const newSession = (): Session => ({ trip: null, searches: [], offersByAlias: new Map(), flyerIds: null, planId: null });
+export const newSession = (): Session => ({ trip: null, searches: [], offersByAlias: new Map(), flyerIds: null, planId: null, researchCalls: 0 });
 
 export const members = (env: ToolEnv): readonly Member[] => env.roster.map((entry) => entry.member);

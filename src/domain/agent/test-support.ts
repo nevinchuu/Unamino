@@ -11,6 +11,7 @@ import type { PlannerError } from "@/domain/planner/errors";
 import type { ExtractConstraintsInput, Planner, ProposePlanInput, SuggestFreeTimeInput } from "@/domain/planner/planner";
 import type { PlannerOutput } from "@/domain/planner/schema";
 import type { ChatModel, ModelRequest, ModelTurn } from "./loop/model";
+import type { Research, ResearchError, WebResearcher } from "./loop/research";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { SearchRecord } from "@/domain/trip/search";
@@ -340,8 +341,22 @@ export class FakeOfferSource implements OfferSource {
   }
 }
 
+/** A web researcher that answers from a script and remembers every question it was asked. */
+export class FakeResearcher implements WebResearcher {
+  readonly questions: string[] = [];
+  readonly dates: string[] = [];
+  answer: Result<Research, ResearchError> = ok({ answer: "Mid December is cool and dry, around 31C by day.", sources: [{ title: "Weather Atlas", url: "https://www.weather-atlas.com/en/thailand/bangkok-climate" }, { title: "Tourism Authority", url: "https://www.tourismthailand.org/events" }] });
+
+  async research(question: string, today: string): Promise<Result<Research, ResearchError>> {
+    this.questions.push(question);
+    this.dates.push(today);
+    return this.answer;
+  }
+}
+
 export interface World {
   readonly deps: AgentDeps;
+  readonly researcher: FakeResearcher;
   readonly groups: FakeGroups;
   readonly messages: FakeMessages;
   readonly runs: FakeRuns;
@@ -370,14 +385,16 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
   const source = new FakeOfferSource();
   const planners: RecordingPlanner[] = [];
   const models: ScriptedChatModel[] = [];
+  const researcher = new FakeResearcher();
   let steps: ChatStep[] = [];
   const deps: AgentDeps = {
     groups, messages, runs, briefs, constraints, searches, plans, planRepository: plans, offers: source, venues: null,
     fx: new StaticFxRates(),
     makePlanner: (meter) => { const planner = new RecordingPlanner(behaviour, meter); planners.push(planner); return planner; },
     makeChatModel: (meter) => { const model = new ScriptedChatModel(steps, meter); models.push(model); return model; },
+    makeResearcher: () => researcher,
     clock: () => NOW,
     searchOptions: { retryDelayMs: 0 },
   };
-  return { deps, groups, messages, runs, briefs, constraints, searches, plans, source, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
+  return { deps, researcher, groups, messages, runs, briefs, constraints, searches, plans, source, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
 }
