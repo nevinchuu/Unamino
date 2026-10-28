@@ -90,4 +90,34 @@ describe.skipIf(!ENABLED)("PostgresBookingStore on the real database", () => {
     if (!listed.ok) throw new Error(listed.error.message);
     expect(listed.value.find((booking) => booking.pickId === flightPickId)?.status).toBe("cancelled");
   }, 30_000);
+
+  it("finds a plan that has been booking since before a time, and only that plan", async () => {
+    await handle.db.update(plans).set({ status: "booking", updatedAt: new Date("2026-10-27T00:00:00.000Z") }).where(eq(plans.id, planId));
+    const later = new Date("2026-10-27T00:10:00.000Z");
+
+    const stuck = await store.stuckPlans(later, 10);
+    expect(stuck.ok && stuck.value).toContain(planId);
+    expect(await store.isStuck(planId, later)).toEqual({ ok: true, value: true });
+
+    expect(await store.isStuck(planId, new Date("2026-10-26T00:00:00.000Z"))).toEqual({ ok: true, value: false });
+    const none = await store.stuckPlans(new Date("2026-10-26T00:00:00.000Z"), 10);
+    expect(none.ok && none.value).not.toContain(planId);
+  }, 30_000);
+
+  it("finds an ended plan that still has a booking to cancel, and stops once all are cancelled", async () => {
+    await handle.db.update(plans).set({ status: "booked" }).where(eq(plans.id, planId));
+    const whileBooked = await store.unsettledPlans(50);
+    expect(whileBooked.ok && whileBooked.value).not.toContain(planId);
+
+    await handle.db.update(plans).set({ status: "expired" }).where(eq(plans.id, planId));
+    await store.setStatus(planId, hotelPickId, "cancelling");
+    await store.setStatus(planId, flightPickId, "booked");
+    const open = await store.unsettledPlans(50);
+    expect(open.ok && open.value).toContain(planId);
+
+    await store.setStatus(planId, hotelPickId, "cancelled");
+    await store.setStatus(planId, flightPickId, "cancelled");
+    const done = await store.unsettledPlans(50);
+    expect(done.ok && done.value).not.toContain(planId);
+  }, 30_000);
 });

@@ -14,7 +14,7 @@ const raw = (status: PlanStatus = "reviewing"): PlanViewRaw => ({
   id: PLAN_ID, groupId: GROUP, title: "Bangkok weekend", summary: null, status, deadlineAt: new Date("2026-10-27T01:09:00Z"), baseCurrency: "USD",
   fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: 1, replacedByPlanId: null, trip: { city: "Bangkok", departDate: "2026-12-11", returnDate: "2026-12-13" },
   members: [{ id: "ana", name: "Ana", currency: "USD", planAgreement: "pending", approval: "pending", approvedMinor: null, chargedMinor: null, holdPlaced: false }],
-  picks: [{ id: "p1", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "p2", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [],
+  picks: [{ id: "p1", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "p2", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [], bookings: [],
 });
 
 interface Setup {
@@ -26,14 +26,37 @@ interface Setup {
 function setup({ status, member = ana, load }: Setup = {}) {
   const refreshed: string[] = [];
   const loaded: string[] = [];
+  const settled: string[] = [];
   const deps: PlanViewDeps = {
     views: { load: load ?? (async (id) => (loaded.push(id), ok(raw(status)))) },
     memberOf: async () => member,
     payments: "none",
     scheduleRefresh: (id) => void refreshed.push(id),
+    scheduleSettle: (id) => void settled.push(id),
   };
-  return { deps, refreshed, loaded };
+  return { deps, refreshed, loaded, settled };
 }
+
+describe("loadPlanViewFor, settling a stuck booking", () => {
+  it("asks for a plan that is booking to be checked for being stuck, and does not refresh its prices", async () => {
+    const { deps, settled, refreshed } = setup({ status: "booking" });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(settled).toEqual([PLAN_ID]);
+    expect(refreshed).toEqual([]);
+  });
+
+  it("does not ask for any other plan", async () => {
+    const { deps, settled } = setup({ status: "held" });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(settled).toEqual([]);
+  });
+
+  it("does not ask for a stranger's view", async () => {
+    const { deps, settled } = setup({ status: "booking", member: null });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(settled).toEqual([]);
+  });
+});
 
 describe("loadPlanViewFor", () => {
   it("gives a member their view of the plan, as themselves", async () => {

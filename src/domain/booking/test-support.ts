@@ -50,6 +50,22 @@ export class FakeSupplier implements HotelSupplier, FlightSupplier {
 export class MemoryBookingStore implements SupplierBookingStore {
   readonly rows: SupplierBooking[] = [];
   failRecord = false;
+  /** The plans that count as stuck booking, and the plans that count as ended, for the sweeps. */
+  stuck: string[] = [];
+  ended: string[] = [];
+
+  async stuckPlans(): Promise<Result<readonly string[], BookingStoreError>> {
+    return ok(this.stuck);
+  }
+
+  async isStuck(planId: string): Promise<Result<boolean, BookingStoreError>> {
+    return ok(this.stuck.includes(planId));
+  }
+
+  async unsettledPlans(): Promise<Result<readonly string[], BookingStoreError>> {
+    const open = this.rows.filter((row) => row.status !== "cancelled" && this.ended.includes(row.planId)).map((row) => row.planId);
+    return ok([...new Set(open)]);
+  }
 
   async record(booking: SupplierBooking): Promise<Result<void, BookingStoreError>> {
     if (this.failRecord) return err({ message: "db down" });

@@ -3,8 +3,8 @@ import type { PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
 
 /**
- * What the group sees once the trip is paid for: the code to quote, and what they were really charged. In the sandbox
- * nothing is booked with an airline or hotel, so it says so instead of pretending there are booking numbers.
+ * What the group sees once the trip is paid for: the code to quote, and what they were really charged. Booking codes from the
+ * suppliers are shown when there are any; when booking is only pretended it says so instead of inventing booking numbers.
  */
 export function TripConfirmed({ view }: { readonly view: PlanViewDto }) {
   if (view.reference === null) return null;
@@ -25,6 +25,25 @@ export function TripConfirmed({ view }: { readonly view: PlanViewDto }) {
         <p className="font-mono text-2xl font-semibold tracking-widest select-all">{view.reference}</p>
         <p className="mt-1 text-xs opacity-80">Quote this code to your group. It is this app&apos;s own reference, not an airline or hotel booking number.</p>
       </div>
+
+      {view.confirmations.length > 0 ? (
+        <div className="rounded-xl bg-card p-4 shadow-sm">
+          <h2 className="text-sm font-medium text-muted-foreground">Booking codes</h2>
+          <ul className="mt-2 space-y-2 text-sm">
+            {view.confirmations.map((confirmation) => (
+              <li key={`${confirmation.kind}-${confirmation.code}`} className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 truncate text-muted-foreground">
+                  {confirmation.kind === "flight" ? "Flight" : "Hotel"} · {confirmation.title}
+                </span>
+                <span className="shrink-0 font-mono font-semibold select-all">{confirmation.code}</span>
+              </li>
+            ))}
+          </ul>
+          <p role="note" className="mt-3 text-xs text-muted-foreground">
+            These come from the booking partner&apos;s sandbox, so they are test codes: nothing real was reserved.
+          </p>
+        </div>
+      ) : null}
 
       {view.demoBooking ? (
         <p role="note" className="rounded-xl bg-muted px-4 py-3 text-xs text-muted-foreground">

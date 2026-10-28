@@ -31,6 +31,14 @@ describe("handleExpireOverdue", () => {
     expect(calls).toEqual([[NOW, OVERDUE_BATCH]]);
   });
 
+  it("also settles stuck bookings and says what it did", async () => {
+    const sweeps: number[] = [];
+    const { deps } = setup({ bookings: { sweep: async (limit) => (sweeps.push(limit), { settled: 1, cancelled: 2, failed: 0 }) } });
+    const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
+    expect(await response.json()).toEqual({ ...SUMMARY, booking: { settled: 1, cancelled: 2, failed: 0 } });
+    expect(sweeps).toEqual([OVERDUE_BATCH]);
+  });
+
   it.each([undefined, "Bearer wrong"])("refuses %j without running anything", async (header) => {
     const { deps, calls } = setup();
     const response = await handleExpireOverdue(request(header), deps);

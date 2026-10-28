@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import { ok } from "@/lib/result";
 import { DEADLINE, NOW } from "@/domain/plan/test-support";
 import { SupplierBookingRunner } from "./booking-runner";
+import { BOOKING_FAILED_LINES } from "./announce";
 import { bookingSetup } from "./test-support";
 
 const BOOK = [{ type: "book" }] as const;
 
-function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = () => NOW, renew?: (planId: string) => Promise<void>) {
+function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = () => NOW, renew?: (planId: string) => Promise<void>, announce?: (planId: string, line: string) => Promise<void>) {
   return new SupplierBookingRunner({
     plans: world.plans,
     details: world.details,
@@ -18,6 +19,7 @@ function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = (
     onward: () => world.onward,
     clock,
     renew,
+    announce,
   });
 }
 
@@ -191,5 +193,87 @@ describe("SupplierBookingRunner", () => {
     expect(await runner.cancelBookings("plan-1")).toEqual(ok(undefined));
 
     expect(world.hotels.cancelled).toEqual(["H-1"]);
+  });
+
+  describe("telling the group", () => {
+    const told = () => {
+      const lines: string[] = [];
+      return { lines, announce: async (_planId: string, line: string) => { lines.push(line); } };
+    };
+
+    it.each([
+      ["a price rise", { code: "price_changed", message: "x" } as const, "price"],
+      ["a sold-out flight", { code: "unavailable", message: "x" } as const, "unavailable"],
+      ["any other refusal", { code: "rejected", message: "x" } as const, "other"],
+    ] as const)("says why for %s, in a fixed line that holds nothing from the supplier", async (_name, failure, kind) => {
+      const world = bookingSetup();
+      world.hotels.failBooking = { ...failure, message: "SECRET passport K1234567A" };
+      const { lines, announce } = told();
+      await runnerFor(world, () => NOW, undefined, announce).run("plan-1", 5, BOOK);
+
+      expect(lines).toEqual([BOOKING_FAILED_LINES[kind]]);
+      expect(lines[0]).not.toContain("K1234567A");
+    });
+
+    it("says why when details are missing, a hold is gone, or the time ran out", async () => {
+      const missing = bookingSetup();
+      missing.travellers.load = async () => ok(null);
+      const a = told();
+      await runnerFor(missing, () => NOW, undefined, a.announce).run("plan-1", 5, BOOK);
+
+      const holdLost = bookingSetup();
+      holdLost.holds.why = "gone";
+      const b = told();
+      await runnerFor(holdLost, () => NOW, undefined, b.announce).run("plan-1", 5, BOOK);
+
+      const late = bookingSetup();
+      const times = [NOW, new Date(DEADLINE.getTime() + 1)];
+      let call = 0;
+      const c = told();
+      await runnerFor(late, () => times[Math.min(call++, times.length - 1)], undefined, c.announce).run("plan-1", 5, BOOK);
+
+      expect([a.lines, b.lines, c.lines]).toEqual([[BOOKING_FAILED_LINES.details], [BOOKING_FAILED_LINES.hold], [BOOKING_FAILED_LINES.deadline]]);
+    });
+
+    it("says nothing when the booking worked", async () => {
+      const world = bookingSetup();
+      const { lines, announce } = told();
+      await runnerFor(world, () => NOW, undefined, announce).run("plan-1", 5, BOOK);
+      expect(lines).toEqual([]);
+    });
+
+    it("still ends the plan when the chat cannot be reached", async () => {
+      const world = bookingSetup();
+      world.holds.why = "gone";
+      await runnerFor(world, () => NOW, undefined, async () => { throw new Error("chat down"); }).run("plan-1", 5, BOOK);
+      expect(world.plans.plan.status).toBe("expired");
+    });
+  });
+
+  describe("settling a plan stuck in booking", () => {
+    it("ends the plan, lets go of the holds, cancels what was booked and tells the group", async () => {
+      const world = bookingSetup();
+      world.plans.stored = { ...world.plans.stored, plan: { ...world.plans.plan, status: "booking" } };
+      await world.bookings.record({ planId: "plan-1", pickId: "pick-hotel", kind: "hotel", bookingId: "H-1", confirmation: null, status: "booked" });
+      const lines: string[] = [];
+      const runner = runnerFor(world, () => NOW, undefined, async (_id, line) => { lines.push(line); });
+
+      expect(await runner.settleStuck("plan-1")).toEqual(ok(undefined));
+      expect(world.plans.plan.status).toBe("expired");
+      expect(world.onward.types).toEqual(["release_holds"]);
+      expect(world.hotels.cancelled).toEqual(["H-1"]);
+      expect(lines).toEqual([BOOKING_FAILED_LINES.stuck]);
+    });
+
+    it("leaves a plan that was booked for real alone, so its bookings are never cancelled", async () => {
+      const world = bookingSetup();
+      const runner = runnerFor(world);
+      await world.bookings.record({ planId: "plan-1", pickId: "pick-hotel", kind: "hotel", bookingId: "H-1", confirmation: null, status: "booked" });
+      world.plans.stored = { ...world.plans.stored, plan: { ...world.plans.plan, status: "booked" } };
+
+      expect(await runner.settleStuck("plan-1")).toEqual(ok(undefined));
+      expect(world.plans.plan.status).toBe("booked");
+      expect(world.hotels.cancelled).toEqual([]);
+    });
   });
 });

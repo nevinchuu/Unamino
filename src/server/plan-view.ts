@@ -17,6 +17,8 @@ export interface PlanViewDeps {
   readonly travellers?: Pick<TravellerService, "haveDetails"> | null;
   /** Asks for the offers to be checked again once the response is on its way. Never waited for. */
   readonly scheduleRefresh: (planId: string) => void;
+  /** Asks for a plan that has been booking for too long to be settled once the response is on its way. Never waited for. */
+  readonly scheduleSettle?: (planId: string) => void;
 }
 
 export type LoadedPlanView = { readonly ok: true; readonly view: PlanViewDto } | { readonly ok: false; readonly reason: "not_found" | "unavailable" };
@@ -36,6 +38,8 @@ export async function loadPlanViewFor(deps: PlanViewDeps, planId: string): Promi
 
   // Prices are checked after the answer is sent, so nobody waits for the airline and hotel searches.
   if (LIVE_PLAN_STATUSES.includes(raw.value.status)) deps.scheduleRefresh(planId);
+  // A plan stuck booking would otherwise wait for the next scheduled sweep, which on the free plan can be a day away.
+  if (raw.value.status === "booking") deps.scheduleSettle?.(planId);
   return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking, travellers: await travellerStatus(deps, member.id) }) };
 }
 

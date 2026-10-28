@@ -74,12 +74,13 @@ describe.skipIf(!ENABLED)("PostgresPlanViewStore on the real database", () => {
     expect(raw.fx.ratesPerBase).toEqual({ SGD: 1.35 });
     expect(raw.trip).toEqual({ city: "Bangkok", departDate: "2026-12-11", returnDate: "2026-12-13" });
     expect(raw.members).toEqual([
-      { id: memberIds[0], name: "ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 30_000, holdPlaced: true },
-      { id: memberIds[1], name: "ben", currency: "SGD", planAgreement: "agreed", approval: "pending", approvedMinor: null, holdPlaced: false },
+      { id: memberIds[0], name: "ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 30_000, chargedMinor: null, holdPlaced: true },
+      { id: memberIds[1], name: "ben", currency: "SGD", planAgreement: "agreed", approval: "pending", approvedMinor: null, chargedMinor: null, holdPlaced: false },
     ]);
     expect(raw.picks.map((pick) => [pick.offer.id, pick.reason])).toEqual([[FLIGHT!.id, "flight reason"], [HOTEL!.id, "hotel reason"]]);
     expect(raw.picks[1].notes).toEqual({ [memberIds[1]]: "own room" });
     expect(raw.ideas.map((idea) => idea.venue.name)).toEqual(["Chatuchak Market", "Grand Palace"]);
+    expect(raw.bookings).toEqual([]);
   }, 30_000);
 
   it("never reads anyone's token or hash", async () => {

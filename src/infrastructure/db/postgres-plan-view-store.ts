@@ -3,7 +3,7 @@ import { err, ok, type Result } from "@/lib/result";
 import type { RepositoryError } from "@/domain/plan/repository";
 import type { PlanViewRaw, PlanViewStore } from "@/domain/plan/view-store";
 import type { Database } from "./client";
-import { members, planMembers, planPicks, plans, scheduleSuggestions, tripBriefs } from "./schema";
+import { members, planMembers, planPicks, plans, scheduleSuggestions, supplierBookings, tripBriefs } from "./schema";
 
 const unavailable = (): Result<never, RepositoryError> => err({ code: "unavailable", message: "The database could not be reached" });
 
@@ -28,6 +28,8 @@ export class PostgresPlanViewStore implements PlanViewStore {
       const picks = await this.db.select().from(planPicks).where(eq(planPicks.planId, planId)).orderBy(asc(planPicks.position));
       const ideas = await this.db.select().from(scheduleSuggestions).where(eq(scheduleSuggestions.planId, planId)).orderBy(asc(scheduleSuggestions.date), asc(scheduleSuggestions.startTime));
 
+      const booked = await this.db.select({ pickId: supplierBookings.pickId, confirmation: supplierBookings.confirmation, status: supplierBookings.status }).from(supplierBookings).where(eq(supplierBookings.planId, planId)).orderBy(asc(supplierBookings.createdAt));
+
       return ok({
         id: plan.id,
         groupId: plan.groupId,
@@ -43,6 +45,8 @@ export class PostgresPlanViewStore implements PlanViewStore {
         members: people.map(({ row, name, currency }) => ({ id: row.memberId, name, currency, planAgreement: row.planAgreement, approval: row.approval, approvedMinor: row.approvedMinor, chargedMinor: row.chargedMinor, holdPlaced: row.holdPlaced })),
         picks: picks.map((pick) => ({ id: pick.id, offer: pick.offer, memberIds: pick.memberIds, reason: pick.reason, notes: pick.notes })),
         ideas: ideas.map((idea) => ({ id: idea.id, date: idea.date, startTime: idea.startTime, endTime: idea.endTime, category: idea.category, why: idea.why, venue: idea.venue })),
+        // A cancelled booking is not part of the trip, so it is never shown as a confirmation.
+        bookings: booked.filter((booking) => booking.status !== "cancelled").map(({ pickId, confirmation }) => ({ pickId, confirmation })),
       });
     } catch {
       return unavailable();

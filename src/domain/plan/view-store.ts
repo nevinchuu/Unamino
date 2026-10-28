@@ -37,6 +37,12 @@ export interface ViewIdea {
   readonly venue: VenueFacts;
 }
 
+/** A booking an airline or hotel made for one pick, with the supplier own confirmation code when it gave one. */
+export interface ViewBooking {
+  readonly pickId: string;
+  readonly confirmation: string | null;
+}
+
 /** Everything the plan screen shows, as stored. `buildPlanView` turns it into what is sent to the browser. */
 export interface PlanViewRaw {
   readonly id: string;
@@ -54,6 +60,8 @@ export interface PlanViewRaw {
   readonly members: readonly ViewMember[];
   readonly picks: readonly ViewPick[];
   readonly ideas: readonly ViewIdea[];
+  /** What the suppliers confirmed. Empty until the trip is booked, and when booking is only pretended. */
+  readonly bookings: readonly ViewBooking[];
 }
 
 export interface PlanViewStore {

@@ -50,6 +50,13 @@ export interface IdeaDto {
   readonly why: string;
 }
 
+/** What an airline or hotel gave back for the trip, to quote at the desk. */
+export interface ConfirmationDto {
+  readonly kind: "flight" | "hotel";
+  readonly title: string;
+  readonly code: string;
+}
+
 export interface PersonDto {
   readonly id: string;
   readonly name: string;
@@ -118,6 +125,8 @@ export interface PlanViewDto {
   readonly pricesAvailable: boolean;
   readonly items: readonly PlanItemDto[];
   readonly ideas: readonly IdeaDto[];
+  /** The suppliers own codes, once the trip is booked. Empty when none were given. */
+  readonly confirmations: readonly ConfirmationDto[];
   readonly people: readonly PersonDto[];
   readonly me: MeDto;
 }
@@ -171,6 +180,14 @@ function ideaOf(idea: ViewIdea): IdeaDto {
  * What one person sees of a plan, worked out from what is stored. Prices are today's, from the stored offers, and
  * what the person may do is decided here from the plan's state and their own, so the screen never has to guess.
  */
+function confirmationsOf(raw: PlanViewRaw): ConfirmationDto[] {
+  return raw.bookings.flatMap((booking) => {
+    const pick = raw.picks.find((candidate) => candidate.id === booking.pickId);
+    if (!pick || !booking.confirmation || pick.offer.kind === "activity") return [];
+    return [{ kind: pick.offer.kind, title: pick.offer.title, code: booking.confirmation }];
+  });
+}
+
 export function buildPlanView(
   raw: PlanViewRaw,
   viewerId: string,
@@ -234,6 +251,7 @@ export function buildPlanView(
     pricesAvailable: priced.ok,
     items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names)),
     ideas: raw.ideas.map(ideaOf),
+    confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],
     people,
     me: {
       id: viewerId,

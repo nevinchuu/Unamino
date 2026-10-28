@@ -56,6 +56,37 @@ describe("PaymentEffectRunner", () => {
     const { runner } = setup({ ensure: err({ kind: "payment", message: "stripe is down" }) });
     expect(await runner.run("plan-1", 1, [{ type: "place_hold", memberId: "ana", amountMinor: 1 }])).toEqual({ ok: false, error: { message: "stripe is down" } });
   });
+  describe("charging after the trip is booked", () => {
+    const flaky = (failures: number) => {
+      let calls = 0;
+      const pauses: number[] = [];
+      const holds = {
+        captureHolds: async (): Promise<Outcome> => (calls += 1, calls <= failures ? err({ kind: "payment", message: "stripe is down" }) : ok(undefined)),
+      } as unknown as ConstructorParameters<typeof PaymentEffectRunner>[0];
+      const runner = new PaymentEffectRunner(holds, undefined, { captureAttempts: 3, pause: async (ms) => void pauses.push(ms) });
+      return { runner, pauses, calls: () => calls };
+    };
+    const charge: PlanEffect = { type: "capture_holds", captures: CAPTURES };
+
+    it("tries again right away when a charge fails for a moment, and stops once it works", async () => {
+      const { runner, pauses, calls } = flaky(2);
+      expect(await runner.run("plan-1", 1, [charge])).toEqual({ ok: true, value: undefined });
+      expect(calls()).toBe(3);
+      expect(pauses).toHaveLength(2);
+    });
+
+    it("gives up after the attempts it was allowed and reports the failure, to be retried later", async () => {
+      const { runner, calls } = flaky(10);
+      expect(await runner.run("plan-1", 1, [charge])).toEqual({ ok: false, error: { message: "stripe is down" } });
+      expect(calls()).toBe(3);
+    });
+
+    it("tries once by default, as before", async () => {
+      const { runner, calls } = setup({ capture: err({ kind: "payment", message: "no" }) });
+      await runner.run("plan-1", 1, [charge]);
+      expect(calls.filter((call) => call[0] === "captureHolds")).toHaveLength(1);
+    });
+  });
 });
 
 describe("PaymentEffectRunner, writing down how it went", () => {

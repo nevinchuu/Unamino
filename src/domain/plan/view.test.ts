@@ -32,6 +32,7 @@ function raw(overrides: Partial<PlanViewRaw> = {}): PlanViewRaw {
       { id: "pick-flight", offer: flight(), memberIds: ["ana", "ben"], reason: "After 18:00 for Ana", notes: {} },
     ],
     ideas: [IDEA],
+    bookings: [],
     ...overrides,
   };
 }
@@ -204,5 +205,25 @@ describe("a paid trip", () => {
       expect(buildPlanView(raw({ status }), "ana", { payments: "stripe" }).reference, status).toBeNull();
     }
     expect(view().people.every((person) => person.chargedMinor === null)).toBe(true);
+  });
+
+  describe("the suppliers' booking codes", () => {
+    const bookings = [{ pickId: "pick-flight", confirmation: "FL123" }, { pickId: "pick-hotel", confirmation: "HC9" }, { pickId: "pick-hotel", confirmation: null }];
+
+    it("shows the code each supplier gave once the trip is booked, with the name of what was booked", () => {
+      const dto = view({ status: "captured", bookings });
+      expect(dto.confirmations).toEqual([
+        { kind: "flight", title: "SIN to BKK", code: "FL123" },
+        { kind: "hotel", title: "Riverside Hotel", code: "HC9" },
+      ]);
+    });
+
+    it("shows nothing before the trip is booked, even if a booking exists", () => {
+      expect(view({ status: "booking", bookings }).confirmations).toEqual([]);
+    });
+
+    it("leaves out a booking whose pick is gone", () => {
+      expect(view({ status: "captured", bookings: [{ pickId: "nope", confirmation: "X" }] }).confirmations).toEqual([]);
+    });
   });
 });

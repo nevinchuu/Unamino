@@ -83,6 +83,12 @@ export interface SupplierBookingStore {
   record(booking: SupplierBooking): Promise<Result<void, BookingStoreError>>;
   list(planId: string): Promise<Result<readonly SupplierBooking[], BookingStoreError>>;
   setStatus(planId: string, pickId: string, status: SupplierBookingStatus): Promise<Result<void, BookingStoreError>>;
+  /** Plans that have been booking since before `before`, oldest first: the server probably stopped halfway. */
+  stuckPlans(before: Date, limit: number): Promise<Result<readonly string[], BookingStoreError>>;
+  /** Whether this plan has been booking since before `before`. */
+  isStuck(planId: string, before: Date): Promise<Result<boolean, BookingStoreError>>;
+  /** Plans that ended while a supplier booking was still not cancelled, oldest first. */
+  unsettledPlans(limit: number): Promise<Result<readonly string[], BookingStoreError>>;
 }
 
 /** Whether every card hold of a plan can still be charged. Checked just before anything is booked. */

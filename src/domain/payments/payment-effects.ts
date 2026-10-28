@@ -10,11 +10,31 @@ import type { HoldService } from "./hold-service";
  * somebody else's job. How each one went is written in the effect log, so what failed can be done again later. A
  * hold that could not be made yet is not a failure to report, because the card form makes it when the person opens it.
  */
+export interface PaymentEffectOptions {
+  /**
+   * How many times a charge is tried right away before it is left to the scheduled retry. The trip is already booked
+   * by then, so a charge that failed for a moment should not wait for the next sweep. Charges already made are not
+   * made again, so trying more than once is safe.
+   */
+  readonly captureAttempts?: number;
+  readonly pause?: (ms: number) => Promise<void>;
+}
+
+const CAPTURE_PAUSE_MS = 2_000;
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export class PaymentEffectRunner implements EffectRunner {
+  private readonly captureAttempts: number;
+  private readonly pause: (ms: number) => Promise<void>;
+
   constructor(
     private readonly holds: Pick<HoldService, "ensureHold" | "releaseHolds" | "captureHolds">,
     private readonly log?: Pick<EffectLog, "finish">,
-  ) {}
+    options: PaymentEffectOptions = {},
+  ) {
+    this.captureAttempts = Math.max(1, options.captureAttempts ?? 1);
+    this.pause = options.pause ?? wait;
+  }
 
   async run(planId: string, version: number, effects: readonly PlanEffect[]): Promise<Result<void, EffectError>> {
     const failures: string[] = [];
@@ -38,8 +58,14 @@ export class PaymentEffectRunner implements EffectRunner {
         return released.ok ? null : released.error.message;
       }
       case "capture_holds": {
-        const captured = await this.holds.captureHolds(planId, effect.captures);
-        return captured.ok ? null : captured.error.message;
+        let failure = "";
+        for (let attempt = 1; attempt <= this.captureAttempts; attempt += 1) {
+          const captured = await this.holds.captureHolds(planId, effect.captures);
+          if (captured.ok) return null;
+          failure = captured.error.message;
+          if (attempt < this.captureAttempts) await this.pause(CAPTURE_PAUSE_MS);
+        }
+        return failure;
       }
       case "request_review":
       case "request_approval":

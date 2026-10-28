@@ -4,6 +4,7 @@ import { StaticFxRates } from "@/domain/agent/static-fx";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
 import type { OfferSource } from "@/domain/offers/offer-source";
 import { SupplierBookingRunner } from "@/domain/booking/booking-runner";
+import { BookingSweeper } from "@/domain/booking/sweeper";
 import { EffectRetrier, giveUpLine } from "@/domain/payments/effect-retrier";
 import { ProviderHoldReadiness } from "@/domain/payments/hold-readiness";
 import { HoldService } from "@/domain/payments/hold-service";
@@ -83,9 +84,14 @@ export interface Container {
   };
   /** Null when there is no encryption key, in which case details cannot be taken. */
   readonly travellers: TravellerService | null;
+  /** Null unless bookings are made for real. Settles bookings that got stuck. */
+  readonly bookingSweeper: BookingSweeper | null;
   readonly offers: OfferSource;
   readonly cronSecret: string | null;
 }
+
+/** How many times a charge is tried right away after the trip is booked. */
+const CAPTURE_ATTEMPTS = 3;
 
 function build(): Container {
   const env = readServerEnv(process.env);
@@ -161,17 +167,20 @@ function build(): Container {
   const holdStore = new PostgresHoldStore(db);
   let holds: HoldService | null = null;
   let retrier: EffectRetrier | null = null;
+  let bookingSweeper: BookingSweeper | null = null;
   let webhook: Container["payments"]["webhook"] = null;
   if (mode === "stripe" && env.value.stripeSecretKey) {
     const stripe = createStripeClient(env.value.stripeSecretKey);
     const provider = new StripePaymentProvider(stripe);
     holds = new HoldService({ provider, store: holdStore, plans: planRepository, effects: () => effects, clock: agent.clock });
     const log = new PostgresEffectLog(db);
-    const paymentRunner = new PaymentEffectRunner(holds, log);
+    // The trip is already booked when the charges are taken, so a charge that fails for a moment is tried again right away.
+    const paymentRunner = new PaymentEffectRunner(holds, log, { captureAttempts: CAPTURE_ATTEMPTS });
     runners.push(paymentRunner);
     // Real booking with the airline and hotel needs the travellers' details, so without the encryption key the plan waits at "held".
     if (!bookingSimulation.value && travellers) {
       const bookingHttp = new LiteApiBookingHttp({ apiKey: env.value.liteApiKey });
+      const bookingStore = new PostgresBookingStore(db);
       const booking = new SupplierBookingRunner({
         plans: planRepository,
         details: new PostgresPlanDetailsStore(db),
@@ -179,13 +188,18 @@ function build(): Container {
         holds: new ProviderHoldReadiness(holdStore, provider),
         hotels: new LiteApiHotelSupplier(bookingHttp),
         flights: new LiteApiFlightSupplier(bookingHttp),
-        bookings: new PostgresBookingStore(db),
+        bookings: bookingStore,
         onward: () => effects,
         clock: agent.clock,
         renew: async (planId) => {
           await planService.refresh(planId, agent.clock());
         },
+        announce: async (planId, line) => {
+          const group = await views.groupIdOf(planId);
+          if (group.ok && group.value) await messages.postSystem(group.value, line);
+        },
       });
+      bookingSweeper = new BookingSweeper(bookingStore, booking, agent.clock);
       // The last card hold is placed inside a request; booking takes far longer than a person should wait.
       runners.push(new DeferredBookingRunner(booking, (task) => after(task)));
     }
@@ -212,6 +226,7 @@ function build(): Container {
     views,
     payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, webhook },
     travellers,
+    bookingSweeper,
     offers,
     cronSecret: env.value.cronSecret,
   };
