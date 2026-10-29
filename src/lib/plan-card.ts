@@ -1,4 +1,5 @@
 import type { PlanStatus } from "@/domain/plan/statuses";
+import type { IdeaDto, PlanItemDto } from "@/domain/plan/view";
 
 /** Where one person in the plan stands, for the list of who has done what. */
 export interface CardPerson {
@@ -10,8 +11,20 @@ export interface CardPerson {
   readonly held: boolean;
 }
 
+/** What the card shows when it is opened in the chat: the picks the agent made, as on the plan screen. */
+export interface CardDetail {
+  /** "Fri 18 Dec to Mon 21 Dec · 4 people", or just the headcount when the dates are not set. */
+  readonly subtitle: string;
+  readonly items: readonly PlanItemDto[];
+  readonly ideas: readonly IdeaDto[];
+  /** What the whole trip costs at today's prices. Null when the shares cannot all be priced in the plan's currency. */
+  readonly totalMinor: number | null;
+  readonly currency: string;
+}
+
 /** What the plan means for the person looking at the chat, so the card can offer them the next step. */
 export interface CardMine {
+  readonly detail: CardDetail;
   /** They have not agreed yet, and may. */
   readonly canAgree: boolean;
   readonly agreed: boolean;

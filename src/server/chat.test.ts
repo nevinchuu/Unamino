@@ -21,7 +21,7 @@ interface Setup {
   member?: Member | null;
 }
 
-const MINE = { canAgree: true, agreed: false, canRequestChanges: true, shareMinor: 32_000, currency: "USD", lines: [], people: [], needsAmount: false };
+const MINE = { canAgree: true, agreed: false, canRequestChanges: true, shareMinor: 32_000, currency: "USD", lines: [], people: [], needsAmount: false, detail: { subtitle: "", items: [], ideas: [], totalMinor: null, currency: "USD" } };
 
 function setup({ stored = [], running = false, plans = [], member = ana }: Setup = {}) {
   const asked: string[] = [];

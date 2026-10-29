@@ -40,6 +40,13 @@ describe("ViewerCards", () => {
     expect(card?.lines.map((line) => line.minor).reduce((sum, minor) => sum + minor, 0)).toBe(card?.shareMinor);
   });
 
+  it("carries the picks and the trip total for the card to open onto", async () => {
+    const card = await setup().cards.forPlan(PLAN, "ana");
+    expect(card?.detail.items.map((item) => item.kind)).toEqual(["flight", "hotel"]);
+    expect(card?.detail.subtitle).toBe("Fri 11 Dec to Sun 13 Dec · 1 person");
+    expect(card?.detail.totalMinor).toBe(card?.shareMinor);
+  });
+
   it("says a person has agreed once they have, and offers them nothing more to agree to", async () => {
     expect(await setup(raw("reviewing", "agreed")).cards.forPlan(PLAN, "ana")).toMatchObject({ canAgree: false, agreed: true });
   });

@@ -37,9 +37,17 @@ export class ViewerCards {
   private async read(planId: string, memberId: string): Promise<CardMine | null> {
     const raw = await this.deps.views.load(planId);
     if (!raw.ok) return null;
-    const { me, currency, people } = buildPlanView(raw.value, memberId, { payments: this.deps.payments });
+    const { me, currency, people, items, ideas, dates, headcount } = buildPlanView(raw.value, memberId, { payments: this.deps.payments });
     if (!me.inPlan) return null;
+    const shares = people.map((person) => (person.currency === currency ? person.shareMinor : null));
     return {
+      detail: {
+        subtitle: [dates, `${headcount} ${headcount === 1 ? "person" : "people"}`].filter((part) => part !== null).join(" · "),
+        items,
+        ideas,
+        totalMinor: shares.every((share) => share !== null) ? shares.reduce<number>((sum, share) => sum + share, 0) : null,
+        currency,
+      },
       canAgree: me.actions.agree,
       agreed: me.agreement === "agreed",
       canRequestChanges: me.actions.requestChanges,

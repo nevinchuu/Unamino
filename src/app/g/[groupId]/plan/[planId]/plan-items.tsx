@@ -11,14 +11,14 @@ function SandboxTag() {
 function Card({ icon, title, subtitle, price, sandbox = false, children }: { readonly icon: ReactNode; readonly title: string; readonly subtitle?: string; readonly price?: ReactNode; readonly sandbox?: boolean; readonly children?: ReactNode }) {
   return (
     <article className="rounded-xl bg-card p-4 shadow-sm">
-      <header className="flex items-start gap-3">
+      <header className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">{icon}</span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-40 flex-1">
           <h3 className="font-semibold break-words">{title}</h3>
           {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
         </div>
         {price ? (
-          <div className="shrink-0 text-right">
+          <div className="ml-auto shrink-0 text-right">
             {price}
             {sandbox ? <SandboxTag /> : null}
           </div>
@@ -51,7 +51,21 @@ function Who({ names }: { readonly names: readonly string[] }) {
   );
 }
 
-function Why({ reason, notes }: { readonly reason: string; readonly notes: readonly { readonly name: string; readonly text: string }[] }) {
+function Why({ reason, notes, asTags }: { readonly reason: string; readonly notes: readonly { readonly name: string; readonly text: string }[]; readonly asTags: boolean }) {
+  if (asTags) {
+    return (
+      <div className="mt-2 space-y-2 text-sm text-muted-foreground">
+        <p>{reason}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {notes.map((note) => (
+            <span key={`${note.name}-${note.text}`} className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+              {note.name}: {note.text}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mt-2 space-y-1 text-sm text-muted-foreground">
       <p>{reason}</p>
@@ -64,8 +78,8 @@ function Why({ reason, notes }: { readonly reason: string; readonly notes: reado
   );
 }
 
-/** One thing the plan buys: a flight, a stay or an activity, with who it is for and why it was chosen. */
-export function ItemCard({ item }: { readonly item: PlanItemDto }) {
+/** One thing the plan buys: a flight, a stay or an activity, with who it is for and why it was chosen. `asTags` shows what suits each person as small green tags instead of lines. */
+export function ItemCard({ item, asTags = false }: { readonly item: PlanItemDto; readonly asTags?: boolean }) {
   const price = (
     <>
       <p className="font-semibold">{formatMinor(item.totalMinor, item.currency)}</p>
@@ -91,7 +105,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
           ))}
         </ul>
         <Who names={item.memberNames} />
-        <Why reason={item.reason} notes={item.notes} />
+        <Why reason={item.reason} notes={item.notes} asTags={asTags} />
       </Card>
     );
   }
@@ -108,7 +122,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
           </p>
         ))}
         <Who names={item.memberNames} />
-        <Why reason={item.reason} notes={item.notes} />
+        <Why reason={item.reason} notes={item.notes} asTags={asTags} />
       </Card>
     );
   }
@@ -116,7 +130,7 @@ export function ItemCard({ item }: { readonly item: PlanItemDto }) {
   return (
     <Card icon={<Ticket className="size-5" />} title={item.title} subtitle={item.when} price={price}>
       <Who names={item.memberNames} />
-      <Why reason={item.reason} notes={item.notes} />
+      <Why reason={item.reason} notes={item.notes} asTags={asTags} />
     </Card>
   );
 }

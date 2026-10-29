@@ -8,6 +8,7 @@ import { StatusChip } from "@/components/status-chip";
 import { formatMinor } from "@/lib/format-money";
 import { describeSheet, type CardMine, type CardPlan } from "@/lib/plan-card";
 import { cn } from "@/lib/utils";
+import { PlanPreview } from "./plan-preview";
 import { agreeToPlan } from "./plan/[planId]/actions";
 import { ChangeRequestSheet } from "./plan/[planId]/change-request-sheet";
 
@@ -34,7 +35,9 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [changesOpen, setChangesOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const open = !folded && (chosen ?? view.actionable);
+  const big = open && detailsOpen;
 
   async function agree() {
     if (mine.shareMinor === null) return;
@@ -55,7 +58,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
 
   const share = mine.shareMinor !== null ? formatMinor(mine.shareMinor, mine.currency) : null;
   return (
-    <section aria-label="Plan decision" className="flex max-h-[55dvh] flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-card px-5 pt-2.5 pb-4 shadow-sheet">
+    <section aria-label="Plan decision" className={cn("flex flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-card px-5 pt-2.5 pb-4 shadow-sheet", big ? "max-h-[85dvh]" : "max-h-[55dvh]")}>
       <button type="button" onClick={() => setChosen(!open)} aria-expanded={open} className="flex min-h-9 items-center justify-between gap-3">
         <span className="flex w-11 justify-start text-muted-foreground">{open ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}</span>
         <span className="h-[5px] w-11 rounded-full bg-border" aria-hidden="true" />
@@ -91,7 +94,14 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
             <p className="text-[13px] leading-[19px] text-muted-foreground">Your card is held for up to {share}, not charged. We only charge when everyone is in, and release anything above today&apos;s share.</p>
           ) : null}
 
-          <div className="flex gap-2.5">
+          <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} aria-expanded={detailsOpen} className="flex min-h-11 items-center justify-center gap-1 self-center text-sm font-semibold text-link">
+            {detailsOpen ? "Hide plan details" : "View plan details"}
+            {detailsOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+          </button>
+
+          {detailsOpen ? <PlanPreview detail={mine.detail} planHref={`/g/${groupId}/plan/${plan.id}`} /> : null}
+
+          <div className={cn("flex gap-2.5", big && "sticky bottom-0 -mx-5 bg-card px-5 pt-2")}>
             {mine.canRequestChanges ? (
               <Button type="button" variant="secondary" className="h-12 flex-1 rounded-2xl text-sm font-bold" onClick={() => setChangesOpen(true)}>
                 I need changes

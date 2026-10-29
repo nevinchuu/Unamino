@@ -41,7 +41,7 @@ describe("describePlanCard", () => {
 });
 
 const person = (name: string, overrides: Partial<CardPerson> = {}): CardPerson => ({ name, isMe: false, agreed: false, approved: false, held: false, ...overrides });
-const mineWith = (people: readonly CardPerson[], overrides: Partial<CardMine> = {}): CardMine => ({ canAgree: true, agreed: false, canRequestChanges: true, shareMinor: 6434, currency: "USD", lines: [], people, needsAmount: false, ...overrides });
+const mineWith = (people: readonly CardPerson[], overrides: Partial<CardMine> = {}): CardMine => ({ canAgree: true, agreed: false, canRequestChanges: true, shareMinor: 6434, currency: "USD", lines: [], people, needsAmount: false, detail: { subtitle: "", items: [], ideas: [], totalMinor: null, currency: "USD" }, ...overrides });
 
 describe("describeSheet", () => {
   const people = [person("Nev", { isMe: true }), person("Ana", { agreed: true }), person("Ben"), person("Jia", { agreed: true })];

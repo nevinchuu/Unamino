@@ -33,7 +33,7 @@ function setup({ groups = {}, tokens = {}, read = {}, standing = [] }: World) {
     },
     messages: { recent: async (id) => (groups[id]?.messages ?? []).slice(-1) },
     plans: { cards: async (id) => groups[id]?.plans ?? [] },
-    viewerCards: { forPlan: async () => ({ canAgree: false, agreed: false, canRequestChanges: false, shareMinor: null, currency: "USD", lines: [], people: standing, needsAmount: false } satisfies CardMine) },
+    viewerCards: { forPlan: async () => ({ canAgree: false, agreed: false, canRequestChanges: false, shareMinor: null, currency: "USD", lines: [], people: standing, needsAmount: false, detail: { subtitle: "", items: [], ideas: [], totalMinor: null, currency: "USD" } } satisfies CardMine) },
     reads: { lastRead: async (ids) => new Map(ids.map((id) => [id, read[id] ?? 0])) },
   };
   return deps;
