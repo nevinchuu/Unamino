@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { err, ok } from "@/lib/result";
 import type { Member } from "@/domain/group/types";
-import { runDeleteGroup, runLeave, runMakeAdmin, runRemove, type MembershipActionDeps } from "./membership-actions";
+import { runDeleteGroup, runIssueAccessLink, runLeave, runMakeAdmin, runRemove, type MembershipActionDeps } from "./membership-actions";
 
 const GROUP = "3f2b8c1e-5a4d-4e0b-9c7a-1d2e3f4a5b6c";
 const OTHER_GROUP = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
@@ -18,6 +18,7 @@ function setup(refusal: string | null = null) {
       remove: answer("remove", { planEnded: false, newJoinToken: "secret" }),
       makeAdmin: answer("makeAdmin", undefined),
       deleteGroup: answer("deleteGroup", undefined),
+      issueAccessLink: answer("issueAccessLink", "new-secret"),
     } as unknown as MembershipActionDeps["membership"],
   };
   return { deps, calls };
@@ -60,6 +61,20 @@ describe("membership actions", () => {
     const { deps, calls } = setup();
     expect((await runRemove(deps, admin, { groupId: GROUP, targetMemberId: "not-an-id", resetLink: false })).ok).toBe(false);
     expect((await runMakeAdmin(deps, admin, { groupId: GROUP, targetMemberId: "x" })).ok).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it("hands back the new access secret once, and asks about the person named", async () => {
+    const { deps, calls } = setup();
+    expect(await runIssueAccessLink(deps, admin, { groupId: GROUP, targetMemberId: BEN_ID })).toEqual({ ok: true, accessToken: "new-secret" });
+    expect(calls[0]).toEqual({ method: "issueAccessLink", args: [admin, BEN_ID] });
+  });
+
+  it("refuses a re-issue from someone not signed in, from another group, or for an id that is not an id", async () => {
+    const { deps, calls } = setup();
+    expect((await runIssueAccessLink(deps, null, { groupId: GROUP, targetMemberId: BEN_ID })).ok).toBe(false);
+    expect((await runIssueAccessLink(deps, stranger, { groupId: GROUP, targetMemberId: BEN_ID })).ok).toBe(false);
+    expect((await runIssueAccessLink(deps, admin, { groupId: GROUP, targetMemberId: "nope" })).ok).toBe(false);
     expect(calls).toEqual([]);
   });
 

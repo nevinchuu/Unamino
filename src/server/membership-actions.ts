@@ -3,10 +3,10 @@ import type { Member } from "@/domain/group/types";
 import { isUuid } from "./ids";
 
 /** What the screen is told. `joinToken` is the new invite link's secret when removing someone replaced it; it is shown once and never stored in clear. */
-export type ManageResult = { readonly ok: true; readonly joinToken?: string; readonly planEnded?: boolean } | { readonly ok: false; readonly error: string };
+export type ManageResult = { readonly ok: true; readonly joinToken?: string; readonly accessToken?: string; readonly planEnded?: boolean } | { readonly ok: false; readonly error: string };
 
 export interface MembershipActionDeps {
-  readonly membership: Pick<MembershipService, "leave" | "remove" | "makeAdmin" | "deleteGroup">;
+  readonly membership: Pick<MembershipService, "leave" | "remove" | "makeAdmin" | "deleteGroup" | "issueAccessLink">;
 }
 
 const NOT_SIGNED_IN = "Open your invite link to rejoin this group.";
@@ -34,6 +34,14 @@ export async function runMakeAdmin(deps: MembershipActionDeps, member: Member | 
   if (!isUuid(input.targetMemberId)) return { ok: false, error: NOT_FOUND };
   const made = await deps.membership.makeAdmin(member, input.targetMemberId);
   return made.ok ? { ok: true } : { ok: false, error: made.error.message };
+}
+
+/** `accessToken` is the new secret for the person, handed back once for the admin to pass on. */
+export async function runIssueAccessLink(deps: MembershipActionDeps, member: Member | null, input: { readonly groupId: string; readonly targetMemberId: string }): Promise<ManageResult> {
+  if (!inGroup(member, input.groupId)) return { ok: false, error: NOT_SIGNED_IN };
+  if (!isUuid(input.targetMemberId)) return { ok: false, error: NOT_FOUND };
+  const issued = await deps.membership.issueAccessLink(member, input.targetMemberId);
+  return issued.ok ? { ok: true, accessToken: issued.value } : { ok: false, error: issued.error.message };
 }
 
 export async function runDeleteGroup(deps: MembershipActionDeps, member: Member | null, input: { readonly groupId: string; readonly typedName: string }): Promise<ManageResult> {

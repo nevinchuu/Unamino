@@ -1,12 +1,13 @@
 "use client";
 
-import { LogOut, MoreVertical, Trash2, UserMinus, UserCog } from "lucide-react";
+import { KeyRound, LogOut, MoreVertical, Trash2, UserMinus, UserCog, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Avatar } from "@/components/avatar";
 import { ConfirmSheet } from "@/components/confirm-sheet";
+import { LinkActions } from "@/components/link-actions";
 import { Dialog } from "@base-ui/react/dialog";
-import { deleteGroup, leaveGroup, makeGroupAdmin, removeMember } from "./manage-actions";
+import { deleteGroup, issueAccessLink, leaveGroup, makeGroupAdmin, removeMember } from "./manage-actions";
 
 export interface Participant {
   readonly id: string;
@@ -37,8 +38,10 @@ export function ParticipantList({ groupId, people, viewerIsAdmin }: { readonly g
 function ParticipantMenu({ groupId, person }: { readonly groupId: string; readonly person: Participant }) {
   const router = useRouter();
   const [menu, setMenu] = useState(false);
-  const [confirming, setConfirming] = useState<"remove" | "admin" | null>(null);
+  const [confirming, setConfirming] = useState<"remove" | "admin" | "link" | null>(null);
   const [resetLink, setResetLink] = useState(true);
+  /** The new access link for this person, shown once to the admin to pass on. */
+  const [issued, setIssued] = useState<string | null>(null);
 
   return (
     <>
@@ -62,6 +65,17 @@ function ParticipantMenu({ groupId, person }: { readonly groupId: string; readon
             >
               <UserCog className="size-5 text-muted-foreground" />
               Make group admin
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenu(false);
+                setConfirming("link");
+              }}
+              className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left font-medium hover:bg-muted"
+            >
+              <KeyRound className="size-5 text-muted-foreground" />
+              Send new access link
             </button>
             <button
               type="button"
@@ -91,6 +105,41 @@ function ParticipantMenu({ groupId, person }: { readonly groupId: string; readon
           return null;
         }}
       />
+
+      <ConfirmSheet
+        open={confirming === "link"}
+        onOpenChange={(open) => !open && setConfirming(null)}
+        title={`New access link for ${person.name}?`}
+        description={`${person.name} is signed out of their current phone and browser, and you get a link to send them yourself. The group will see that you did it.`}
+        confirmLabel="Make link"
+        onConfirm={async () => {
+          const result = await issueAccessLink(groupId, person.id);
+          if (!result.ok) return result.error;
+          setIssued(result.accessToken ?? null);
+          return null;
+        }}
+      />
+
+      <Dialog.Root open={issued !== null} onOpenChange={(open) => !open && setIssued(null)}>
+        <Dialog.Portal>
+          <Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40" />
+          <Dialog.Popup className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[90dvh] w-full max-w-[430px] overflow-y-auto rounded-t-2xl bg-background px-5 pt-5 pb-6 shadow-xl outline-none">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <Dialog.Title className="text-lg font-semibold">Send this to {person.name}</Dialog.Title>
+                <Dialog.Description className="mt-1 text-sm text-muted-foreground">It signs {person.name} back in, and it is shown only once.</Dialog.Description>
+              </div>
+              <Dialog.Close aria-label="Close" className="-mt-1 -mr-1 rounded-full p-3 text-muted-foreground hover:bg-muted">
+                <X className="size-5" />
+              </Dialog.Close>
+            </div>
+            {issued ? <LinkActions path={`/back/${issued}`} shareTitle={`${person.name}: access link`} shareLabel="Send" /> : null}
+            <p role="note" className="mt-3 text-xs text-muted-foreground">
+              Send it only to {person.name}. Anyone who has it can act as {person.name} until {person.name} makes their own new link in Group info.
+            </p>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       <ConfirmSheet
         open={confirming === "remove"}

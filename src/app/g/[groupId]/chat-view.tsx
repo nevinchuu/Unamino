@@ -15,6 +15,7 @@ import { ActionSheet } from "./action-sheet";
 import { Composer } from "./composer";
 import { MessageRow, type RowModel } from "./message-row";
 import { PlanStrip } from "./plan-strip";
+import { SaveLinkPrompt } from "./save-link-prompt";
 
 const POLL_MS = 2_000;
 /** A hidden tab does not poll, but looks again this often in case it was shown without the browser saying so. */
@@ -261,6 +262,8 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}
       </p>
+
+      <SaveLinkPrompt groupId={groupId} />
 
       {current && current.status !== "expired" && !decidingOn ? <PlanStrip groupId={groupId} plan={current} /> : null}
 

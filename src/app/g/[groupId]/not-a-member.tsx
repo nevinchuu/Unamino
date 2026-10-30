@@ -10,7 +10,7 @@ export function NotAMember() {
       <main className="flex flex-1 flex-col items-center gap-3 px-8 pt-20 text-center">
         <Avatar name="?" size={96} />
         <h2 className="mt-2 text-xl font-semibold">You&apos;re not in this group</h2>
-        <p className="text-muted-foreground">Open the invite link someone sent you to join.</p>
+        <p className="text-muted-foreground">Open the invite link someone sent you to join, or your access link if you made one.</p>
         <Link href="/new" className="mt-4 text-sm font-medium text-primary">
           Start your own group
         </Link>

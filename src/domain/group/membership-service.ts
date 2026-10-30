@@ -21,7 +21,7 @@ export interface MembershipError {
 }
 
 export interface MembershipDeps {
-  readonly groups: Pick<GroupRepository, "find" | "joinedMembers" | "leave" | "replaceJoinLink">;
+  readonly groups: Pick<GroupRepository, "find" | "joinedMembers" | "leave" | "replaceJoinLink" | "replaceMemberToken">;
   readonly admin: GroupAdminStore;
   readonly plans: PlanRepository;
   readonly effects: EffectRunner;
@@ -91,6 +91,23 @@ export class MembershipService {
     if (!moved.ok) return err(UNAVAILABLE);
     await this.deps.messages.postSystem(actor.groupId, `${actor.displayName} made ${target.value.displayName} the group admin.`);
     return ok(undefined);
+  }
+
+  /**
+   * Gives someone who lost their way back in a new access link, for the admin to pass on. It replaces that person's sign-in
+   * secret, so any browser still signed in as them is signed out, and the group is told in the chat so a misuse can be
+   * seen. Returns the secret once. It moves no money, so it works after a trip is booked.
+   */
+  async issueAccessLink(actor: Member, targetMemberId: string): Promise<Result<string, MembershipError>> {
+    if (!actor.isOrganiser) return err(NOT_ADMIN);
+    const target = await this.findPerson(actor.groupId, targetMemberId);
+    if (!target.ok) return target;
+    if (target.value.id === actor.id) return err({ kind: "not_found", message: "That's you. Use Your access link instead." });
+
+    const replaced = await this.deps.groups.replaceMemberToken(target.value.id);
+    if (!replaced.ok) return err(UNAVAILABLE);
+    await this.deps.messages.postSystem(actor.groupId, `${actor.displayName} reset ${target.value.displayName}'s access link.`);
+    return ok(replaced.value);
   }
 
   /** `typedName` is what the admin typed to confirm. Nothing is touched unless it is exactly the group's name. */

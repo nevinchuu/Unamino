@@ -1,7 +1,7 @@
 "use server";
 
 import { getContainer } from "@/server/container";
-import { runDeleteGroup, runLeave, runMakeAdmin, runRemove, type ManageResult } from "@/server/membership-actions";
+import { runDeleteGroup, runIssueAccessLink, runLeave, runMakeAdmin, runRemove, type ManageResult } from "@/server/membership-actions";
 import { currentMember, forgetMember, rememberInviteToken } from "@/server/session";
 
 /** The person leaves. Their browser forgets the group so it drops off the trips list. */
@@ -19,6 +19,14 @@ export async function removeMember(groupId: string, targetMemberId: string, rese
   const result = await runRemove(getContainer(), await currentMember(groupId), { groupId, targetMemberId, resetLink });
   if (result.ok && result.joinToken) await rememberInviteToken(groupId, result.joinToken);
   return result.ok ? { ok: true, planEnded: result.planEnded } : result;
+}
+
+/**
+ * The admin makes a new access link for someone who lost their way back in. Their old sign-in stops working, the group is told,
+ * and the new link comes back once, for the admin to send them.
+ */
+export async function issueAccessLink(groupId: string, targetMemberId: string): Promise<ManageResult> {
+  return runIssueAccessLink(getContainer(), await currentMember(groupId), { groupId, targetMemberId });
 }
 
 export async function makeGroupAdmin(groupId: string, targetMemberId: string): Promise<ManageResult> {

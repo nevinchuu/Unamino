@@ -32,6 +32,21 @@ Each person pays only for what they take part in: a friend who already lives at 
 - **Passport details** are encrypted (AES-256-GCM) and deleted as soon as the trip is booked or the plan ends.
 - **Overlapping trips are refused.** A group cannot plan dates that clash with a trip it has booked.
 
+## Identity and recovery
+
+There are no accounts. Being "you" in a group means your browser holds a secret (a long random token in a cookie, kept on the server only as a hash). That keeps the demo to one tap, with no sign-up, no password and no contact details to look after. The cost is that the secret *is* the identity, so getting back in after losing it has to be designed on purpose.
+
+**What is built**
+
+- **An access link.** Group info has *Your access link*: it makes a new secret for you and shows it once as a link. Opening it on another phone asks "Continue as ...?", and only the button signs in, so a link preview or a prefetch cannot. Making a new link signs out your other devices and replaces the old link.
+- **Admin re-issue.** If someone lost their phone and never saved a link, the group admin can make a new one for them (the menu next to their name). It signs out their old devices, the chat shows "Maya reset Ana's access link.", and the admin sends the link themselves.
+- **A reminder.** A slim bar in the chat asks each person, once, to save their link.
+- **Leaving and removal.** Anyone can exit, the admin can remove someone and replace the invite link, and a booked trip cannot be left or deleted.
+
+**What someone holding a link can and cannot do.** Anyone with a link can act as that person until it is replaced, which is why the chat says when one is reset. They can read the chat, post, agree and approve as that person, ask Trippy, and see confirmations and receipts. They cannot see or use a card (the form is Stripe's and a card is never stored), read traveller or passport details (encrypted, never shown in the app, deleted once the trip is booked), or move money to themselves, because every charge still needs that person's own card hold. Names and chat are personal data, so they are kept only as long as the retention rules in the privacy notice say.
+
+**What a real launch would add.** Single-use recovery links that expire, with a "signed back in" line in the chat; verified contact details (an email or phone code) or real accounts; a shorter cookie life with a sign-out button; and a second admin so the group is never left without one. None of that is built here, on purpose: it costs more than it earns in a demo that uses test data and test cards.
+
 ## How Muse Spark is used
 
 Muse Spark is the agent's brain, not a text generator bolted on.
@@ -149,7 +164,7 @@ The latest run passed 22 of 24 checks. Both misses are one weakness that the eva
 
 - Sandbox and test mode only, as described above.
 - Everyone pays in USD.
-- The Trips list is built from the member cookies a browser holds, so clearing the browser loses the list. A group is then only reachable again through its invite link.
+- The Trips list is built from the member cookies a browser holds, so clearing the browser loses the list. A group is then reachable again through an access link, if the person saved one, or one the group admin makes for them (see *Identity and recovery*). A person who never saved one, and whose group has no other admin, cannot be recovered.
 - Chat history is read a page at a time; there is no search yet.
 - Anyone in a group can end a plan for everyone, though **I need changes** offers a softer route.
 - Two scheduled routes (`/api/cron/expire-overdue`, `/api/cron/retry-effects`) end overdue plans, settle stuck bookings, retry failed charges and delete traveller details kept longer than 72 hours. `vercel.json` schedules them daily on Vercel (the free plan's limit), and they need `CRON_SECRET` set there. Nothing runs them locally.

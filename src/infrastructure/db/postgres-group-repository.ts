@@ -149,6 +149,20 @@ export class PostgresGroupRepository implements GroupRepository {
     }
   }
 
+  async replaceMemberToken(memberId: string): Promise<Result<string, GroupError>> {
+    const memberToken = generateToken();
+    try {
+      const updated = await this.db
+        .update(members)
+        .set({ inviteTokenHash: hashToken(memberToken) })
+        .where(and(eq(members.id, memberId), eq(members.status, "joined")))
+        .returning({ id: members.id });
+      return updated.length === 1 ? ok(memberToken) : failure("not_found", "There is no such member");
+    } catch {
+      return failure("unavailable", "The database could not be reached");
+    }
+  }
+
   async replaceJoinLink(groupId: string, actingMemberId: string): Promise<Result<string, GroupError>> {
     const allowed = await this.requireOrganiser(groupId, actingMemberId);
     if (!allowed.ok) return allowed;

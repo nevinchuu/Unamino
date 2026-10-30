@@ -32,6 +32,11 @@ class FakeGroups {
   async replaceJoinLink(): Promise<Result<string, GroupError>> {
     return ok("new-secret");
   }
+  replacedTokens: string[] = [];
+  async replaceMemberToken(memberId: string): Promise<Result<string, GroupError>> {
+    this.replacedTokens.push(memberId);
+    return ok(`access-for-${memberId}`);
+  }
 }
 
 class FakeAdmin implements GroupAdminStore {
@@ -175,6 +180,48 @@ describe("MembershipService", () => {
     it("works even after a trip is booked, because it moves no money", async () => {
       const w = world({ statuses: [{ id: "plan-1", status: "booked" }] });
       expect((await w.service.makeAdmin(ana, "ben")).ok).toBe(true);
+    });
+  });
+
+  describe("issueAccessLink", () => {
+    it("gives the admin a new secret for someone who lost their way back in, and tells the group", async () => {
+      const w = world({ statuses: [] });
+      expect(await w.service.issueAccessLink(ana, "ben")).toEqual({ ok: true, value: "access-for-ben" });
+      expect(w.groups.replacedTokens).toEqual(["ben"]);
+      expect(w.said).toEqual(["Ana reset Ben's access link."]);
+    });
+
+    it("is for the admin only, and changes nothing otherwise", async () => {
+      const w = world();
+      expect(failedWith(await w.service.issueAccessLink(ben, "cai"))).toBe("not_admin");
+      expect(w.groups.replacedTokens).toEqual([]);
+      expect(w.said).toEqual([]);
+    });
+
+    it("is for someone who is in the group, and not for the admin themself", async () => {
+      const w = world();
+      expect(failedWith(await w.service.issueAccessLink(ana, "nobody"))).toBe("not_found");
+      expect(failedWith(await w.service.issueAccessLink(ana, "ana"))).toBe("not_found");
+      expect(w.groups.replacedTokens).toEqual([]);
+    });
+
+    it("does not end an open plan or touch a card hold, because it moves no money", async () => {
+      const w = world({ planStatus: "approving" });
+      expect((await w.service.issueAccessLink(ana, "ben")).ok).toBe(true);
+      expect(w.plans.plan.status).toBe("approving");
+      expect(w.effects.types).toEqual([]);
+    });
+
+    it("works after a trip is booked", async () => {
+      const w = world({ statuses: [{ id: "plan-1", status: "booked" }] });
+      expect((await w.service.issueAccessLink(ana, "ben")).ok).toBe(true);
+    });
+
+    it("says nothing in the chat when the secret could not be made", async () => {
+      const w = world({ statuses: [] });
+      w.groups.replaceMemberToken = async () => err({ code: "unavailable", message: "db" });
+      expect(failedWith(await w.service.issueAccessLink(ana, "ben"))).toBe("unavailable");
+      expect(w.said).toEqual([]);
     });
   });
 

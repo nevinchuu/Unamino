@@ -36,6 +36,11 @@ export interface GroupRepository {
   /** The people in the group right now, in the order they joined. This is the headcount for every search. */
   joinedMembers(groupId: string): Promise<readonly Member[]>;
   leave(memberId: string): Promise<Result<void, GroupError>>;
+  /**
+   * Gives one member a new secret and returns it, once. Whatever secret they had stops working, so every browser that was
+   * signed in as them is signed out until it opens the link made from this one. Only a member who is in the group has one.
+   */
+  replaceMemberToken(memberId: string): Promise<Result<string, GroupError>>;
   /** Organiser only. A new link replaces the old one and turns joining back on. Returns the new secret, once. */
   replaceJoinLink(groupId: string, actingMemberId: string): Promise<Result<string, GroupError>>;
   /** Organiser only. Nobody new can join until the link is replaced. */

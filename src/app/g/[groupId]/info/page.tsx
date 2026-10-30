@@ -4,6 +4,7 @@ import { Avatar } from "@/components/avatar";
 import { AppBar, Screen } from "@/components/screen";
 import { getContainer } from "@/server/container";
 import { readInviteToken, currentMember } from "@/server/session";
+import { AccessLinkPanel } from "../access-link-panel";
 import { GroupDangerZone, ParticipantList } from "../group-controls";
 import { InvitePanel } from "../invite-panel";
 import { NotAMember } from "../not-a-member";
@@ -53,6 +54,8 @@ async function Group({ params }: { readonly params: PageProps<"/g/[groupId]/info
             people={people.map((person) => ({ id: person.id, name: person.displayName, isMe: person.id === me.id, isAdmin: person.isOrganiser }))}
           />
         </section>
+
+        <AccessLinkPanel groupId={groupId} groupName={group.value.name} />
 
         <GroupDangerZone groupId={groupId} groupName={group.value.name} isAdmin={me.isOrganiser} />
 
