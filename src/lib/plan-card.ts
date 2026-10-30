@@ -30,6 +30,8 @@ export interface CardMine {
   readonly agreed: boolean;
   /** They may still ask Trippy to change the plan. */
   readonly canRequestChanges: boolean;
+  /** They may cover some or all of a friend's share: the plan is still open and has someone else in it. */
+  readonly canCover: boolean;
   /** Their share, in `currency`'s minor units. The price the Agree button shows, and that the server checks again. */
   readonly shareMinor: number | null;
   readonly currency: string;

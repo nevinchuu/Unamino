@@ -4,6 +4,7 @@ import { passportRequiredFor } from "@/domain/travellers/requirements";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
 import { planReference } from "@/lib/plan-reference";
 import { httpsUrlOrNull } from "@/lib/safe-url";
+import type { CoverLine } from "@/domain/split/types";
 import { currentShares } from "./pricing";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import type { PlanViewRaw, ViewIdea, ViewPick } from "./view-store";
@@ -86,8 +87,25 @@ export interface PersonDto {
   readonly approvedMinor: number | null;
   /** What they were really charged. Null until the trip is paid for. */
   readonly chargedMinor: number | null;
-  /** The parts of their share, only when they pay in the plan's own currency so the parts add up to the total shown. */
+  /** The parts of their share, only when they pay in the plan's own currency so the parts add up to the total shown. Money a friend covers shows as a line too, below zero when it comes off. */
   readonly lines: readonly { readonly label: string; readonly minor: number }[];
+  /** What they take part in, before any friend covers part of it, in the plan's currency. The most a friend can cover for them. Null if the offers cannot be priced. */
+  readonly ownPartMinor: number | null;
+  /** What the viewer is covering of this person, if anything. */
+  readonly coveredByMe: { readonly whole: boolean; readonly percent: number | null; readonly amountMinor: number } | null;
+}
+
+/** A friend paying some or all of someone else's part. `amountMinor` is what is covered at today's prices, in the plan's currency. */
+export interface CoverDto {
+  readonly sponsorId: string;
+  readonly sponsorName: string;
+  readonly beneficiaryId: string;
+  readonly beneficiaryName: string;
+  readonly amountMinor: number;
+  /** True when the whole of their part is covered, however the price moves. */
+  readonly whole: boolean;
+  /** Set when this is a percent of their part, which moves with the price. */
+  readonly percent: number | null;
 }
 
 export interface PlanActions {
@@ -97,6 +115,8 @@ export interface PlanActions {
   readonly declineAmount: boolean;
   /** Ask Trippy to change the plan, which keeps it alive. Open while people are still deciding. */
   readonly requestChanges: boolean;
+  /** Cover some or all of a friend's share. Open while people are still deciding, because the amounts are not final yet. */
+  readonly cover: boolean;
 }
 
 /** What this person still owes the booking in the way of personal details. */
@@ -115,8 +135,10 @@ export interface MeDto {
   readonly approval: ApprovalStatus | null;
   readonly shareMinor: number | null;
   readonly approvedMinor: number | null;
-  /** True when this person has approved and their card still has to be added to the hold. */
+  /** True when this person has approved an amount above nothing and their card still has to be added to the hold. */
   readonly cardNeeded: boolean;
+  /** True when this person has approved and is not yet ready: they still owe a card, or (when a friend covers their whole share) their details. */
+  readonly awaitingDetails: boolean;
   readonly details: DetailsDto;
   readonly actions: PlanActions;
 }
@@ -148,7 +170,15 @@ export interface PlanViewDto {
   /** The steps of booking the trip, while it is being booked. Empty at any other time. */
   readonly progress: readonly ProgressStepDto[];
   readonly people: readonly PersonDto[];
+  /** Who is covering whom. Empty when everybody pays their own part. */
+  readonly covers: readonly CoverDto[];
   readonly me: MeDto;
+}
+
+/** One cover as a line of the share: what the person pays for a friend, or what the friend pays for them (below zero). */
+function coverLineOf(line: CoverLine, names: ReadonlyMap<string, string>): { readonly label: string; readonly minor: number } {
+  const name = names.get(line.counterpartId) ?? "Someone";
+  return line.direction === "covering" ? { label: `Covering ${name}`, minor: line.baseMinor } : { label: `${name} covers`, minor: -line.baseMinor };
 }
 
 const KIND_ORDER: Record<Offer["kind"], number> = { flight: 0, hotel: 1, activity: 2 };
@@ -276,8 +306,19 @@ export function buildPlanView(
   const priced = currentShares(raw, raw.picks);
   const shares = new Map(priced.ok ? priced.value.map((share) => [share.memberId, share]) : []);
 
+  const covers: CoverDto[] = raw.covers.map((cover) => ({
+    sponsorId: cover.sponsorId,
+    sponsorName: names.get(cover.sponsorId) ?? "Someone",
+    beneficiaryId: cover.beneficiaryId,
+    beneficiaryName: names.get(cover.beneficiaryId) ?? "Someone",
+    amountMinor: shares.get(cover.sponsorId)?.coverLines.find((line) => line.direction === "covering" && line.counterpartId === cover.beneficiaryId)?.baseMinor ?? 0,
+    whole: cover.amountBaseMinor === null && (cover.sharePercent ?? null) === null,
+    percent: cover.sharePercent ?? null,
+  }));
+
   const people: PersonDto[] = raw.members.map((member) => {
     const share = shares.get(member.id);
+    const mine = covers.find((cover) => cover.sponsorId === viewerId && cover.beneficiaryId === member.id);
     return {
       id: member.id,
       name: member.name,
@@ -289,7 +330,9 @@ export function buildPlanView(
       currency: member.currency,
       approvedMinor: member.approvedMinor,
       chargedMinor: member.chargedMinor,
-      lines: share && share.currency === raw.baseCurrency ? share.lines.map((line) => ({ label: line.label, minor: line.baseMinor })) : [],
+      lines: share && share.currency === raw.baseCurrency ? [...share.lines.map((line) => ({ label: line.label, minor: line.baseMinor })), ...share.coverLines.map((line) => coverLineOf(line, names))] : [],
+      ownPartMinor: share?.baseShareMinor ?? null,
+      coveredByMe: mine ? { whole: mine.whole, percent: mine.percent, amountMinor: mine.amountMinor } : null,
     };
   });
 
@@ -303,10 +346,13 @@ export function buildPlanView(
     approve: approving && (mine?.approval === "pending" || mine?.approval === "needs_reapproval") && canPrice,
     declineAmount: (approving || raw.status === "held") && mine !== undefined,
     requestChanges: (reviewing || approving) && mine !== undefined,
+    cover: (reviewing || approving) && mine !== undefined,
   };
 
-  // The card and the details are asked for together, once the person has approved their amount.
-  const cardNeeded = options.payments === "stripe" && approving && mine?.approval === "approved" && mine.holdPlaced === false;
+  // The card and the details are asked for together, once the person has approved their amount. Someone whose whole share
+  // a friend covers has nothing to hold, so they give their details and no card.
+  const awaitingDetails = options.payments === "stripe" && approving && mine?.approval === "approved" && mine.holdPlaced === false;
+  const cardNeeded = awaitingDetails && mine?.approvedMinor !== 0;
   const bookingCodes = bookingCodesOf(raw);
 
   return {
@@ -330,6 +376,7 @@ export function buildPlanView(
     confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],
     progress: bookingProgressOf(raw),
     people,
+    covers,
     me: {
       id: viewerId,
       inPlan: mine !== undefined,
@@ -338,7 +385,8 @@ export function buildPlanView(
       shareMinor: mine?.shareMinor ?? null,
       approvedMinor: mine?.approvedMinor ?? null,
       cardNeeded,
-      details: { needed: cardNeeded && options.travellers !== undefined && !options.travellers.given, passportRequired: passportRequiredFor(raw.picks, viewerId) },
+      awaitingDetails,
+      details: { needed: awaitingDetails && options.travellers !== undefined && !options.travellers.given, passportRequired: passportRequiredFor(raw.picks, viewerId) },
       actions,
     },
   };

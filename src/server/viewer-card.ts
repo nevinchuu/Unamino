@@ -51,11 +51,12 @@ export class ViewerCards {
       canAgree: me.actions.agree,
       agreed: me.agreement === "agreed",
       canRequestChanges: me.actions.requestChanges,
+      canCover: me.actions.cover && people.length > 1,
       shareMinor: me.shareMinor,
       currency,
       lines: people.find((person) => person.isMe)?.lines ?? [],
       people: people.map((person) => ({ name: person.name, isMe: person.isMe, agreed: person.agreement === "agreed", approved: person.approval === "approved", held: person.holdPlaced })),
-      needsAmount: me.actions.approve || me.cardNeeded,
+      needsAmount: me.actions.approve || me.awaitingDetails,
     };
   }
 

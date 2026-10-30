@@ -3,13 +3,13 @@ import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "@/domain/p
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
 import { countdownText, describeStage, priceHoldElapsed } from "./plan-stage";
 
-const person = (id: string, agreement: PlanAgreementStatus = "pending", approval: ApprovalStatus = "pending"): PersonDto => ({ id, name: id, isMe: id === "ana", agreement, approval, holdPlaced: false, shareMinor: 30_000, currency: "USD", approvedMinor: null, chargedMinor: null, lines: [] });
+const person = (id: string, agreement: PlanAgreementStatus = "pending", approval: ApprovalStatus = "pending"): PersonDto => ({ id, name: id, isMe: id === "ana", agreement, approval, holdPlaced: false, shareMinor: 30_000, currency: "USD", approvedMinor: null, chargedMinor: null, lines: [], ownPartMinor: 30_000, coveredByMe: null });
 
 function view(status: PlanStatus, people: PersonDto[], overrides: Partial<PlanViewDto> = {}, inPlan = true): PlanViewDto {
   const mine = people.find((p) => p.isMe);
   return {
-    id: "p", groupId: "g", title: "t", summary: null, status, city: null, dates: null, headcount: people.length, deadlineAt: "2026-10-27T01:09:00.000Z", replacedBy: null, reference: null, payments: "none", demoBooking: false, currency: "USD", pricesAvailable: true, items: [], ideas: [], confirmations: [], progress: [], people,
-    me: { id: "ana", inPlan, agreement: mine?.agreement ?? null, approval: mine?.approval ?? null, shareMinor: 30_000, approvedMinor: null, cardNeeded: false, details: { needed: false, passportRequired: false }, actions: { agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false } },
+    id: "p", groupId: "g", title: "t", summary: null, status, city: null, dates: null, headcount: people.length, deadlineAt: "2026-10-27T01:09:00.000Z", replacedBy: null, reference: null, payments: "none", demoBooking: false, currency: "USD", pricesAvailable: true, items: [], ideas: [], confirmations: [], progress: [], people, covers: [],
+    me: { id: "ana", inPlan, agreement: mine?.agreement ?? null, approval: mine?.approval ?? null, shareMinor: 30_000, approvedMinor: null, cardNeeded: false, awaitingDetails: false, details: { needed: false, passportRequired: false }, actions: { agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false, cover: false } },
     ...overrides,
   };
 }

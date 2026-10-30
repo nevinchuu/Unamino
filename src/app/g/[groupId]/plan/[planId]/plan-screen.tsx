@@ -13,6 +13,7 @@ import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
 import { CardSheet } from "./card-sheet";
 import { ChangeRequestSheet } from "./change-request-sheet";
+import { CoverSheet } from "./cover-sheet";
 import { IdeaCard, ItemCard } from "./plan-items";
 import { BookingProgress } from "./booking-progress";
 import { TripConfirmed } from "./trip-confirmed";
@@ -45,6 +46,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   const [gone, setGone] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
+  const [coverOpen, setCoverOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const live = LIVE_PLAN_STATUSES.includes(view.status);
@@ -145,6 +147,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   }
 
   const { me } = view;
+  // A friend covering the whole share leaves nothing to pay, which reads better as a word than as $0.00.
+  const covered = me.shareMinor === 0;
   const stage = describeStage(view);
   const deadline = new Date(view.deadlineAt);
   const subtitle = [view.dates, `${view.headcount} ${view.headcount === 1 ? "person" : "people"}`].filter(Boolean).join(" · ");
@@ -248,7 +252,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           <div className="space-y-2">
             {me.actions.agree && me.shareMinor !== null ? (
               <Button type="button" className="h-12 w-full rounded-full text-base font-semibold" disabled={busy !== null} onClick={() => perform("agree", () => agreeToPlan(view.groupId, view.id, me.shareMinor as number))}>
-                {busy === "agree" ? <Loader2 className="size-5 animate-spin" /> : `Agree to this plan · ${formatMinor(me.shareMinor, view.currency)}`}
+                {busy === "agree" ? <Loader2 className="size-5 animate-spin" /> : covered ? "Agree to this plan · covered" : `Agree to this plan · ${formatMinor(me.shareMinor, view.currency)}`}
               </Button>
             ) : null}
 
@@ -261,15 +265,30 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
               </>
             ) : null}
 
+            {!me.cardNeeded && me.details.needed ? (
+              <>
+                <Button type="button" className="h-12 w-full rounded-full text-base font-semibold" onClick={() => setCardOpen(true)}>
+                  Add your traveller details
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">A friend covers your share, so there is no card to add.</p>
+              </>
+            ) : null}
+
             {me.actions.approve && me.shareMinor !== null ? (
               <>
                 <Button type="button" className="h-12 w-full rounded-full text-base font-semibold" disabled={busy !== null} onClick={() => perform("approve", () => approvePlanAmount(view.groupId, view.id, me.shareMinor as number))}>
-                  {busy === "approve" ? <Loader2 className="size-5 animate-spin" /> : `Approve ${formatMinor(me.shareMinor, view.currency)}`}
+                  {busy === "approve" ? <Loader2 className="size-5 animate-spin" /> : covered ? "Approve · your share is covered" : `Approve ${formatMinor(me.shareMinor, view.currency)}`}
                 </Button>
                 <p className="text-center text-xs text-muted-foreground">
-                  A hold for this amount, not a charge.{view.payments === "demo" ? " Demo: no real card is held." : ""}
+                  {covered ? "A friend pays your share, so no card is held for you." : `A hold for this amount, not a charge.${view.payments === "demo" ? " Demo: no real card is held." : ""}`}
                 </p>
               </>
+            ) : null}
+
+            {me.actions.cover && view.people.length > 1 ? (
+              <Button type="button" variant="outline" className="h-11 w-full rounded-full border-foreground/30" onClick={() => setCoverOpen(true)}>
+                Cover a friend&apos;s share
+              </Button>
             ) : null}
 
             {me.actions.requestChanges ? (
@@ -289,7 +308,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
               </button>
             ) : null}
 
-            {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount && !me.actions.requestChanges && !me.cardNeeded ? (
+            {!me.actions.agree && !me.actions.approve && !me.actions.decline && !me.actions.declineAmount && !me.actions.requestChanges && !me.cardNeeded && !me.details.needed ? (
               <Link href={`/g/${view.groupId}`} className="flex min-h-11 items-center justify-center text-sm font-medium text-primary">
                 Back to the chat
               </Link>
@@ -309,9 +328,20 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
         }}
       />
 
+      <CoverSheet
+        open={coverOpen && me.actions.cover}
+        onOpenChange={setCoverOpen}
+        view={view}
+        onDone={(text) => {
+          setCoverOpen(false);
+          setNotice({ tone: "info", text });
+          void refetch();
+        }}
+      />
+
       <CardSheet
         // Once the hold is recorded (by this person, or by Stripe telling the server first) there is nothing left to add, so the sheet goes.
-        open={cardOpen && me.cardNeeded}
+        open={cardOpen && (me.cardNeeded || me.details.needed)}
         onOpenChange={setCardOpen}
         groupId={view.groupId}
         planId={view.id}
@@ -319,6 +349,7 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
         publishableKey={PUBLISHABLE_KEY}
         onPlaced={cardPlaced}
         detailsNeeded={me.details.needed}
+        cardRequired={me.cardNeeded}
         passportRequired={me.details.passportRequired}
         onDetailsSaved={detailsSaved}
       />

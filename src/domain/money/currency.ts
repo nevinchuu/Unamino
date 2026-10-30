@@ -26,3 +26,6 @@ export function toMinorUnits(amountMajor: number, currency: string): number | nu
 }
 
 export const isPositiveInteger = (value: number): boolean => Number.isInteger(value) && value > 0;
+
+/** Zero is allowed: a person whose whole share is covered by a friend pays nothing. */
+export const isNonNegativeInteger = (value: number): boolean => Number.isInteger(value) && value >= 0;

@@ -101,6 +101,7 @@ export function bookingSetup(members: MemberSnapshot[] = [approved("ana", { hold
     baseCurrency: "USD",
     fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} },
     offersCheckedAt: null,
+    covers: [],
     members: ids.map((id) => ({ id, currency: "USD" })),
     picks: [
       { id: "pick-flight", offer: flight(), searchId: null, memberIds: ids },

@@ -1,0 +1,2 @@
+ALTER TABLE "plan_covers" ADD COLUMN "share_percent" smallint;--> statement-breakpoint
+ALTER TABLE "plan_covers" ADD CONSTRAINT "plan_covers_share_percent_range" CHECK ("plan_covers"."share_percent" IS NULL OR ("plan_covers"."share_percent" BETWEEN 1 AND 99 AND "plan_covers"."amount_base_minor" IS NULL));

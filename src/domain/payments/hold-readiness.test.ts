@@ -44,6 +44,11 @@ describe("ProviderHoldReadiness", () => {
     expect(await ready.problem("plan-1", ["ana"])).toEqual(ok("a member's hold is not usable (wrong_amount)"));
   });
 
+  it("does not look for a card hold for someone whose whole share a friend covers", async () => {
+    const ready = checker({ ana: record("ana"), ben: record("ben", { approvedMinor: 0, holdId: null }) }, { "hold-ana": hold("ana") });
+    expect(await ready.problem("plan-1", ["ana", "ben"])).toEqual(ok(null));
+  });
+
   it("names the problem when a member has no hold at all", async () => {
     const ready = checker({ ana: record("ana", { holdId: null }) }, {});
     expect(await ready.problem("plan-1", ["ana"])).toEqual(ok("a member has no hold"));

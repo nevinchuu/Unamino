@@ -99,7 +99,7 @@ describe("step 1: agreeing to the plan", () => {
   it("rejects bad input", () => {
     const base = reviewingPlan();
     expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ghost", shareMinor: 100 })).toBe("unknown_member");
-    expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 0 })).toBe("invalid_amount");
+    expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: -1 })).toBe("invalid_amount");
     expect(errorCode(base, { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 10.5 })).toBe("invalid_amount");
     expect(errorCode(planOf(), { type: "plan_agreed", at: T0, memberId: "ana", shareMinor: 100 })).toBe("invalid_status");
   });
@@ -196,7 +196,7 @@ describe("approving", () => {
 
   it("rejects bad input", () => {
     expect(errorCode(planOf(), approve({ memberId: "ghost" }))).toBe("unknown_member");
-    expect(errorCode(planOf(), approve({ amountMinor: 0 }))).toBe("invalid_amount");
+    expect(errorCode(planOf(), approve({ amountMinor: -1 }))).toBe("invalid_amount");
     expect(errorCode(planOf(), approve({ amountMinor: 10.5 }))).toBe("invalid_amount");
     expect(errorCode(planOf(), approve({ expiresAt: minutes(1) }))).toBe("invalid_expiry");
     expect(errorCode(planOf(), approve({ expiresAt: minutes(10) }))).toBe("invalid_expiry");
@@ -328,7 +328,7 @@ describe("the cap: charged is never more than approved", () => {
 
   it("rejects a recheck it cannot compare", () => {
     expect(errorCode(heldPlan(), { type: "price_rechecked", at: T0, memberId: "ghost", currentMinor: 1 })).toBe("unknown_member");
-    expect(errorCode(heldPlan(), { type: "price_rechecked", at: T0, memberId: "ana", currentMinor: 0 })).toBe("invalid_amount");
+    expect(errorCode(heldPlan(), { type: "price_rechecked", at: T0, memberId: "ana", currentMinor: -1 })).toBe("invalid_amount");
     expect(errorCode(planOf(), { type: "price_rechecked", at: T0, memberId: "ana", currentMinor: 100 })).toBe("invalid_member_state");
   });
 });
@@ -497,5 +497,53 @@ describe("deadlines during review", () => {
 
   it("ends the plan when a listing is lost", () => {
     expect(run(reviewingPlan(), { type: "offers_unavailable", at: T0 }).plan.status).toBe("expired");
+  });
+});
+
+describe("a friend covers someone's share", () => {
+  it("lets a fully covered person agree to a price of nothing", () => {
+    const plan = agree(reviewingPlan(), "ben", 0);
+    expect(byId(plan, "ben").agreedShareMinor).toBe(0);
+  });
+
+  it("approves nothing to hold: no hold is asked for, and the person waits for their details", () => {
+    const { plan, effects } = run(planOf(), { type: "member_approved", at: minutes(1), memberId: "ben", amountMinor: 0, expiresAt: DEADLINE });
+    expect(effects).toEqual([]);
+    expect(byId(plan, "ben")).toMatchObject({ approval: "approved", approvedMinor: 0, currentShareMinor: 0, holdPlaced: false });
+  });
+
+  it("books once the covered person is ready and the paying person has their hold", () => {
+    const covered = run(planOf(), { type: "member_approved", at: minutes(1), memberId: "ben", amountMinor: 0, expiresAt: DEADLINE }).plan;
+    const paying = approveAndHold(covered, "ana", 30000);
+    expect(paying.status).toBe("approving");
+
+    const { plan, effects } = run(paying, { type: "hold_placed", at: minutes(2), memberId: "ben" });
+    expect(plan.status).toBe("held");
+    expect(effects).toEqual([{ type: "book" }]);
+  });
+
+  it("charges only the paying person and leaves the covered one out of the captures", () => {
+    const covered = run(planOf(), { type: "member_approved", at: minutes(1), memberId: "ben", amountMinor: 0, expiresAt: DEADLINE }).plan;
+    const held = run(approveAndHold(covered, "ana", 30000), { type: "hold_placed", at: minutes(2), memberId: "ben" }).plan;
+    const { plan, effects } = run(startBooking(held), { type: "booking_succeeded", at: minutes(3) });
+    expect(effects).toEqual([{ type: "capture_holds", captures: [{ memberId: "ana", captureMinor: 30000, releaseMinor: 0 }] }]);
+    expect(run(plan, { type: "capture_succeeded", at: minutes(4) }).plan.members.map((entry) => entry.chargedMinor)).toEqual([30000, 0]);
+  });
+
+  it("sends only the covered person back to approve when their price rises above nothing", () => {
+    const covered = run(planOf(), { type: "member_approved", at: minutes(1), memberId: "ben", amountMinor: 0, expiresAt: DEADLINE }).plan;
+    const { plan } = run(covered, { type: "price_rechecked", at: minutes(2), memberId: "ben", currentMinor: 500 });
+    expect(byId(plan, "ben").approval).toBe("needs_reapproval");
+  });
+
+  it("goes back to step 1 for everyone, releasing the holds, when who pays what changes", () => {
+    const { plan, effects } = run(approveAndHold(planOf(), "ana", 20000), { type: "covers_changed", at: minutes(2) });
+    expect(plan.status).toBe("reviewing");
+    expect(plan.members.every((entry) => entry.planAgreement === "pending" && entry.approval === "pending")).toBe(true);
+    expect(effects).toEqual([{ type: "release_holds", memberIds: ["ana"] }, { type: "request_review", memberIds: ["ana", "ben"] }]);
+  });
+
+  it("cannot change who pays once every hold is in", () => {
+    expect(errorCode(heldPlan(), { type: "covers_changed", at: minutes(2) })).toBe("invalid_status");
   });
 });

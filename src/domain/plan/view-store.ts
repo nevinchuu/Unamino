@@ -1,7 +1,7 @@
 import type { Result } from "@/lib/result";
 import type { Offer } from "@/domain/offers/schema";
 import type { VenueFacts } from "@/domain/schedule/venue";
-import type { FxRateTable } from "@/domain/split/types";
+import type { Cover, FxRateTable } from "@/domain/split/types";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import type { RepositoryError } from "./repository";
 
@@ -58,6 +58,8 @@ export interface PlanViewRaw {
   readonly replacedByPlanId: string | null;
   readonly trip: { readonly city: string | null; readonly departDate: string | null; readonly returnDate: string | null };
   readonly members: readonly ViewMember[];
+  /** Friends paying some or all of someone else's part. */
+  readonly covers: readonly Cover[];
   readonly picks: readonly ViewPick[];
   readonly ideas: readonly ViewIdea[];
   /** What the suppliers confirmed. Empty until the trip is booked, and when booking is only pretended. */

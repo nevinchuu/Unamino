@@ -1,4 +1,4 @@
-import { isPositiveInteger } from "@/domain/money/currency";
+import { isNonNegativeInteger } from "@/domain/money/currency";
 import { isMaterialRise } from "./material-rise";
 import { EXPIRABLE_PLAN_STATUSES, isTerminalPlanStatus, type PlanStatus } from "./statuses";
 import type {
@@ -91,6 +91,8 @@ function planCaptures(plan: PlanSnapshot): HoldCapture[] | null {
   for (const member of plan.members) {
     const { approvedMinor, currentShareMinor } = member;
     if (approvedMinor === null || currentShareMinor === null || currentShareMinor > approvedMinor) return null;
+    // Nothing was held for someone whose share is covered, so there is nothing to charge or give back.
+    if (approvedMinor === 0) continue;
     captures.push({ memberId: member.id, captureMinor: currentShareMinor, releaseMinor: approvedMinor - currentShareMinor });
   }
   return captures;
@@ -103,6 +105,16 @@ function planCaptures(plan: PlanSnapshot): HoldCapture[] | null {
 function recheckDuringReview(plan: PlanSnapshot, member: MemberSnapshot, currentMinor: number): TransitionResult {
   if (member.agreedShareMinor === null || !isMaterialRise(member.agreedShareMinor, currentMinor)) return succeed(plan);
   return succeed(reopenReview(plan), [{ type: "request_review", memberIds: memberIdsOf(plan) }]);
+}
+
+/** Once every hold is placed, booking has started and neither the picks nor who pays for them can move. */
+function backToReview(plan: PlanSnapshot, eventType: PlanEventType): TransitionResult {
+  const wrongStatus = requireStatus(plan, ["reviewing", "approving"], eventType);
+  if (wrongStatus) return wrongStatus;
+  return succeed(reopenReview(plan), [
+    ...releaseHolds(approvedMemberIds(plan)),
+    { type: "request_review", memberIds: memberIdsOf(plan) },
+  ]);
 }
 
 const handlers: HandlerMap = {
@@ -121,8 +133,8 @@ const handlers: HandlerMap = {
     if (member.planAgreement !== "pending") {
       return fail("invalid_member_state", `Member has already ${member.planAgreement} the plan`);
     }
-    if (!isPositiveInteger(event.shareMinor)) {
-      return fail("invalid_amount", "The price the member saw must be a positive integer in minor units");
+    if (!isNonNegativeInteger(event.shareMinor)) {
+      return fail("invalid_amount", "The price the member saw must be a whole number of minor units");
     }
     const agreed = replaceMember(plan, { ...member, planAgreement: "agreed", agreedShareMinor: event.shareMinor });
     if (!agreed.members.every((candidate) => candidate.planAgreement === "agreed")) return succeed(agreed);
@@ -138,15 +150,10 @@ const handlers: HandlerMap = {
     return expire(plan);
   },
 
-  picks_changed: (plan, event) => {
-    // Once every hold is placed, booking has started and the picks can no longer move.
-    const wrongStatus = requireStatus(plan, ["reviewing", "approving"], event.type);
-    if (wrongStatus) return wrongStatus;
-    return succeed(reopenReview(plan), [
-      ...releaseHolds(approvedMemberIds(plan)),
-      { type: "request_review", memberIds: memberIdsOf(plan) },
-    ]);
-  },
+  picks_changed: (plan, event) => backToReview(plan, event.type),
+
+  // Who pays what changed, so what everyone agreed to and approved is no longer what they will be asked for.
+  covers_changed: (plan, event) => backToReview(plan, event.type),
 
   member_approved: (plan, event) => {
     const wrongStatus = requireStatus(plan, ["approving"], event.type);
@@ -156,8 +163,8 @@ const handlers: HandlerMap = {
     if (member.approval !== "pending" && member.approval !== "needs_reapproval") {
       return fail("invalid_member_state", `Member is already ${member.approval}`);
     }
-    if (!isPositiveInteger(event.amountMinor)) {
-      return fail("invalid_amount", "Approved amount must be a positive integer in minor units");
+    if (!isNonNegativeInteger(event.amountMinor)) {
+      return fail("invalid_amount", "Approved amount must be a whole number of minor units");
     }
     if (event.expiresAt <= event.at || event.expiresAt > plan.deadlineAt) {
       return fail("invalid_expiry", "Approval must expire in the future and no later than the plan deadline");
@@ -171,6 +178,8 @@ const handlers: HandlerMap = {
       approvalExpiresAt: event.expiresAt,
       holdPlaced: false,
     };
+    // Someone whose whole share is covered has nothing to hold. They are marked placed once their details are in.
+    if (event.amountMinor === 0) return succeed(replaceMember(plan, approved));
     return succeed(replaceMember(plan, approved), [
       { type: "place_hold", memberId: member.id, amountMinor: event.amountMinor },
     ]);
@@ -201,8 +210,8 @@ const handlers: HandlerMap = {
     if (wrongStatus) return wrongStatus;
     const member = findMember(plan, event.memberId);
     if (!member) return fail("unknown_member", `No member ${event.memberId}`);
-    if (!isPositiveInteger(event.currentMinor)) {
-      return fail("invalid_amount", "Current price must be a positive integer in minor units");
+    if (!isNonNegativeInteger(event.currentMinor)) {
+      return fail("invalid_amount", "Current price must be a whole number of minor units");
     }
     if (plan.status === "reviewing") return recheckDuringReview(plan, member, event.currentMinor);
     if (member.approval !== "approved" || member.approvedMinor === null) {

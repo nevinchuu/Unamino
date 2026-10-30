@@ -1,6 +1,8 @@
 import { err, ok, type Result } from "@/lib/result";
 import type { OfferQuery, OfferSource, OfferSourceError } from "@/domain/offers/offer-source";
 import type { FlightOffer, HotelOffer, Offer } from "@/domain/offers/schema";
+import type { Cover } from "@/domain/split/types";
+import type { CoverStore } from "./cover-store";
 import type { PlanDetails, PlanDetailsStore, RenewedPick } from "./details-store";
 import { effectKey, type EffectError, type EffectRunner } from "./effects";
 import type { RefreshDeps } from "./refresh";
@@ -70,6 +72,30 @@ export class MemoryDetailsStore implements PlanDetailsStore {
 
   async listPastDeadline(): Promise<Result<readonly string[], RepositoryError>> {
     return ok(this.pastDeadline);
+  }
+}
+
+/** The covers of a plan in memory. It also keeps the plan's details in step, because pricing reads covers from there. */
+export class MemoryCoverStore implements CoverStore {
+  constructor(private readonly details: MemoryDetailsStore, public saveFailure: RepositoryError | null = null) {}
+
+  async list(): Promise<Result<readonly Cover[], RepositoryError>> {
+    return ok(this.details.details.covers);
+  }
+
+  async save(_planId: string, cover: Cover): Promise<Result<void, RepositoryError>> {
+    if (this.saveFailure) return err(this.saveFailure);
+    const kept = this.details.details.covers.filter((entry) => !(entry.sponsorId === cover.sponsorId && entry.beneficiaryId === cover.beneficiaryId));
+    const index = this.details.details.covers.findIndex((entry) => entry.sponsorId === cover.sponsorId && entry.beneficiaryId === cover.beneficiaryId);
+    const covers = index === -1 ? [...kept, cover] : [...kept.slice(0, index), cover, ...kept.slice(index)];
+    this.details.details = { ...this.details.details, covers };
+    return ok(undefined);
+  }
+
+  async remove(_planId: string, sponsorId: string, beneficiaryId: string): Promise<Result<void, RepositoryError>> {
+    const covers = this.details.details.covers.filter((entry) => !(entry.sponsorId === sponsorId && entry.beneficiaryId === beneficiaryId));
+    this.details.details = { ...this.details.details, covers };
+    return ok(undefined);
   }
 }
 
@@ -175,6 +201,7 @@ export function setup(options: SetupOptions = {}) {
     baseCurrency: "USD",
     fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} },
     offersCheckedAt: options.offersCheckedAt ?? null,
+    covers: [],
     members: everyone.map((id) => ({ id, currency: "USD" })),
     picks: [
       { id: "pick-hotel", offer: hotel(), searchId: options.hotelSearchId === undefined ? "search-hotel" : options.hotelSearchId, memberIds: everyone },

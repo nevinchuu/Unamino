@@ -285,3 +285,42 @@ describe("captureHolds", () => {
     expect(result).toMatchObject({ ok: false, error: { kind: "payment" } });
   });
 });
+
+describe("someone whose whole share a friend covers", () => {
+  const covered = () => setup({ members: [approved("ana"), approved("ben", { approvedMinor: 0, currentShareMinor: 0 })] });
+
+  it("is not given a card form, because there is nothing to hold", async () => {
+    const s = covered();
+    expect(await s.service.ensureHold(PLAN, "ben")).toMatchObject({ ok: false, error: { kind: "not_applicable" } });
+    expect(s.provider.all()).toEqual([]);
+  });
+
+  it("counts as ready once confirmed, and the last one ready sets the booking going", async () => {
+    const s = covered();
+    await s.form("ana");
+    s.placeCard("ana");
+    expect(await s.service.confirmHold(PLAN, "ana")).toEqual({ ok: true, value: { status: "placed" } });
+    expect(s.plans.plan.status).toBe("approving");
+
+    expect(await s.service.confirmCovered(PLAN, "ben")).toEqual({ ok: true, value: { status: "placed" } });
+    expect(s.plans.plan.status).toBe("held");
+    expect(s.effects.types).toEqual(["book"]);
+  });
+
+  it("is the same when confirmed twice", async () => {
+    const s = covered();
+    await s.service.confirmCovered(PLAN, "ben");
+    expect(await s.service.confirmCovered(PLAN, "ben")).toEqual({ ok: true, value: { status: "placed" } });
+  });
+
+  it("is refused for someone who pays by card, who must put a card on a real hold", async () => {
+    const s = covered();
+    expect(await s.service.confirmCovered(PLAN, "ana")).toMatchObject({ ok: false, error: { kind: "not_applicable" } });
+    expect(s.plans.plan.members[0].holdPlaced).toBe(false);
+  });
+
+  it("does nothing once the plan has moved on", async () => {
+    const s = setup({ status: "expired", members: [approved("ben", { approvedMinor: 0, currentShareMinor: 0 })] });
+    expect(await s.service.confirmCovered(PLAN, "ben")).toEqual({ ok: true, value: { status: "gone" } });
+  });
+});

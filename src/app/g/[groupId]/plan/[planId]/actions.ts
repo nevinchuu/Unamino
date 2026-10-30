@@ -3,6 +3,7 @@
 import { after } from "next/server";
 import { runAgent } from "@/domain/agent/run-agent";
 import { getContainer } from "@/server/container";
+import { runCoverAction, type CoverActionResult, type CoverChange } from "@/server/cover-actions";
 import { runCardForm, runConfirmHold, type CardFormResult, type ConfirmHoldResult } from "@/server/hold-actions";
 import { runSaveTravellerDetails, type SaveDetailsResult } from "@/server/traveller-actions";
 import { runPlanAction, type PlanActionName, type PlanActionResult } from "@/server/plan-actions";
@@ -46,10 +47,19 @@ export async function confirmCardHold(groupId: string, planId: string): Promise<
   return runConfirmHold({ holds: payments.holds, views }, await currentMember(groupId), planId);
 }
 
+/**
+ * A friend covers some or all of another member's share (or stops). The person covering is whoever is signed in. This
+ * sends everyone back to agree to the plan again, because their amounts changed.
+ */
+export async function coverShare(groupId: string, planId: string, beneficiaryId: string, change: CoverChange): Promise<CoverActionResult> {
+  const { covers, views, messages } = getContainer();
+  return runCoverAction({ covers, views, messages }, await currentMember(groupId), { planId, beneficiaryId, change });
+}
+
 /** Keeps the person's traveller details, locked. The airline and the hotel need them. Only for the person they belong to. */
 export async function saveTravellerDetails(groupId: string, planId: string, input: unknown): Promise<SaveDetailsResult> {
-  const { travellers, views } = getContainer();
-  return runSaveTravellerDetails({ travellers, views }, await currentMember(groupId), planId, input);
+  const { travellers, views, payments } = getContainer();
+  return runSaveTravellerDetails({ travellers, views, holds: payments.holds }, await currentMember(groupId), planId, input);
 }
 
 /**

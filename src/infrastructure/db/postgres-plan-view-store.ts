@@ -3,6 +3,7 @@ import { err, ok, type Result } from "@/lib/result";
 import type { RepositoryError } from "@/domain/plan/repository";
 import type { PlanViewRaw, PlanViewStore } from "@/domain/plan/view-store";
 import type { Database } from "./client";
+import { readCovers } from "./postgres-cover-store";
 import { members, planMembers, planPicks, plans, scheduleSuggestions, supplierBookings, tripBriefs } from "./schema";
 
 const unavailable = (): Result<never, RepositoryError> => err({ code: "unavailable", message: "The database could not be reached" });
@@ -43,6 +44,7 @@ export class PostgresPlanViewStore implements PlanViewStore {
         replacedByPlanId: plan.replacedByPlanId,
         trip: { city: brief.destinationCity, departDate: brief.departDate, returnDate: brief.returnDate },
         members: people.map(({ row, name, currency }) => ({ id: row.memberId, name, currency, planAgreement: row.planAgreement, approval: row.approval, approvedMinor: row.approvedMinor, chargedMinor: row.chargedMinor, holdPlaced: row.holdPlaced })),
+        covers: await readCovers(this.db, planId),
         picks: picks.map((pick) => ({ id: pick.id, offer: pick.offer, memberIds: pick.memberIds, reason: pick.reason, notes: pick.notes })),
         ideas: ideas.map((idea) => ({ id: idea.id, date: idea.date, startTime: idea.startTime, endTime: idea.endTime, category: idea.category, why: idea.why, venue: idea.venue })),
         // A cancelled booking is not part of the trip, so it is never shown as a confirmation.

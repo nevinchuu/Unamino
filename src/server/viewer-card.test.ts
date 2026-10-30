@@ -12,7 +12,7 @@ const raw = (status: PlanStatus = "reviewing", agreement: "pending" | "agreed" =
   id: PLAN, groupId: GROUP, title: "Bangkok", summary: null, status, deadlineAt: new Date("2026-10-27T01:09:00Z"), baseCurrency: "USD",
   fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: 1, replacedByPlanId: null, trip: { city: "Bangkok", departDate: "2026-12-11", returnDate: "2026-12-13" },
   members: [{ id: "ana", name: "Ana", currency: "USD", planAgreement: agreement, approval, approvedMinor: null, chargedMinor: null, holdPlaced: false }],
-  picks: [{ id: "p1", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "p2", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [], bookings: [],
+  picks: [{ id: "p1", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "p2", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [], covers: [], bookings: [],
 });
 
 function setup(plan: PlanViewRaw | "missing" = raw()) {
@@ -33,10 +33,18 @@ describe("ViewerCards", () => {
     expect(card?.shareMinor).toBeGreaterThan(0);
   });
 
+  it("offers covering a friend only when someone else is in the plan", async () => {
+    const base = raw();
+    const together: PlanViewRaw = { ...base, headcount: 2, members: [...base.members, { ...base.members[0], id: "ben", name: "Ben" }] };
+    expect((await setup(together).cards.forPlan(PLAN, "ana"))?.canCover).toBe(true);
+    expect((await setup(raw("held")).cards.forPlan(PLAN, "ana"))?.canCover).toBe(false);
+  });
+
   it("also carries what the sheet shows: where each person stands, the parts of the price, and whether changes can be asked for", async () => {
     const card = await setup().cards.forPlan(PLAN, "ana");
     expect(card?.people).toEqual([{ name: "Ana", isMe: true, agreed: false, approved: false, held: false }]);
     expect(card?.canRequestChanges).toBe(true);
+    expect(card?.canCover).toBe(false); // alone in the plan, so there is nobody to cover
     expect(card?.lines.map((line) => line.minor).reduce((sum, minor) => sum + minor, 0)).toBe(card?.shareMinor);
   });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Cover } from "@/domain/split/types";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import { flight, hotel } from "./test-support";
 import { buildPlanView, FAST_POLL_STATUSES, LIVE_PLAN_STATUSES } from "./view";
@@ -32,6 +33,7 @@ function raw(overrides: Partial<PlanViewRaw> = {}): PlanViewRaw {
       { id: "pick-flight", offer: flight(), memberIds: ["ana", "ben"], reason: "After 18:00 for Ana", notes: {} },
     ],
     ideas: [IDEA],
+    covers: [],
     bookings: [],
     ...overrides,
   };
@@ -111,20 +113,82 @@ describe("who pays what", () => {
   });
 });
 
+describe("a friend covering someone's share", () => {
+  const withCover = (cover: Cover, viewer = "ana", overrides: Partial<PlanViewRaw> = {}) => buildPlanView(raw({ covers: [cover], ...overrides }), viewer, { payments: "stripe", travellers: { given: false } });
+  const anaCoversBen = { sponsorId: "ana", beneficiaryId: "ben", amountBaseMinor: 4_000 };
+
+  it("moves the amount between the two cards and keeps the total", () => {
+    const { people } = withCover(anaCoversBen);
+    expect(people.map((p) => p.shareMinor)).toEqual([34_000, 26_000]);
+    expect(people.reduce((sum, p) => sum + (p.shareMinor ?? 0), 0)).toBe(60_000);
+  });
+
+  it("shows the move as lines of the share, so the parts still add up", () => {
+    const { people } = withCover(anaCoversBen);
+    expect(people[0].lines.at(-1)).toEqual({ label: "Covering Ben", minor: 4_000 });
+    expect(people[1].lines.at(-1)).toEqual({ label: "Ana covers", minor: -4_000 });
+    for (const person of people) expect(person.lines.reduce((sum, line) => sum + line.minor, 0)).toBe(person.shareMinor);
+  });
+
+  it("lists who covers whom, and what the viewer covers of each person", () => {
+    const dto = withCover({ sponsorId: "ana", beneficiaryId: "ben", amountBaseMinor: null });
+    expect(dto.covers).toEqual([{ sponsorId: "ana", sponsorName: "Ana", beneficiaryId: "ben", beneficiaryName: "Ben", amountMinor: 30_000, whole: true, percent: null }]);
+    expect(dto.people.find((p) => p.id === "ben")?.coveredByMe).toEqual({ whole: true, percent: null, amountMinor: 30_000 });
+    expect(dto.people.find((p) => p.id === "ana")?.coveredByMe).toBeNull();
+  });
+
+  it("reports a percent cover with its percent, and not as the whole share", () => {
+    const dto = withCover({ sponsorId: "ana", beneficiaryId: "ben", amountBaseMinor: null, sharePercent: 50 });
+    expect(dto.covers).toEqual([{ sponsorId: "ana", sponsorName: "Ana", beneficiaryId: "ben", beneficiaryName: "Ben", amountMinor: 15_000, whole: false, percent: 50 }]);
+    expect(dto.people.find((p) => p.id === "ben")?.coveredByMe).toEqual({ whole: false, percent: 50, amountMinor: 15_000 });
+  });
+
+  it("tells each person the most that can be covered for them: what they take part in, before any cover", () => {
+    expect(withCover(anaCoversBen).people.map((p) => p.ownPartMinor)).toEqual([30_000, 30_000]);
+  });
+
+  it("allows covering while people are still deciding, and not after", () => {
+    expect(withCover(anaCoversBen).me.actions.cover).toBe(true);
+    expect(withCover(anaCoversBen, "ana", { status: "approving" }).me.actions.cover).toBe(true);
+    expect(withCover(anaCoversBen, "ana", { status: "held" }).me.actions.cover).toBe(false);
+    expect(withCover(anaCoversBen, "stranger").me.actions.cover).toBe(false);
+  });
+
+  describe("when the whole share is covered", () => {
+    const covered = (overrides: Partial<ViewMember> = {}) =>
+      withCover({ sponsorId: "ana", beneficiaryId: "ben", amountBaseMinor: null }, "ben", { status: "approving", members: [member("ana", "Ana"), member("ben", "Ben", { planAgreement: "agreed", approval: "approved", approvedMinor: 0, ...overrides })] });
+
+    it("asks for the traveller details but no card", () => {
+      const { me } = covered();
+      expect(me).toMatchObject({ shareMinor: 0, cardNeeded: false, details: { needed: true } });
+    });
+
+    it("asks for nothing more once the details are in", () => {
+      const dto = buildPlanView(raw({ status: "approving", covers: [{ sponsorId: "ana", beneficiaryId: "ben", amountBaseMinor: null }], members: [member("ana", "Ana"), member("ben", "Ben", { planAgreement: "agreed", approval: "approved", approvedMinor: 0, holdPlaced: true })] }), "ben", { payments: "stripe", travellers: { given: true } });
+      expect(dto.me).toMatchObject({ cardNeeded: false, details: { needed: false } });
+    });
+
+    it("still asks the paying friend for a card", () => {
+      const dto = buildPlanView(raw({ status: "approving", covers: [{ sponsorId: "ana", beneficiaryId: "ben", amountBaseMinor: null }], members: [member("ana", "Ana", { planAgreement: "agreed", approval: "approved", approvedMinor: 60_000 }), member("ben", "Ben")] }), "ana", { payments: "stripe", travellers: { given: false } });
+      expect(dto.me).toMatchObject({ shareMinor: 60_000, cardNeeded: true });
+    });
+  });
+});
+
 describe("what a person may do", () => {
   const actionsFor = (status: PlanStatus, agreement: PlanAgreementStatus, approval: ApprovalStatus) =>
     view({ status, members: [member("ana", "Ana", { planAgreement: agreement, approval }), member("ben", "Ben")] }).me.actions;
 
   it("can agree or decline while the plan is being reviewed and they have not agreed", () => {
-    expect(actionsFor("reviewing", "pending", "pending")).toEqual({ agree: true, decline: true, approve: false, declineAmount: false, requestChanges: true });
+    expect(actionsFor("reviewing", "pending", "pending")).toEqual({ agree: true, decline: true, approve: false, declineAmount: false, requestChanges: true, cover: true });
   });
 
   it("can only decline, to change their mind, once they have agreed", () => {
-    expect(actionsFor("reviewing", "agreed", "pending")).toEqual({ agree: false, decline: true, approve: false, declineAmount: false, requestChanges: true });
+    expect(actionsFor("reviewing", "agreed", "pending")).toEqual({ agree: false, decline: true, approve: false, declineAmount: false, requestChanges: true, cover: true });
   });
 
   it("can approve their amount, or decline, once everyone has agreed", () => {
-    expect(actionsFor("approving", "agreed", "pending")).toEqual({ agree: false, decline: false, approve: true, declineAmount: true, requestChanges: true });
+    expect(actionsFor("approving", "agreed", "pending")).toEqual({ agree: false, decline: false, approve: true, declineAmount: true, requestChanges: true, cover: true });
   });
 
   it("can approve again after their price rose past their cap", () => {
@@ -132,13 +196,13 @@ describe("what a person may do", () => {
   });
 
   it("has nothing to approve once they have", () => {
-    expect(actionsFor("approving", "agreed", "approved")).toEqual({ agree: false, decline: false, approve: false, declineAmount: true, requestChanges: true });
+    expect(actionsFor("approving", "agreed", "approved")).toEqual({ agree: false, decline: false, approve: false, declineAmount: true, requestChanges: true, cover: true });
   });
 
   it("can still back out while the holds are in, but not once booking has started or the plan has ended", () => {
     expect(actionsFor("held", "agreed", "approved").declineAmount).toBe(true);
     for (const status of ["booking", "booked", "captured", "expired"] as const) {
-      expect(actionsFor(status, "agreed", "approved"), status).toEqual({ agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false });
+      expect(actionsFor(status, "agreed", "approved"), status).toEqual({ agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false, cover: false });
     }
   });
 
@@ -149,7 +213,7 @@ describe("what a person may do", () => {
 
   it("cannot act on a plan made before they joined, but can look at it", () => {
     const late = view({}, "newcomer");
-    expect(late.me).toMatchObject({ id: "newcomer", inPlan: false, agreement: null, approval: null, shareMinor: null, actions: { agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false } });
+    expect(late.me).toMatchObject({ id: "newcomer", inPlan: false, agreement: null, approval: null, shareMinor: null, actions: { agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false, cover: false } });
     expect(late.people.some((p) => p.isMe)).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import type { Member } from "@/domain/group/types";
+import type { HoldService } from "@/domain/payments/hold-service";
 import type { PlanViewStore } from "@/domain/plan/view-store";
 import type { TravellerFieldErrors } from "@/domain/travellers/details";
 import { passportRequiredFor } from "@/domain/travellers/requirements";
@@ -12,6 +13,8 @@ export interface TravellerActionDeps {
   /** Null when this server does not take traveller details. */
   readonly travellers: Pick<TravellerService, "save"> | null;
   readonly views: Pick<PlanViewStore, "load">;
+  /** Present when card holds are real. A person whose whole share a friend covers is ready once their details are in, with no card. */
+  readonly holds?: Pick<HoldService, "confirmCovered"> | null;
 }
 
 const NOT_SIGNED_IN = "Open your invite link to rejoin this group.";
@@ -41,7 +44,14 @@ export async function runSaveTravellerDetails(deps: TravellerActionDeps, member:
   if (!(ASKING as readonly string[]).includes(plan.value.status)) return { ok: false, error: NOT_NOW };
 
   const saved = await deps.travellers.save(member.id, input, { passportRequired: passportRequiredFor(plan.value.picks, member.id) });
-  if (saved.ok) return { ok: true };
+  if (saved.ok) {
+    const person = plan.value.members.find((candidate) => candidate.id === member.id);
+    if (deps.holds && plan.value.status === "approving" && person?.approval === "approved" && person.approvedMinor === 0) {
+      const ready = await deps.holds.confirmCovered(planId, member.id);
+      if (!ready.ok) console.error("marking a covered person ready failed", ready.error.kind);
+    }
+    return { ok: true };
+  }
   if (saved.error.kind === "invalid") return { ok: false, error: "Check the fields marked below.", fields: saved.error.fields };
   console.error("saving traveller details failed");
   return { ok: false, error: UNAVAILABLE };

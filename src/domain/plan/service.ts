@@ -48,7 +48,8 @@ export interface OverdueSummary {
 type PlanEnded = Extract<ActionOutcome, { status: "plan_ended" }>;
 type Fresh = { readonly status: "ready"; readonly plan: PlanSnapshot; readonly currentMinor: number } | PlanEnded;
 
-const isMoney = (minor: number): boolean => Number.isSafeInteger(minor) && minor > 0;
+/** A price someone was shown. Zero is a real price: a friend covers the whole share. */
+const isMoney = (minor: number): boolean => Number.isSafeInteger(minor) && minor >= 0;
 
 /**
  * What members and the clock can do to a plan. Every action first looks at the offers again, so nobody agrees to
@@ -71,7 +72,7 @@ export class PlanService {
    * of the two prices, so a rise is always measured from what they actually saw or from what it costs now.
    */
   async agree(planId: string, memberId: string, seenShareMinor: number, now: Date): Promise<Result<ActionOutcome, ServiceError>> {
-    if (!isMoney(seenShareMinor)) return err({ kind: "invalid_amount", message: "The price the member saw must be a positive whole number of minor units" });
+    if (!isMoney(seenShareMinor)) return err({ kind: "invalid_amount", message: "The price the member saw must be a whole number of minor units" });
     const fresh = await this.freshShare(planId, memberId, now);
     if (!fresh.ok) return fresh;
     if (fresh.value.status === "plan_ended") return ok(fresh.value);
@@ -91,7 +92,7 @@ export class PlanService {
    * and never taken from the caller. `seenShareMinor` only proves they saw a price at least as high.
    */
   async approveAmount(planId: string, memberId: string, seenShareMinor: number, now: Date): Promise<Result<ActionOutcome, ServiceError>> {
-    if (!isMoney(seenShareMinor)) return err({ kind: "invalid_amount", message: "The price the member saw must be a positive whole number of minor units" });
+    if (!isMoney(seenShareMinor)) return err({ kind: "invalid_amount", message: "The price the member saw must be a whole number of minor units" });
     const fresh = await this.freshShare(planId, memberId, now);
     if (!fresh.ok) return fresh;
     if (fresh.value.status === "plan_ended") return ok(fresh.value);

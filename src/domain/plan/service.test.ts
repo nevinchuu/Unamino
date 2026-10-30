@@ -66,7 +66,7 @@ describe("PlanService", () => {
       expect(s.plans.stored).toBe(before);
     });
 
-    it.each([0, -5, 1.5, Number.NaN, Number.POSITIVE_INFINITY])("refuses %s as the price the member saw, without searching", async (seen) => {
+    it.each([-5, 1.5, Number.NaN, Number.POSITIVE_INFINITY])("refuses %s as the price the member saw, without searching", async (seen) => {
       const s = setup();
       const result = await serviceFor(s).agree("plan-1", "ana", seen, NOW);
       expect(result.ok ? null : result.error.kind).toBe("invalid_amount");

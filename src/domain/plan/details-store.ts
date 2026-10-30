@@ -1,7 +1,7 @@
 import type { Result } from "@/lib/result";
 import type { OfferQuery } from "@/domain/offers/offer-source";
 import type { Offer } from "@/domain/offers/schema";
-import type { FxRateTable } from "@/domain/split/types";
+import type { Cover, FxRateTable } from "@/domain/split/types";
 import type { RepositoryError } from "./repository";
 
 /** One bought item of a plan, with the members it is for. */
@@ -20,6 +20,8 @@ export interface PlanDetails {
   readonly fx: FxRateTable;
   /** When the offers were last checked, or when a check was last started. */
   readonly offersCheckedAt: Date | null;
+  /** Friends paying some or all of someone else's part, in the order they were made. */
+  readonly covers: readonly Cover[];
   /** In the order they were added, the same order as the plan's snapshot. */
   readonly members: readonly { readonly id: string; readonly currency: string }[];
   /** In the order the plan lists them. */

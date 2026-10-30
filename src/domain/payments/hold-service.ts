@@ -78,6 +78,7 @@ export class HoldService {
     if (record.planStatus !== "approving" || record.approval !== "approved" || record.holdPlaced || cap === null) {
       return err(notApplicable("A hold is only needed after approving, while the plan waits for everyone's holds"));
     }
+    if (cap === 0) return err(notApplicable("A friend covers this person's whole share, so there is nothing to hold"));
 
     if (record.holdId) {
       const existing = await this.deps.provider.getHold(record.holdId);
@@ -123,6 +124,27 @@ export class HoldService {
       return ok({ status: applied.error.error.code === "invalid_member_state" ? "placed" : "gone" });
     }
     // The effects of the last hold (booking) are not this call's to succeed or fail: the hold is placed either way.
+    if (applied.value.effects.length > 0) await this.deps.effects().run(planId, applied.value.version, applied.value.effects);
+    return ok({ status: "placed" });
+  }
+
+  /**
+   * For someone whose whole share a friend covers: there is no card, so there is no hold to wait for. Once their
+   * details are in (the caller checks) they count as ready, and the last person ready sets the booking going.
+   */
+  async confirmCovered(planId: string, memberId: string): Promise<Result<ConfirmOutcome, HoldFailure>> {
+    const found = await this.deps.store.find(planId, memberId);
+    if (!found.ok) return err(fromStore(found.error));
+    const record = found.value;
+    if (record.holdPlaced) return ok({ status: "placed" });
+    if (record.planStatus !== "approving" || record.approval !== "approved") return ok({ status: "gone" });
+    if (record.approvedMinor !== 0) return err(notApplicable("This person pays by card"));
+
+    const applied = await applyPlanEvent(this.deps.plans, planId, { type: "hold_placed", at: this.deps.clock(), memberId });
+    if (!applied.ok) {
+      if (applied.error.kind === "repository") return err({ kind: "store", message: applied.error.error.message });
+      return ok({ status: applied.error.error.code === "invalid_member_state" ? "placed" : "gone" });
+    }
     if (applied.value.effects.length > 0) await this.deps.effects().run(planId, applied.value.version, applied.value.effects);
     return ok({ status: "placed" });
   }

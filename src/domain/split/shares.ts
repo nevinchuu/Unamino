@@ -46,6 +46,7 @@ export function computeMemberShares(input: ComputeSharesInput): Result<readonly 
       currency: member.currency,
       lines,
       baseShareMinor,
+      coverLines: [],
       shareMinor: converted.value,
       // convertMinor succeeded, so the rate exists
       fxRate: rateBetween(fx, fx.baseCurrency, member.currency) ?? 1,

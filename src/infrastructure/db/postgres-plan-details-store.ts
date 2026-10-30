@@ -5,6 +5,7 @@ import type { PlanDetails, PlanDetailsStore, RenewedPick } from "@/domain/plan/d
 import type { RepositoryError } from "@/domain/plan/repository";
 import { EXPIRABLE_PLAN_STATUSES } from "@/domain/plan/statuses";
 import type { Database } from "./client";
+import { readCovers } from "./postgres-cover-store";
 import { members, offerSearches, planMembers, planPicks, plans } from "./schema";
 
 const unavailable = (): Result<never, RepositoryError> => err({ code: "unavailable", message: "The database could not be reached" });
@@ -40,6 +41,7 @@ export class PostgresPlanDetailsStore implements PlanDetailsStore {
         baseCurrency: plan.baseCurrency,
         fx: plan.fx,
         offersCheckedAt: plan.offersCheckedAt,
+        covers: await readCovers(this.db, planId),
         members: memberRows,
         picks: pickRows.map((pick) => ({ id: pick.id, offer: pick.offer, searchId: pick.searchId, memberIds: pick.memberIds })),
         queries,

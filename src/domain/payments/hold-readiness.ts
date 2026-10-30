@@ -20,6 +20,8 @@ export class ProviderHoldReadiness implements HoldReadiness {
       const found = await this.store.find(planId, memberId);
       if (!found.ok) return err({ message: found.error.message });
       const { holdId, approvedMinor, currency } = found.value;
+      // A friend covers all of their share, so there is no card hold to look for.
+      if (approvedMinor === 0) continue;
       if (!holdId || approvedMinor === null) return ok("a member has no hold");
 
       const fetched = await this.provider.getHold(holdId);

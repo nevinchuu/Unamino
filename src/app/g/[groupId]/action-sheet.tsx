@@ -8,6 +8,7 @@ import { StatusChip } from "@/components/status-chip";
 import { formatMinor } from "@/lib/format-money";
 import { describeSheet, type CardMine, type CardPlan } from "@/lib/plan-card";
 import { cn } from "@/lib/utils";
+import { CoverAction } from "./cover-action";
 import { PlanPreview } from "./plan-preview";
 import { agreeToPlan } from "./plan/[planId]/actions";
 import { ChangeRequestSheet } from "./plan/[planId]/change-request-sheet";
@@ -26,7 +27,8 @@ interface ActionSheetProps {
 
 /**
  * The panel above the composer for the plan the group is deciding on. It shows where the plan stands ("2/4 agreed")
- * and offers this person their next step: agree to it, ask for changes, or approve their amount. It opens by itself
+ * and offers this person their next step: agree to it, ask for changes, or approve their amount. A small button at the side
+ * covers a friend's share without opening the full plan. It opens by itself
  * while there is something to do and folds away while the person is only waiting, and either can be changed by tapping the handle.
  */
 export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false }: ActionSheetProps) {
@@ -57,6 +59,8 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
   }
 
   const share = mine.shareMinor !== null ? formatMinor(mine.shareMinor, mine.currency) : null;
+  // A friend covering the whole share leaves nothing to pay, which reads better as a word than as $0.00.
+  const covered = mine.shareMinor === 0;
   return (
     <section aria-label="Plan decision" className={cn("flex flex-col gap-3 overflow-y-auto rounded-t-[26px] bg-card px-5 pt-2.5 pb-4 shadow-sheet", big ? "max-h-[85dvh]" : "max-h-[55dvh]")}>
       <button type="button" onClick={() => setChosen(!open)} aria-expanded={open} className="flex min-h-9 items-center justify-between gap-3">
@@ -91,7 +95,11 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
           ) : null}
 
           {view.step === "approve" && view.actionable && share ? (
-            <p className="text-[13px] leading-[19px] text-muted-foreground">Your card is held for up to {share}, not charged. We only charge when everyone is in, and release anything above today&apos;s share.</p>
+            <p className="text-[13px] leading-[19px] text-muted-foreground">
+              {covered
+                ? "A friend is covering your whole share, so there is no card to add. Open the plan to give your traveller details."
+                : `Your card is held for up to ${share}, not charged. We only charge when everyone is in, and release anything above today's share.`}
+            </p>
           ) : null}
 
           <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} aria-expanded={detailsOpen} className="flex min-h-11 items-center justify-center gap-1 self-center text-sm font-semibold text-link">
@@ -102,6 +110,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
           {detailsOpen ? <PlanPreview detail={mine.detail} planHref={`/g/${groupId}/plan/${plan.id}`} /> : null}
 
           <div className={cn("flex gap-2.5", big && "sticky bottom-0 -mx-5 bg-card px-5 pt-2")}>
+            {mine.canCover ? <CoverAction planId={plan.id} onNote={setNote} /> : null}
             {mine.canRequestChanges ? (
               <Button type="button" variant="secondary" className="h-12 flex-1 rounded-2xl text-sm font-bold" onClick={() => setChangesOpen(true)}>
                 I need changes
@@ -109,12 +118,12 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
             ) : null}
             {view.step === "agree" && view.actionable && share ? (
               <Button type="button" variant="action" className="h-12 flex-[1.4] rounded-2xl text-sm" disabled={busy} onClick={() => void agree()}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : `Agree · ${share}`}
+                {busy ? <Loader2 className="size-4 animate-spin" /> : covered ? "Agree · covered" : `Agree · ${share}`}
               </Button>
             ) : null}
             {view.step === "approve" && view.actionable ? (
               <Link href={`/g/${groupId}/plan/${plan.id}`} className={cn(buttonVariants({ variant: "action" }), "h-12 flex-[1.4] rounded-2xl text-sm")}>
-                Approve your amount
+                {covered ? "Open the plan" : "Approve your amount"}
               </Link>
             ) : null}
           </div>

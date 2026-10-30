@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, text, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, smallint, text, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SupplierBookingStatus } from "@/domain/booking/ports";
 import type { Offer } from "@/domain/offers/schema";
 import type { SeenQuote } from "@/domain/quote/types";
@@ -82,6 +82,33 @@ export const planMembers = pgTable(
   ],
 ).enableRLS();
 
+/**
+ * A friend paying some or all of another member's part. The trip total does not change; the money only moves between
+ * cards. `amountBaseMinor` is in the plan's base currency; `sharePercent` is a percent of the beneficiary's own part.
+ * With neither set it is the beneficiary's whole part.
+ */
+export const planCovers = pgTable(
+  "plan_covers",
+  {
+    planId: uuid("plan_id").notNull().references(() => plans.id, { onDelete: "cascade" }),
+    sponsorId: uuid("sponsor_id").notNull().references(() => members.id),
+    beneficiaryId: uuid("beneficiary_id").notNull().references(() => members.id),
+    amountBaseMinor: minor("amount_base_minor"),
+    sharePercent: smallint("share_percent"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.planId, table.sponsorId, table.beneficiaryId] }),
+    check("plan_covers_share_percent_range", sql`${table.sharePercent} IS NULL OR (${table.sharePercent} BETWEEN 1 AND 99 AND ${table.amountBaseMinor} IS NULL)`),
+    check("plan_covers_not_self", sql`${table.sponsorId} <> ${table.beneficiaryId}`),
+    check("plan_covers_amount_positive", sql`${table.amountBaseMinor} IS NULL OR ${table.amountBaseMinor} > 0`),
+  ],
+).enableRLS();
+
+/**
+ * Why a plan's booking failed: which hotel or flight, and the reason, so the group and Trippy can plan something different.
+ * A plan has at most one. It goes when the plan goes. `listingId` lets the same listing be kept out of the next plan.
+ */
 /** What was bought for the plan. A snapshot of the offer is kept, because offers expire and change. */
 export const planPicks = pgTable(
   "plan_picks",

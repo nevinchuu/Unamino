@@ -18,16 +18,17 @@ const plan = (overrides: Partial<PlanViewRaw> = {}): PlanViewRaw => ({
   id: PLAN_ID, groupId: GROUP, title: "t", summary: null, status: "approving", deadlineAt: new Date("2026-10-27T01:09:00Z"), baseCurrency: "USD",
   fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} }, headcount: 1, replacedByPlanId: null, trip: { city: "Bangkok", departDate: "2026-12-11", returnDate: "2026-12-13" },
   members: [{ id: "ana", name: "Ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 100, chargedMinor: null, holdPlaced: false }],
-  picks: [{ id: "f", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "h", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [], bookings: [],
+  picks: [{ id: "f", offer: flight(), memberIds: ["ana"], reason: "r", notes: {} }, { id: "h", offer: hotel(), memberIds: ["ana"], reason: "r", notes: {} }], ideas: [], covers: [], bookings: [],
   ...overrides,
 });
 
-function setup(options: { plan?: PlanViewRaw; save?: TravellerService["save"]; none?: boolean; storeDown?: boolean } = {}) {
+function setup(options: { plan?: PlanViewRaw; save?: TravellerService["save"]; none?: boolean; storeDown?: boolean; covered?: string[] } = {}) {
   const saves: unknown[][] = [];
   const save: TravellerService["save"] = options.save ?? (async (...args) => (saves.push(args), ok(undefined)));
   const deps: TravellerActionDeps = {
     travellers: options.none ? null : { save },
     views: { load: async () => (options.storeDown ? err({ code: "unavailable" as const, message: "db" }) : ok(options.plan ?? plan())) },
+    holds: { confirmCovered: async (_planId, memberId) => (options.covered?.push(memberId), ok({ status: "placed" as const })) },
   };
   return { deps, saves };
 }
@@ -84,5 +85,29 @@ describe("runSaveTravellerDetails", () => {
     const down: TravellerService["save"] = async () => err({ kind: "unavailable" });
     expect(await runSaveTravellerDetails(setup({ save: down }).deps, ana, PLAN_ID, FORM)).toEqual(SAVE_FAILED);
     expect(await runSaveTravellerDetails(setup({ storeDown: true }).deps, ana, PLAN_ID, FORM)).toEqual(SAVE_FAILED);
+  });
+});
+
+describe("someone whose whole share a friend covers", () => {
+  const coveredPlan = (overrides: Partial<PlanViewRaw["members"][number]> = {}, status: PlanStatus = "approving") =>
+    plan({ status, members: [{ id: "ana", name: "Ana", currency: "USD", planAgreement: "agreed", approval: "approved", approvedMinor: 0, chargedMinor: null, holdPlaced: false, ...overrides }] });
+
+  it("is marked ready once their details are saved, since there is no card to wait for", async () => {
+    const covered: string[] = [];
+    expect(await runSaveTravellerDetails(setup({ plan: coveredPlan(), covered }).deps, ana, PLAN_ID, FORM)).toEqual({ ok: true });
+    expect(covered).toEqual(["ana"]);
+  });
+
+  it("is not marked ready when they pay by card, whose hold marks them ready", async () => {
+    const covered: string[] = [];
+    await runSaveTravellerDetails(setup({ plan: coveredPlan({ approvedMinor: 100 }), covered }).deps, ana, PLAN_ID, FORM);
+    expect(covered).toEqual([]);
+  });
+
+  it("is not marked ready when their details failed to save", async () => {
+    const covered: string[] = [];
+    const save: TravellerService["save"] = async () => err({ kind: "unavailable", message: "db" });
+    await runSaveTravellerDetails(setup({ plan: coveredPlan(), covered, save }).deps, ana, PLAN_ID, FORM);
+    expect(covered).toEqual([]);
   });
 });

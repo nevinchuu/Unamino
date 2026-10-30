@@ -8,7 +8,7 @@ export interface MemberSnapshot {
   /** The price the member saw when they agreed. A later rise is measured against this. Null until they agree. */
   readonly agreedShareMinor: number | null;
   readonly approval: ApprovalStatus;
-  /** The cap: the most this member agreed to pay, and the amount held on their card. */
+  /** The cap: the most this member agreed to pay, and the amount held on their card. Zero when a friend covers their whole share. */
   readonly approvedMinor: number | null;
   /** What the member owes at today's prices. At booking this is charged, and it never exceeds the cap. */
   readonly currentShareMinor: number | null;
@@ -35,6 +35,8 @@ export type PlanEvent =
   | { readonly type: "plan_declined"; readonly at: Date; readonly memberId: string }
   /** The flights, hotels or activities changed. Everyone looks again, and anything they approved is undone. */
   | { readonly type: "picks_changed"; readonly at: Date }
+  /** A friend started or stopped covering part of someone's share. The same reset as new picks, because the amounts changed. */
+  | { readonly type: "covers_changed"; readonly at: Date }
   | {
       readonly type: "member_approved";
       readonly at: Date;

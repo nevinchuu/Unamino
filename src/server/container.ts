@@ -14,6 +14,7 @@ import { PaymentEffectRunner } from "@/domain/payments/payment-effects";
 import type { PaymentsMode } from "@/domain/payments/types";
 import { ChatEffectRunner } from "@/domain/plan/chat-effects";
 import { CompositeEffectRunner, type EffectRunner } from "@/domain/plan/effects";
+import { CoverService } from "@/domain/plan/cover-service";
 import { PlanService } from "@/domain/plan/service";
 import { SimulatedBookingRunner } from "@/domain/plan/simulated-booking";
 import { SimulatedHoldRunner } from "@/domain/plan/simulated-holds";
@@ -29,6 +30,7 @@ import { PostgresEffectRecorder } from "@/infrastructure/db/postgres-effect-reco
 import { PostgresGroupRepository } from "@/infrastructure/db/postgres-group-repository";
 import { PostgresHoldStore } from "@/infrastructure/db/postgres-hold-store";
 import { PostgresMessageRepository } from "@/infrastructure/db/postgres-message-repository";
+import { PostgresCoverStore } from "@/infrastructure/db/postgres-cover-store";
 import { PostgresPlanDetailsStore } from "@/infrastructure/db/postgres-plan-details-store";
 import { PostgresPlanRepository } from "@/infrastructure/db/postgres-plan-repository";
 import { PostgresPlanStatusReader } from "@/infrastructure/db/postgres-plan-status-reader";
@@ -77,6 +79,9 @@ export interface Container {
   /** What the trips list reads. */
   readonly trips: TripsDeps;
   readonly plans: PlanService;
+  /** A friend paying some or all of another member's share. */
+  readonly covers: CoverService;
+  /** Leaving, removing someone, handing on the admin role and deleting a group. */
   readonly planStatus: PlanStatusReader;
   /** What the plan screen reads. */
   readonly views: PlanViewStore;
@@ -173,6 +178,7 @@ function build(): Container {
   if (travellers) runners.push(new TravellerCleanupRunner(travellers));
   const effects = new CompositeEffectRunner(runners);
   const planService = new PlanService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), source: offers, effects });
+  const covers = new CoverService({ plans: planRepository, details: new PostgresPlanDetailsStore(db), covers: new PostgresCoverStore(db), effects, clock: agent.clock });
   // Both of these pass on what the last hold sets in motion (booking), so they need the whole set, themselves included.
   if (mode === "demo") runners.push(new SimulatedHoldRunner(planRepository, () => effects, agent.clock));
   if (bookingSimulation.value) runners.push(new SimulatedBookingRunner(planRepository, () => effects, agent.clock));
@@ -237,6 +243,7 @@ function build(): Container {
     chat: { groups, messages, runs: agent.runs, plans: agent.plans, viewerCards, reads, clock: agent.clock },
     trips: { groups, messages, plans: agent.plans, viewerCards, reads },
     plans: planService,
+    covers,
     planStatus: new PostgresPlanStatusReader(db),
     views,
     payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, webhook },

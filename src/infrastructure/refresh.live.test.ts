@@ -63,6 +63,7 @@ describe.skipIf(!LIVE)("renewing a plan against the real liteAPI sandbox", () =>
       baseCurrency: "USD",
       fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} },
       offersCheckedAt: null,
+      covers: [],
       members: everyone.map((id) => ({ id, currency: "USD" })),
       picks: [
         { id: "pick-hotel", offer: hotel, searchId: "s-hotel", memberIds: everyone },

@@ -23,6 +23,8 @@ interface CardSheetProps {
   readonly onPlaced: () => void;
   /** True while the person's traveller details are still to be given. They come first, and the card after. */
   readonly detailsNeeded: boolean;
+  /** False when a friend covers the person's whole share: only the details are asked for, and there is no card. */
+  readonly cardRequired: boolean;
   readonly passportRequired: boolean;
   /** Called once the details are saved, so the screen can ask where things stand and move on to the card. */
   readonly onDetailsSaved: () => void;
@@ -36,7 +38,7 @@ const APPEARANCE = {
 } as const;
 
 /** The card form for one person's hold, in a sheet over the plan. The card number goes straight to Stripe's own fields. */
-export function CardSheet({ open, onOpenChange, groupId, planId, amountText, publishableKey, onPlaced, detailsNeeded, passportRequired, onDetailsSaved }: CardSheetProps) {
+export function CardSheet({ open, onOpenChange, groupId, planId, amountText, publishableKey, onPlaced, detailsNeeded, cardRequired, passportRequired, onDetailsSaved }: CardSheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -47,7 +49,7 @@ export function CardSheet({ open, onOpenChange, groupId, planId, amountText, pub
               <Dialog.Title className="text-lg font-semibold">{detailsNeeded ? "Your traveller details" : "Add your card"}</Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                 {detailsNeeded
-                  ? "The airline and the hotel need these to book your place. Then you add your card."
+                  ? `The airline and the hotel need these to book your place.${cardRequired ? " Then you add your card." : " A friend covers your share, so there is no card to add."}`
                   : `We hold ${amountText} on your card. It is not a charge. You are only charged once everyone is in and the trip is booked, and the hold is let go if the plan ends.`}
               </Dialog.Description>
             </div>
@@ -58,7 +60,7 @@ export function CardSheet({ open, onOpenChange, groupId, planId, amountText, pub
 
           {/* The card form is only mounted once the details are in and the sheet is open, so the hold is made when it is asked for and not before. */}
           {open && detailsNeeded ? <TravellerForm groupId={groupId} planId={planId} passportRequired={passportRequired} onSaved={onDetailsSaved} /> : null}
-          {open && !detailsNeeded ? <Body groupId={groupId} planId={planId} amountText={amountText} publishableKey={publishableKey} onPlaced={onPlaced} onClose={() => onOpenChange(false)} /> : null}
+          {open && !detailsNeeded && cardRequired ? <Body groupId={groupId} planId={planId} amountText={amountText} publishableKey={publishableKey} onPlaced={onPlaced} onClose={() => onOpenChange(false)} /> : null}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
