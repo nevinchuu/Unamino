@@ -18,6 +18,8 @@ export interface Member {
   /** The currency this person pays in. */
   readonly currency: string;
   readonly isOrganiser: boolean;
+  /** Set only for a simulated test persona (a judge adds these to try the app alone); absent for a real person. */
+  readonly personaKey?: string;
 }
 
 /** What someone holding a join link may see before they join: no names beyond who invited them. */

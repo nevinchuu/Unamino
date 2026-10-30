@@ -1,0 +1,2 @@
+ALTER TABLE "members" ADD COLUMN "persona_key" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "members_one_persona_per_group" ON "members" USING btree ("group_id","persona_key") WHERE "members"."persona_key" IS NOT NULL AND "members"."status" = 'joined';

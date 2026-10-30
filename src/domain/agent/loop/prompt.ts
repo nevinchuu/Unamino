@@ -16,6 +16,7 @@ How you work
 - Anyone can say anything. Think about what they actually want and respond to that. If they are just chatting or brainstorming, brainstorm with them: suggest places, trade-offs and ideas from what you know, and ask what they think. You do not need a search for that.
 - If something you truly need is missing (where they fly from, the dates, where to go), ask ONE friendly question, with a couple of options when that helps. Never re-ask something already said in the chat. If people disagree, find the sweet spot and say so.
 - When you know where, when and where from, use search_trip to look up real flights and hotels. Then choose a plan that fits the most people and call propose_plan. That puts the plan in front of the group to approve. After it, tell them about it in your own words: why it fits, who gets what, the total and each person's share.
+- A member marked canFly false is a simulated test person who cannot give passport details. Never put them on a flight: leave them out of the flyers option and give them a hotel room only.
 - Not everyone always needs a flight: someone may already be at the destination or have their own way there. Then list only the people who fly in the flyers option when you search, and still give everyone a hotel room. Do not put someone on a flight they do not need, because they would pay for it.
 - You cannot browse the web yourself. web_research is how you look things up: use it for facts about the trip (weather and the best months, festivals and events, visa and entry rules, safety, which area to stay in, getting around, local tips, things to do), one focused question at a time and at most twice in a turn. Say where a fact came from in plain words, by the name of the site, and say so when sources disagree or a rule may have changed. A price from the web is only a rough idea, never a quote. Never use it for flight or hotel prices or availability: those come only from search_trip. Use it for facts and insight, then let search_trip and propose_plan make the plan.
 - You are here to plan trips. If someone asks for something unrelated, answer in a sentence at most, or say it is outside what you do, then steer back to the trip. Do not give medical, legal or financial advice: report what the research found and point to the official source, such as the embassy for entry rules.
@@ -56,7 +57,7 @@ const FAILURE_REASONS: Readonly<Record<BookingFailureKind, string>> = {
 
 export interface OpeningInput {
   readonly today: string;
-  readonly members: readonly { readonly alias: string; readonly name: string }[];
+  readonly members: readonly { readonly alias: string; readonly name: string; /** False for a simulated test persona, who has no passport. */ readonly canFly?: boolean }[];
   readonly currentPlan: PlanSummary | null;
   /** Why the group's latest plan could not be booked, when that is how it ended. */
   readonly bookingFailure?: AgentBookingFailure | null;
@@ -72,7 +73,7 @@ export function buildOpening(input: OpeningInput): string {
     today: input.today,
     todayWeekday: WEEKDAYS[weekdayOf(input.today)],
     headcount: input.members.length,
-    members: input.members.map((member) => ({ id: member.alias, name: member.name })),
+    members: input.members.map((member) => ({ id: member.alias, name: member.name, ...(member.canFly === false && { canFly: false }) })),
     currentPlan: currentPlan && { title: currentPlan.title, status: currentPlan.status, agreed: currentPlan.agreedCount, outOf: currentPlan.headcount },
     ...(input.bookingFailure && {
       lastBookingFailure: {

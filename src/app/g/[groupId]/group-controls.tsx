@@ -14,6 +14,8 @@ export interface Participant {
   readonly name: string;
   readonly isMe: boolean;
   readonly isAdmin: boolean;
+  /** A simulated friend a judge added. It has no access link to send. */
+  readonly isTestPersona: boolean;
 }
 
 /** The people in the group. The admin gets a menu on everyone else, to hand over the role or remove them. */
@@ -27,6 +29,7 @@ export function ParticipantList({ groupId, people, viewerIsAdmin }: { readonly g
             {person.name}
             {person.isMe ? <span className="font-normal text-muted-foreground"> (You)</span> : null}
           </span>
+          {person.isTestPersona ? <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">Test persona</span> : null}
           {person.isAdmin ? <span className="rounded-full border border-success px-2 py-0.5 text-xs font-medium text-success">Group admin</span> : null}
           {viewerIsAdmin && !person.isMe ? <ParticipantMenu groupId={groupId} person={person} /> : null}
         </li>
@@ -55,28 +58,32 @@ function ParticipantMenu({ groupId, person }: { readonly groupId: string; readon
           <Dialog.Popup className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] rounded-t-2xl bg-background px-3 pt-4 pb-6 shadow-xl outline-none">
             <Dialog.Title className="px-3 pb-2 text-base font-semibold">{person.name}</Dialog.Title>
             <Dialog.Description className="sr-only">What the group admin can do for {person.name}</Dialog.Description>
-            <button
-              type="button"
-              onClick={() => {
-                setMenu(false);
-                setConfirming("admin");
-              }}
-              className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left font-medium hover:bg-muted"
-            >
-              <UserCog className="size-5 text-muted-foreground" />
-              Make group admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMenu(false);
-                setConfirming("link");
-              }}
-              className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left font-medium hover:bg-muted"
-            >
-              <KeyRound className="size-5 text-muted-foreground" />
-              Send new access link
-            </button>
+            {person.isTestPersona ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenu(false);
+                  setConfirming("admin");
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left font-medium hover:bg-muted"
+              >
+                <UserCog className="size-5 text-muted-foreground" />
+                Make group admin
+              </button>
+            )}
+            {person.isTestPersona ? null : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenu(false);
+                  setConfirming("link");
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left font-medium hover:bg-muted"
+              >
+                <KeyRound className="size-5 text-muted-foreground" />
+                Send new access link
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

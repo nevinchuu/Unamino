@@ -31,6 +31,7 @@ import { PostgresEffectLog } from "@/infrastructure/db/postgres-effect-log";
 import { PostgresEffectRecorder } from "@/infrastructure/db/postgres-effect-recorder";
 import { PostgresBookingFailureStore } from "@/infrastructure/db/postgres-booking-failure-store";
 import { PostgresGroupAdminStore } from "@/infrastructure/db/postgres-group-admin-store";
+import { PostgresPersonaStore } from "@/infrastructure/db/postgres-persona-store";
 import { PostgresRetentionStore } from "@/infrastructure/db/postgres-retention-store";
 import { PostgresGroupRepository } from "@/infrastructure/db/postgres-group-repository";
 import { PostgresHoldStore } from "@/infrastructure/db/postgres-hold-store";
@@ -59,7 +60,9 @@ import { MuseResearcher } from "@/infrastructure/muse/muse-researcher";
 import { traceSinkFromEnv } from "@/infrastructure/trace/file-trace";
 import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
 import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
+import { StripeTestCard } from "@/infrastructure/stripe/test-card";
 import { DeferredBookingRunner } from "./deferred-runner";
+import { buildPersonas, type Personas } from "./personas";
 import { ViewerCards } from "./viewer-card";
 import type { GroupCounter } from "./group-rate";
 import type { ChatDeps } from "./chat";
@@ -88,6 +91,8 @@ export interface Container {
   readonly covers: CoverService;
   /** Leaving, removing someone, handing on the admin role and deleting a group. */
   readonly membership: MembershipService;
+  /** Simulated test personas a judge can add to a group. Null when switched off with PERSONAS=off. */
+  readonly personas: Personas | null;
   /** The scheduled deletion of old groups and old dispute records. */
   readonly retention: RetentionService;
   readonly planStatus: PlanStatusReader;
@@ -199,9 +204,12 @@ function build(): Container {
   let retrier: EffectRetrier | null = null;
   let bookingSweeper: BookingSweeper | null = null;
   let webhook: Container["payments"]["webhook"] = null;
+  let testCard: StripeTestCard | null = null;
   if (mode === "stripe" && env.value.stripeSecretKey) {
     const stripe = createStripeClient(env.value.stripeSecretKey);
     const provider = new StripePaymentProvider(stripe);
+    // Only a test-mode key gives a test card, so a persona can never put a hold on real money.
+    testCard = StripeTestCard.forKey(env.value.stripeSecretKey, stripe);
     holds = new HoldService({ provider, store: holdStore, plans: planRepository, effects: () => effects, clock: agent.clock });
     const log = new PostgresEffectLog(db);
     // The trip is already booked when the charges are taken, so a charge that fails for a moment is tried again right away.
@@ -247,6 +255,8 @@ function build(): Container {
     webhook = { secret: env.value.stripeWebhookSecret, verify: (body, signature, secret) => stripe.webhooks.constructEvent(body, signature, secret) as unknown as StripeEventLike };
   }
 
+  const personas = env.value.personas ? buildPersonas({ groups, store: new PostgresPersonaStore(db), agent, plans: planService, views, travellers, holds, payments: mode, testCard }) : null;
+
   return {
     groups,
     groupCounter: groups,
@@ -257,6 +267,7 @@ function build(): Container {
     plans: planService,
     covers,
     membership,
+    personas,
     retention: new RetentionService(new PostgresRetentionStore(db)),
     planStatus: new PostgresPlanStatusReader(db),
     views,

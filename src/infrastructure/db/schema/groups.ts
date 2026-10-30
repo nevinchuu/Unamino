@@ -33,6 +33,8 @@ export const members = pgTable(
      * Only the hash is stored, so a leaked table cannot be used to sign in. (Named for the earlier per-person invite idea.)
      */
     inviteTokenHash: text("invite_token_hash").notNull().unique(),
+    /** Set for a simulated test persona, which a judge adds from the chat to try the app alone. Null for a real person. */
+    personaKey: text("persona_key"),
     /** The `seq` of the newest message this person has had on screen. A message after it is unread. */
     lastReadSeq: bigint("last_read_seq", { mode: "number" }).notNull().default(0),
     joinedAt: instant("joined_at"),
@@ -42,6 +44,7 @@ export const members = pgTable(
   (table) => [
     index("members_group_idx").on(table.groupId),
     uniqueIndex("members_one_organiser_per_group").on(table.groupId).where(sql`${table.isOrganiser}`),
+    uniqueIndex("members_one_persona_per_group").on(table.groupId, table.personaKey).where(sql`${table.personaKey} IS NOT NULL AND ${table.status} = 'joined'`),
     check("members_joined_has_time", sql`${table.status} <> 'joined' OR ${table.joinedAt} IS NOT NULL`),
     check("members_left_has_time", sql`${table.status} <> 'left' OR ${table.leftAt} IS NOT NULL`),
   ],

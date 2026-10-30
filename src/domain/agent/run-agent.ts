@@ -166,7 +166,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
   const end = await runConversation({
     model: deps.makeChatModel(meter),
     system: SYSTEM_PROMPT,
-    opening: buildOpening({ today: now.toISOString().slice(0, 10), members: roster.map((entry) => ({ alias: entry.alias, name: entry.member.displayName })), currentPlan, bookingFailure, chat }),
+    opening: buildOpening({ today: now.toISOString().slice(0, 10), members: roster.map((entry) => ({ alias: entry.alias, name: entry.member.displayName, canFly: entry.member.personaKey === undefined })), currentPlan, bookingFailure, chat }),
     tools: toolSpecsFor(researcher !== null),
     runTool: (name, argumentsJson) => runTool(env, name, argumentsJson),
     say,

@@ -21,7 +21,14 @@ class Rollback extends Error {
 }
 
 const toGroup = (row: GroupRow): Group => ({ id: row.id, name: row.name, baseCurrency: row.baseCurrency });
-const toMember = (row: MemberRow): Member => ({ id: row.id, groupId: row.groupId, displayName: row.displayName, currency: row.currency, isOrganiser: row.isOrganiser });
+export const toMember = (row: MemberRow): Member => ({
+  id: row.id,
+  groupId: row.groupId,
+  displayName: row.displayName,
+  currency: row.currency,
+  isOrganiser: row.isOrganiser,
+  ...(row.personaKey !== null && { personaKey: row.personaKey }),
+});
 
 /** Returns the reason a person's details are not acceptable, or null. */
 function personProblem(person: { readonly displayName: string; readonly currency: string }): string | null {

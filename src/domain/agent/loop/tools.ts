@@ -145,13 +145,19 @@ const hotelView = (id: string, offer: HotelOffer) => ({
 const asJson = (value: unknown): string => JSON.stringify(value);
 const problem = (message: string): string => asJson({ error: message });
 
-/** The people the flights are for: everyone, or the ones the model listed. */
+/**
+ * The people the flights are for: everyone, or the ones the model listed. A simulated test persona has no passport to give,
+ * so it is never one of them: left out by default, and refused if listed, whatever the model decides.
+ */
 function resolveFlyers(listed: readonly string[] | undefined, roster: readonly RosterEntry[]): Result<readonly RosterEntry[], string> {
-  if (listed === undefined) return ok(roster);
+  if (listed === undefined) return ok(roster.filter((entry) => entry.member.personaKey === undefined));
   const wanted = new Set(listed);
   const unknown = [...wanted].filter((alias) => !roster.some((entry) => entry.alias === alias));
   if (unknown.length > 0) return err(`These are not people in the group: ${unknown.join(", ")}. Use m1, m2, ... from the group list.`);
-  return ok(roster.filter((entry) => wanted.has(entry.alias)));
+  const flying = roster.filter((entry) => wanted.has(entry.alias));
+  const noPassport = flying.filter((entry) => entry.member.personaKey !== undefined);
+  if (noPassport.length > 0) return err(`${noPassport.map((entry) => entry.alias).join(", ")} cannot fly: they are simulated test people with no passport. Leave them out of flyers and give them a hotel room only.`);
+  return ok(flying);
 }
 
 async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> {

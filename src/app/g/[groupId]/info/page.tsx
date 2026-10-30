@@ -51,7 +51,7 @@ async function Group({ params }: { readonly params: PageProps<"/g/[groupId]/info
           <ParticipantList
             groupId={groupId}
             viewerIsAdmin={me.isOrganiser}
-            people={people.map((person) => ({ id: person.id, name: person.displayName, isMe: person.id === me.id, isAdmin: person.isOrganiser }))}
+            people={people.map((person) => ({ id: person.id, name: person.displayName, isMe: person.id === me.id, isAdmin: person.isOrganiser, isTestPersona: person.personaKey !== undefined }))}
           />
         </section>
 

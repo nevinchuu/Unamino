@@ -14,6 +14,7 @@ import { sendMessage } from "./actions";
 import { ActionSheet } from "./action-sheet";
 import { Composer } from "./composer";
 import { MessageRow, type RowModel } from "./message-row";
+import { PersonasSheet } from "./personas-sheet";
 import { PlanStrip } from "./plan-strip";
 import { SaveLinkPrompt } from "./save-link-prompt";
 
@@ -258,6 +259,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
           </div>
           <AvatarStack people={members.map((name) => ({ name }))} max={3} size={28} />
         </Link>
+        <PersonasSheet groupId={groupId} />
       </header>
       <p role="status" aria-live="polite" className="sr-only">
         {announcement}

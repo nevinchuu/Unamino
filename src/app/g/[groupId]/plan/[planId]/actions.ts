@@ -10,9 +10,17 @@ import { runPlanAction, type PlanActionName, type PlanActionResult } from "@/ser
 import { runRequestChanges, type RequestChangesResult } from "@/server/request-changes";
 import { currentMember } from "@/server/session";
 
+/** Test personas look at where the plan stands after anything a person does to it. */
+function kickPersonas(groupId: string): void {
+  const { personas } = getContainer();
+  if (personas) after(() => personas.director.kick(groupId));
+}
+
 async function act(groupId: string, planId: string, action: PlanActionName, seenMinor?: number): Promise<PlanActionResult> {
   const { plans, views, messages } = getContainer();
-  return runPlanAction({ plans, views, messages, clock: () => new Date() }, await currentMember(groupId), { planId, action, seenMinor });
+  const result = await runPlanAction({ plans, views, messages, clock: () => new Date() }, await currentMember(groupId), { planId, action, seenMinor });
+  if (result.ok) kickPersonas(groupId);
+  return result;
 }
 
 /** Step 1: agree to the plan. `seenMinor` is the price the person was shown. */
@@ -44,7 +52,9 @@ export async function openCardForm(groupId: string, planId: string): Promise<Car
 /** After the card was confirmed in the browser: asks Stripe whether the hold is really there, and records it if so. */
 export async function confirmCardHold(groupId: string, planId: string): Promise<ConfirmHoldResult> {
   const { payments, views } = getContainer();
-  return runConfirmHold({ holds: payments.holds, views }, await currentMember(groupId), planId);
+  const result = await runConfirmHold({ holds: payments.holds, views }, await currentMember(groupId), planId);
+  if (result.ok) kickPersonas(groupId);
+  return result;
 }
 
 /**
@@ -53,13 +63,17 @@ export async function confirmCardHold(groupId: string, planId: string): Promise<
  */
 export async function coverShare(groupId: string, planId: string, beneficiaryId: string, change: CoverChange): Promise<CoverActionResult> {
   const { covers, views, messages } = getContainer();
-  return runCoverAction({ covers, views, messages }, await currentMember(groupId), { planId, beneficiaryId, change });
+  const result = await runCoverAction({ covers, views, messages }, await currentMember(groupId), { planId, beneficiaryId, change });
+  if (result.ok) kickPersonas(groupId);
+  return result;
 }
 
 /** Keeps the person's traveller details, locked. The airline and the hotel need them. Only for the person they belong to. */
 export async function saveTravellerDetails(groupId: string, planId: string, input: unknown): Promise<SaveDetailsResult> {
   const { travellers, views, payments } = getContainer();
-  return runSaveTravellerDetails({ travellers, views, holds: payments.holds }, await currentMember(groupId), planId, input);
+  const result = await runSaveTravellerDetails({ travellers, views, holds: payments.holds }, await currentMember(groupId), planId, input);
+  if (result.ok) kickPersonas(groupId);
+  return result;
 }
 
 /**
@@ -67,10 +81,15 @@ export async function saveTravellerDetails(groupId: string, planId: string, inpu
  * and Trippy answers there; the run is carried out after the person has their answer, because it takes about a minute.
  */
 export async function requestPlanChanges(groupId: string, planId: string, reason: string, note: string): Promise<RequestChangesResult> {
-  const { views, messages, agent, payments } = getContainer();
+  const { views, messages, agent, payments, personas } = getContainer();
   const sent = await runRequestChanges({ views, send: { messages, agent }, payments: payments.mode }, await currentMember(groupId), { planId, reason, note });
   if (!sent.ok) return { ok: false, error: sent.error };
   const { run } = sent.value;
-  if (run) after(() => runAgent(agent, run));
+  if (run || personas) {
+    after(async () => {
+      if (run) await runAgent(agent, run);
+      await personas?.director.kick(groupId);
+    });
+  }
   return { ok: true, asked: sent.value.asked };
 }

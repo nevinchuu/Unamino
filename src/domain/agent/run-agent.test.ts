@@ -507,6 +507,38 @@ describe("someone who does not need a flight", () => {
     expect(world.source.queries).toHaveLength(0);
   });
 
+  describe("a simulated test persona, who has no passport", () => {
+    const withPersona = () => buildWorld({}, ["nevin", "ana", "ben", "jia"].map((id) => (id === "jia" ? { ...member(id), personaKey: "maya" } : member(id))));
+
+    it("is left off the flights when the model does not say who flies", async () => {
+      const world = withPersona();
+      chat(world);
+      world.source.offers = [flight3, triple, single];
+      world.script(searchWith(), says("ok"));
+      await callAgent(world);
+      expect(world.source.queries.find((q) => q.kind === "flight")).toMatchObject({ guests: 3 });
+      expect(toolMessages(world).at(-1)).toContain("noFlightNeeded");
+    });
+
+    it("cannot be listed as a flyer, and the model is told why so it can fix it", async () => {
+      const world = withPersona();
+      chat(world);
+      world.script(searchWith(["m1", "m4"]), says("ok"));
+      await callAgent(world);
+      expect(toolMessages(world).at(-1)).toContain("no passport");
+      expect(world.source.queries).toHaveLength(0);
+    });
+
+    it("is marked as unable to fly in what the model is shown first", async () => {
+      const world = withPersona();
+      chat(world);
+      world.script(says("hi"));
+      await callAgent(world);
+      const opening = world.model().requests[0].messages[0];
+      expect(opening.role === "user" && opening.content).toContain('"canFly":false');
+    });
+  });
+
   it("treats a change in who flies as a new plan, not the same one", async () => {
     const world = buildWorld();
     chat(world);
