@@ -14,7 +14,7 @@ import { buildOpening, SYSTEM_PROMPT } from "./loop/prompt";
 import { newSession, type RosterEntry, type ToolEnv } from "./loop/session";
 import type { WebResearcher } from "./loop/research";
 import { runTool, toolSpecsFor } from "./loop/tools";
-import type { AgentRun, AgentRunRepository, BriefRepository, ConstraintRepository, FxRates, PlanStore, SearchStore, StartedRun, StoreError, UsageMeter, UsageTotals } from "./ports";
+import type { AgentRun, AgentRunRepository, BookingFailureReader, BriefRepository, ConstraintRepository, FxRates, PlanStore, SearchStore, StartedRun, StoreError, UsageMeter, UsageTotals } from "./ports";
 import type { TraceSink } from "./trace";
 
 const CHAT_WINDOW = 200;
@@ -54,6 +54,8 @@ export interface AgentDeps {
   readonly trace?: TraceSink;
   readonly clock: () => Date;
   readonly staleRunMs?: number;
+  /** Where Trippy learns why a booking failed, and which listings not to offer again. Without it, neither is known. */
+  readonly failures?: BookingFailureReader;
   /** How failed searches are retried. Tests turn the pause off. */
   readonly searchOptions?: SearchOptions;
 }
@@ -138,6 +140,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
     .filter((message) => message.kind === "human" || message.kind === "agent")
     .map((message) => ({ from: message.kind === "agent" ? AGENT_DISPLAY_NAME : (nameOf.get(message.memberId ?? "") ?? "Someone who left"), text: message.body }));
   const currentPlan = await deps.plans.latest(run.groupId);
+  const bookingFailure = await deps.failures?.latest(run.groupId).catch(() => null);
   note("run_started", { triggerMessageId: run.triggerMessageId, today: now.toISOString().slice(0, 10), headcount: people.length, chat, currentPlan: currentPlan && { status: currentPlan.status, agreed: currentPlan.agreedCount } });
 
   const planner = new AliasingPlanner(deps.makePlanner(meter), people);
@@ -163,7 +166,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
   const end = await runConversation({
     model: deps.makeChatModel(meter),
     system: SYSTEM_PROMPT,
-    opening: buildOpening({ today: now.toISOString().slice(0, 10), members: roster.map((entry) => ({ alias: entry.alias, name: entry.member.displayName })), currentPlan, chat }),
+    opening: buildOpening({ today: now.toISOString().slice(0, 10), members: roster.map((entry) => ({ alias: entry.alias, name: entry.member.displayName })), currentPlan, bookingFailure, chat }),
     tools: toolSpecsFor(researcher !== null),
     runTool: (name, argumentsJson) => runTool(env, name, argumentsJson),
     say,

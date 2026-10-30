@@ -11,6 +11,9 @@ import { proposePlan } from "./propose-plan";
 import { siteOf } from "./research";
 import { members, type RosterEntry, type ToolEnv } from "./session";
 
+/** How long a hotel or flight that could not be booked is left out of this group's searches. */
+export const BLOCK_FAILED_LISTING_MS = 24 * 60 * 60_000;
+
 const iata = z.string().regex(/^[A-Z]{3}$/, "a 3-letter airport code in capitals");
 const searchArgs = z.strictObject({
   destinationCity: z.string().trim().min(1).max(80),
@@ -173,7 +176,11 @@ async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> 
   const searched = await searchForTrip(env.deps.offers, assessed.trip, everyone.length, env.deps.searchOptions, flying.length);
   if (!searched.ok) return problem("The flight and hotel search is not answering right now. Tell the group and suggest trying again in a moment.");
 
-  const kept = prefilterOffers({ offers: searched.value.offers, constraints: await env.constraints(), now: env.now, limits: SEARCH_LIMITS }).offers;
+  const prefiltered = prefilterOffers({ offers: searched.value.offers, constraints: await env.constraints(), now: env.now, limits: SEARCH_LIMITS }).offers;
+  // A hotel or flight that could not be booked a moment ago would fail the same way, so it is never shown again for a while.
+  const blocked = await env.deps.failures?.blockedListingIds(env.group.id, new Date(env.now.getTime() - BLOCK_FAILED_LISTING_MS)).catch(() => new Set<string>());
+  const kept = blocked && blocked.size > 0 ? prefiltered.filter((offer) => !blocked.has(offer.listingId)) : prefiltered;
+  const leftOut = prefiltered.length - kept.length;
   const flights = kept.filter((offer): offer is FlightOffer => offer.kind === "flight");
   const hotels = kept.filter((offer): offer is HotelOffer => offer.kind === "hotel");
 
@@ -189,7 +196,8 @@ async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> 
   if (flights.length === 0 && flying.length > 0) notes.push("No flights were found for these dates and group size.");
   if (hotels.length === 0) notes.push("No hotels were found for these dates and group size.");
   if (searched.value.failures.length > 0) notes.push("Part of the search did not answer, so some options may be missing.");
-  env.note("search_done", { trip: assessed.trip, offersFound: searched.value.offers.length, offersShown: kept.length, failures: searched.value.failures.length });
+  if (leftOut > 0) notes.push(`${leftOut} option${leftOut === 1 ? " was" : "s were"} left out because ${leftOut === 1 ? "it" : "they"} could not be booked for this group a moment ago.`);
+  env.note("search_done", { trip: assessed.trip, offersFound: searched.value.offers.length, offersShown: kept.length, leftOut, failures: searched.value.failures.length });
 
   return asJson({
     trip: assessed.trip,

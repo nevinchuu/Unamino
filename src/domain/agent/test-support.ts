@@ -15,7 +15,7 @@ import type { Research, ResearchError, WebResearcher } from "./loop/research";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { SearchRecord } from "@/domain/trip/search";
-import type { AgentActivity, AgentRun, AgentRunRepository, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanCardSummary, PlanStore, PlanSummary, RecentRuns, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
+import type { AgentActivity, AgentBookingFailure, AgentRun, AgentRunRepository, BookingFailureReader, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanCardSummary, PlanStore, PlanSummary, RecentRuns, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
 import { StaticFxRates } from "./static-fx";
 import type { AgentDeps } from "./run-agent";
 
@@ -335,6 +335,23 @@ export class FakePlans implements PlanStore, PlanRepository {
 }
 
 /** Finds offers by kind, whatever the query, from a list the test can change. */
+/** What Trippy is told about a failed booking, and which listings it may not offer again. */
+export class FakeFailures implements BookingFailureReader {
+  latestFailure: AgentBookingFailure | null = null;
+  blocked: ReadonlySet<string> = new Set();
+  broken = false;
+  readonly blockedAsked: { groupId: string; since: Date }[] = [];
+  async latest(): Promise<AgentBookingFailure | null> {
+    if (this.broken) throw new Error("db down");
+    return this.latestFailure;
+  }
+  async blockedListingIds(groupId: string, since: Date): Promise<ReadonlySet<string>> {
+    this.blockedAsked.push({ groupId, since });
+    if (this.broken) throw new Error("db down");
+    return this.blocked;
+  }
+}
+
 export class FakeOfferSource implements OfferSource {
   readonly queries: Parameters<OfferSource["search"]>[0][] = [];
   failWith: { code: "source_unavailable"; message: string } | null = null;
@@ -372,6 +389,7 @@ export interface World {
   readonly searches: FakeSearches;
   readonly plans: FakePlans;
   readonly source: FakeOfferSource;
+  readonly failures: FakeFailures;
   readonly planners: RecordingPlanner[];
   readonly planner: () => RecordingPlanner;
   /** What the model does on each turn of the next run. */
@@ -390,6 +408,7 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
   const searches = new FakeSearches();
   const plans = new FakePlans(briefs);
   const source = new FakeOfferSource();
+  const failures = new FakeFailures();
   const planners: RecordingPlanner[] = [];
   const models: ScriptedChatModel[] = [];
   const researcher = new FakeResearcher();
@@ -402,6 +421,7 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
     makeResearcher: () => researcher,
     clock: () => NOW,
     searchOptions: { retryDelayMs: 0 },
+    failures,
   };
-  return { deps, researcher, groups, messages, runs, briefs, constraints, searches, plans, source, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
+  return { deps, researcher, groups, messages, runs, briefs, constraints, searches, plans, source, failures, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
 }

@@ -704,3 +704,86 @@ function proposeFromEarlierSearch(request: ModelRequest): ReturnType<typeof call
   const searchResult = firstTool && firstTool.role === "tool" ? firstTool.content : "{}";
   return proposeFrom({ ...request, messages: [{ role: "tool", toolCallId: "x", content: searchResult }] });
 }
+
+describe("after a booking failed", () => {
+  const HOTEL_FAILURE = { reason: "price", part: { kind: "hotel", title: "Riverside Hotel - Close to the river, near the pier" }, undone: [{ kind: "flight", title: "SIN to BKK" }], retryable: false } as const;
+  const openingOf = (world: World) => {
+    const [first] = world.model().requests[0].messages;
+    return JSON.parse(first.role === "user" ? first.content : "{}") as { lastBookingFailure?: { failedPart: string | null; why: string; canTrySamePlanAgain: boolean; alsoCancelled: string[] } };
+  };
+
+  it("tells Trippy which part failed, why, and what was cancelled, in the opening message", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.failures.latestFailure = HOTEL_FAILURE;
+    world.script(says("hi"));
+    await callAgent(world, "ana", "@trippy can we try again?");
+    expect(openingOf(world).lastBookingFailure).toEqual({ failedPart: "hotel: Riverside Hotel", why: "its price went up above what the group agreed to", canTrySamePlanAgain: false, alsoCancelled: ["flight: SIN to BKK"] });
+  });
+
+  it("says the same plan may be tried again only when the supplier was merely unreachable", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.failures.latestFailure = { reason: "temporary", part: { kind: "flight", title: "SIN to BKK" }, undone: [], retryable: true };
+    world.script(says("hi"));
+    await callAgent(world);
+    expect(openingOf(world).lastBookingFailure).toMatchObject({ failedPart: "flight: SIN to BKK", canTrySamePlanAgain: true });
+  });
+
+  it("says nothing about a failure when there is none", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.script(says("hi"));
+    await callAgent(world);
+    expect(openingOf(world)).not.toHaveProperty("lastBookingFailure");
+  });
+
+  it("is told what to do about it: name the part, plan something different, never offer it again", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.script(says("hi"));
+    await callAgent(world);
+    const { system } = world.model().requests[0];
+    expect(system).toContain("lastBookingFailure");
+    expect(system).toContain("Never offer the failed hotel or flight again");
+  });
+
+  it("leaves a listing that failed to book out of the search, and says so, asking only about the last day", async () => {
+    const world = buildWorld();
+    chat(world);
+    const failed = BANGKOK_OFFERS.find((offer) => offer.id === "fx-htl-single");
+    if (!failed) throw new Error("fixture missing");
+    world.failures.blocked = new Set([failed.listingId]);
+    let seen: Record<string, unknown> = {};
+    world.script(search(), (request) => { seen = lastToolResult(request); return says("ok"); });
+    await callAgent(world);
+
+    // The blocked listing is the single room; the triple, which shares its name, is still offered.
+    const rooms = (seen.hotels as { roomIsFor: number }[]).map((hotel) => hotel.roomIsFor);
+    expect(failed).toMatchObject({ guests: 1 });
+    expect(rooms).not.toContain(1);
+    expect(rooms).toContain(3);
+    expect(seen.notes).toContainEqual(expect.stringMatching(/1 option was left out because it could not be booked/));
+    expect(world.failures.blockedAsked).toEqual([{ groupId: "g1", since: new Date(NOW.getTime() - 24 * 60 * 60_000) }]);
+  });
+
+  it("shows every option when nothing is blocked", async () => {
+    const world = buildWorld();
+    chat(world);
+    let seen: Record<string, unknown> = {};
+    world.script(search(), (request) => { seen = lastToolResult(request); return says("ok"); });
+    await callAgent(world);
+    expect(JSON.stringify(seen.notes)).not.toContain("left out");
+  });
+
+  it("plans as usual when the failure cannot be read", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.failures.broken = true;
+    let seen: Record<string, unknown> = {};
+    world.script(search(), (request) => { seen = lastToolResult(request); return says("ok"); });
+    await callAgent(world);
+    expect((seen.hotels as unknown[]).length).toBeGreaterThan(0);
+    expect(world.runs.finished[0].outcome).toMatchObject({ status: "done" });
+  });
+});

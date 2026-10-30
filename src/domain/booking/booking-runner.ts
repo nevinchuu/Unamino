@@ -5,8 +5,10 @@ import type { EffectError, EffectRunner } from "@/domain/plan/effects";
 import type { PlanRepository } from "@/domain/plan/repository";
 import type { PlanEffect } from "@/domain/plan/types";
 import type { TravellerService } from "@/domain/travellers/service";
-import { BOOKING_FAILED_LINES, type BookingFailureKind } from "./announce";
+import { bookingFailedLine } from "./announce";
+import { isRetryable, type BookingFailureKind, type BookingFailureRecord, type FailedPart, type UndonePart } from "./failure";
 import type {
+  BookingFailureStore,
   BookingTraveller,
   FlightSupplier,
   HoldReadiness,
@@ -35,17 +37,22 @@ export interface BookingRunnerDeps {
   readonly renew?: (planId: string) => Promise<void>;
   /** Tells the group something in the chat. A failure to tell does not change the booking. */
   readonly announce?: (planId: string, line: string) => Promise<void>;
+  /** Keeps why a booking failed. A failure to keep it does not change the booking. */
+  readonly failures?: Pick<BookingFailureStore, "save">;
 }
 
 /** Why a booking was given up on. For logs and the chat's fixed lines, never shown with supplier detail. */
 interface BookingFailure {
   readonly kind: BookingFailureKind;
   readonly message: string;
+  /** The hotel or flight that could not be booked, when one is to blame. */
+  readonly part?: FailedPart;
 }
 
-const fail = (kind: BookingFailureKind, message: string): Result<never, BookingFailure> => err({ kind, message });
-/** Which fixed line fits a supplier's refusal. */
-const kindOf = (error: SupplierError): BookingFailureKind => (error.code === "price_changed" ? "price" : error.code === "unavailable" ? "unavailable" : "other");
+const fail = (kind: BookingFailureKind, message: string, part?: FailedPart): Result<never, BookingFailure> => err({ kind, message, ...(part && { part }) });
+/** Which reason fits a supplier's refusal. */
+const kindOf = (error: SupplierError): BookingFailureKind =>
+  error.code === "price_changed" ? "price" : error.code === "unavailable" ? "unavailable" : error.code === "rejected" ? "rejected" : "temporary";
 const describe = (what: string, error: SupplierError): string => `${what}: ${error.code}, ${error.message}`;
 
 /**
@@ -93,13 +100,37 @@ export class SupplierBookingRunner implements EffectRunner {
    * a plan that has since been booked for real is never touched.
    */
   async settleStuck(planId: string): Promise<Result<void, EffectError>> {
+    const undone = await this.undoneParts(planId);
     const failed = await applyPlanEvent(this.deps.plans, planId, { type: "booking_failed", at: this.deps.clock() });
     if (!failed.ok) return failed.error.kind === "transition" ? ok(undefined) : err({ message: "A stuck booking could not be ended" });
 
-    await this.tell(planId, BOOKING_FAILED_LINES.stuck);
+    await this.report(planId, { kind: "stuck", message: "Booking took too long" }, undone);
     const released = await this.deps.onward().run(planId, failed.value.version, failed.value.effects);
     const cancelled = await this.cancelBookings(planId);
     return cancelled.ok ? released : cancelled;
+  }
+
+  /** The hotels and flights that were booked and are about to be cancelled, by name. Empty if they cannot be read. */
+  private async undoneParts(planId: string): Promise<readonly UndonePart[]> {
+    try {
+      const [listed, details] = await Promise.all([this.deps.bookings.list(planId), this.deps.details.load(planId)]);
+      if (!listed.ok) return [];
+      const titles = new Map(details.ok ? details.value.picks.map((pick) => [pick.id, pick.offer.title] as const) : []);
+      return listed.value.filter((booking) => booking.status !== "cancelled").map((booking) => ({ kind: booking.kind, title: titles.get(booking.pickId) ?? booking.kind }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Keeps why the booking failed, then tells the group which part it was. Neither failing changes the outcome: the plan has already ended. */
+  private async report(planId: string, failure: BookingFailure, undone: readonly UndonePart[]): Promise<void> {
+    const record: BookingFailureRecord = { planId, reason: failure.kind, part: failure.part ?? null, undone, retryable: isRetryable(failure.kind) };
+    try {
+      await this.deps.failures?.save(record);
+    } catch {
+      // The chat line below still says what failed; the saved copy is for Trippy and can be missing.
+    }
+    await this.tell(planId, bookingFailedLine(record));
   }
 
   private async tell(planId: string, line: string): Promise<void> {
@@ -135,6 +166,8 @@ export class SupplierBookingRunner implements EffectRunner {
 
   /** Undoes the bookings, ends the plan and lets go of every hold. The plan ends even if a cancellation is still open. */
   private async giveUp(planId: string, reason: BookingFailure): Promise<Result<void, EffectError>> {
+    // Read before cancelling, because cancelling changes what is listed as booked.
+    const undone = await this.undoneParts(planId);
     const cancelled = await this.cancelBookings(planId);
     const failed = await applyPlanEvent(this.deps.plans, planId, { type: "booking_failed", at: this.deps.clock() });
     if (!failed.ok) {
@@ -142,7 +175,7 @@ export class SupplierBookingRunner implements EffectRunner {
         ? cancelled
         : err({ message: `Booking failed (${reason.message}) and the plan could not be ended` });
     }
-    await this.tell(planId, BOOKING_FAILED_LINES[reason.kind]);
+    await this.report(planId, reason, undone);
     const released = await this.deps.onward().run(planId, failed.value.version, failed.value.effects);
     if (!cancelled.ok) return cancelled;
     return released;
@@ -204,7 +237,8 @@ export class SupplierBookingRunner implements EffectRunner {
       offer.kind === "hotel"
         ? await this.deps.hotels.book({ offer, reference, lead, maxTotalMinor })
         : await this.deps.flights.book({ offer, reference, passengers: people, maxTotalMinor });
-    if (!receipt.ok) return fail(kindOf(receipt.error), describe(`${offer.kind} booking failed`, receipt.error));
+    const part: FailedPart = { pickId: pick.id, kind: offer.kind, title: offer.title, listingId: offer.listingId, offeredMinor: offer.totalMinor, currency: offer.currency };
+    if (!receipt.ok) return fail(kindOf(receipt.error), describe(`${offer.kind} booking failed`, receipt.error), part);
 
     const kind: SupplierBookingKind = offer.kind;
     const recorded = await this.deps.bookings.record({ planId, pickId: pick.id, kind, bookingId: receipt.value.bookingId, confirmation: receipt.value.confirmation, status: "booked" });
@@ -212,7 +246,7 @@ export class SupplierBookingRunner implements EffectRunner {
       // A booking nobody knows about could never be cancelled, so undo it now.
       const supplier = kind === "hotel" ? this.deps.hotels : this.deps.flights;
       await supplier.cancel(receipt.value.bookingId);
-      return fail("other", `A ${kind} booking could not be saved: ${recorded.error.message}`);
+      return fail("other", `A ${kind} booking could not be saved: ${recorded.error.message}`, part);
     }
     return ok(undefined);
   }

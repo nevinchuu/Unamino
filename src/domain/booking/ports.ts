@@ -1,6 +1,7 @@
 import type { Result } from "@/lib/result";
 import type { FlightOffer, HotelOffer } from "@/domain/offers/schema";
 import type { TravellerDetails } from "@/domain/travellers/details";
+import type { BookingFailureRecord } from "./failure";
 
 /** A person on a booking, with the details the airline or hotel needs. Only ever held in memory while booking. */
 export interface BookingTraveller {
@@ -89,6 +90,11 @@ export interface SupplierBookingStore {
   isStuck(planId: string, before: Date): Promise<Result<boolean, BookingStoreError>>;
   /** Plans that ended while a supplier booking was still not cancelled, oldest first. */
   unsettledPlans(limit: number): Promise<Result<readonly string[], BookingStoreError>>;
+}
+
+/** Where the reason a booking failed is kept, so the group and Trippy can plan something different. A plan has at most one. */
+export interface BookingFailureStore {
+  save(record: BookingFailureRecord): Promise<Result<void, BookingStoreError>>;
 }
 
 /** Whether every card hold of a plan can still be charged. Checked just before anything is booked. */

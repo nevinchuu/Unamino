@@ -29,6 +29,7 @@ import { PostgresBriefRepository } from "@/infrastructure/db/postgres-brief-repo
 import { PostgresConstraintRepository } from "@/infrastructure/db/postgres-constraint-repository";
 import { PostgresEffectLog } from "@/infrastructure/db/postgres-effect-log";
 import { PostgresEffectRecorder } from "@/infrastructure/db/postgres-effect-recorder";
+import { PostgresBookingFailureStore } from "@/infrastructure/db/postgres-booking-failure-store";
 import { PostgresGroupAdminStore } from "@/infrastructure/db/postgres-group-admin-store";
 import { PostgresRetentionStore } from "@/infrastructure/db/postgres-retention-store";
 import { PostgresGroupRepository } from "@/infrastructure/db/postgres-group-repository";
@@ -132,6 +133,7 @@ function build(): Container {
   const groups = new PostgresGroupRepository(db);
   const messages = new PostgresMessageRepository(db);
   const planRepository = new PostgresPlanRepository(db);
+  const bookingFailures = new PostgresBookingFailureStore(db);
   const offers = new LiteApiOfferSource({ apiKey: env.value.liteApiKey, currency: GROUP_CURRENCY, guestNationality: "SG", timeoutMs: OFFER_TIMEOUT_MS });
 
   const trace = traceSinkFromEnv(process.env);
@@ -153,6 +155,7 @@ function build(): Container {
     makeChatModel: (meter) => new MuseChatModel(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })),
     ...(env.value.webSearch && { makeResearcher: (meter) => new MuseResearcher(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })) }),
     trace,
+    failures: bookingFailures,
     clock: () => new Date(),
   };
 
@@ -225,6 +228,7 @@ function build(): Container {
           const group = await views.groupIdOf(planId);
           if (group.ok && group.value) await messages.postSystem(group.value, line);
         },
+        failures: bookingFailures,
       });
       bookingSweeper = new BookingSweeper(bookingStore, booking, agent.clock);
       // The last card hold is placed inside a request; booking takes far longer than a person should wait.

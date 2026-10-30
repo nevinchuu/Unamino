@@ -1,4 +1,5 @@
 import type { Result } from "@/lib/result";
+import type { BookingFailureKind, PartKind, UndonePart } from "@/domain/booking/failure";
 import type { ConstraintSet } from "@/domain/constraints/schema";
 import type { Offer } from "@/domain/offers/schema";
 import type { PlanStatus } from "@/domain/plan/statuses";
@@ -96,6 +97,24 @@ export interface PlanSummary {
   readonly headcount: number;
   /** How many people have agreed to the plan so far. */
   readonly agreedCount: number;
+}
+
+/** Why the group's latest plan could not be booked, as Trippy is told it. */
+export interface AgentBookingFailure {
+  readonly reason: BookingFailureKind;
+  /** The hotel or flight that could not be booked. Null when no single one is to blame. */
+  readonly part: { readonly kind: PartKind; readonly title: string } | null;
+  /** Bookings that were made and cancelled again because of it. */
+  readonly undone: readonly UndonePart[];
+  /** Whether the same plan may work if tried again. */
+  readonly retryable: boolean;
+}
+
+export interface BookingFailureReader {
+  /** The failure of the group's newest plan, if that is how it ended. Null once the group has made a newer plan. */
+  latest(groupId: string): Promise<AgentBookingFailure | null>;
+  /** Listings that could not be booked for this group since `since`, so they are not offered again. A supplier that was only unreachable is left out: it may work next time. */
+  blockedListingIds(groupId: string, since: Date): Promise<ReadonlySet<string>>;
 }
 
 /** What a plan card in the chat shows about one of the group's plans. */

@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, smallint, text, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SupplierBookingStatus } from "@/domain/booking/ports";
 import type { Offer } from "@/domain/offers/schema";
+import { BOOKING_FAILURE_KINDS, type BookingFailureKind, type PartKind, type UndonePart } from "@/domain/booking/failure";
 import type { RecordedPayment, RecordedSupplier } from "@/domain/retention/record";
 import type { SeenQuote } from "@/domain/quote/types";
 import type { VenueFacts } from "@/domain/schedule/venue";
@@ -109,6 +110,34 @@ export const planCovers = pgTable(
 /**
  * Why a plan's booking failed: which hotel or flight, and the reason, so the group and Trippy can plan something different.
  * A plan has at most one. It goes when the plan goes. `listingId` lets the same listing be kept out of the next plan.
+ */
+export const bookingFailures = pgTable(
+  "booking_failures",
+  {
+    planId: uuid("plan_id").primaryKey().references(() => plans.id, { onDelete: "cascade" }),
+    reason: text("reason").$type<BookingFailureKind>().notNull(),
+    /** Null when no single hotel or flight is to blame. */
+    partKind: text("part_kind").$type<PartKind>(),
+    partTitle: text("part_title"),
+    listingId: text("listing_id"),
+    offeredMinor: minor("offered_minor"),
+    currency: currencyCode("currency"),
+    /** Whether the same plan may work if tried again: only for a supplier that could not be reached. */
+    retryable: boolean("retryable").notNull(),
+    /** Bookings that were made and cancelled again because this part failed. */
+    undone: jsonb("undone").$type<readonly UndonePart[]>().notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("booking_failures_created_idx").on(table.createdAt),
+    check("booking_failures_reason", sql`${table.reason} IN (${sql.raw(BOOKING_FAILURE_KINDS.map((kind) => `'${kind}'`).join(", "))})`),
+  ],
+).enableRLS();
+
+/**
+ * What is kept after a booked trip's group is deleted, to answer a card dispute: the references people quoted, what each
+ * person approved and was charged, and the suppliers' booking ids. It has no chat and no contact details, and it is not
+ * linked to the group, so deleting the group leaves it. `purgeAfter` is the day it is deleted too.
  */
 export const bookingRecords = pgTable(
   "booking_records",

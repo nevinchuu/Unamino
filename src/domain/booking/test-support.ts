@@ -3,7 +3,9 @@ import { approved, DEADLINE, flight, hotel, HARD, MemoryDetailsStore, MemoryPlan
 import type { MemberSnapshot } from "@/domain/plan/types";
 import { travellerDetailsSchema, type TravellerDetails } from "@/domain/travellers/details";
 import { SAMPLE_DETAILS } from "@/domain/travellers/test-support";
+import type { BookingFailureRecord } from "./failure";
 import type {
+  BookingFailureStore,
   BookingStoreError,
   CancelOutcome,
   FlightBookingRequest,
@@ -80,6 +82,17 @@ export class MemoryBookingStore implements SupplierBookingStore {
   async setStatus(planId: string, pickId: string, status: SupplierBookingStatus): Promise<Result<void, BookingStoreError>> {
     const index = this.rows.findIndex((row) => row.planId === planId && row.pickId === pickId);
     if (index >= 0) this.rows[index] = { ...this.rows[index], status };
+    return ok(undefined);
+  }
+}
+
+/** Remembers the failures it was given, and can be made to refuse them. */
+export class MemoryFailureStore implements BookingFailureStore {
+  readonly saved: BookingFailureRecord[] = [];
+  failing = false;
+  async save(record: BookingFailureRecord): Promise<Result<void, BookingStoreError>> {
+    if (this.failing) return err({ message: "db down" });
+    this.saved.push(record);
     return ok(undefined);
   }
 }
