@@ -6,6 +6,7 @@ import type { ChatMessageDto } from "@/server/chat";
 import { getContainer } from "@/server/container";
 import { groupErrorMessage, type FormState } from "@/server/forms";
 import { sendChatMessage } from "@/server/send-message";
+import { runRemind, type RemindResult } from "@/server/remind";
 import { currentMember, rememberInviteToken } from "@/server/session";
 
 export type SendResult = { readonly ok: true; readonly message: ChatMessageDto } | { readonly ok: false; readonly error: string };
@@ -37,4 +38,10 @@ export async function resetInviteLink(groupId: string): Promise<FormState> {
 
   await rememberInviteToken(groupId, replaced.value);
   return {};
+}
+
+/** Nudges the people the plan is waiting for, with a line in the chat in the sender's name. Held back for a few minutes after each one. */
+export async function remindGroup(groupId: string, planId: string): Promise<RemindResult> {
+  const { views, messages, agent } = getContainer();
+  return runRemind({ views, messages, clock: agent.clock }, await currentMember(groupId), { groupId, planId });
 }

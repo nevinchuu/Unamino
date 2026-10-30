@@ -44,6 +44,7 @@ async function TripPack({ params }: { readonly params: PageProps<"/g/[groupId]/p
         <PackSheet view={view} />
         <div className="flex flex-col gap-2 print:hidden">
           <PrintButton />
+          <p className="text-center text-xs text-muted-foreground">In the print window that opens, choose &quot;Save as PDF&quot; as the printer to keep a copy on your phone or computer.</p>
           {view.tripDates.departDate || view.tripDates.returnDate ? (
             <a href={`${planHref}/pack/calendar`} download className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-foreground/30 text-base font-semibold hover:bg-muted">
               <CalendarPlus className="size-5" aria-hidden />

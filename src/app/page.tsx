@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { DemoNote } from "@/components/demo-note";
 import { Screen } from "@/components/screen";
 import { TripsHeader, TripsHome } from "./trips-home";
 
@@ -9,6 +10,7 @@ export default function Home() {
       <Suspense fallback={<TripsHeader />}>
         <TripsHome />
       </Suspense>
+      <DemoNote />
     </Screen>
   );
 }

@@ -2,6 +2,7 @@
 
 import { Loader2, Lock } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
+import { DateField } from "@/components/date-field";
 import { TextField } from "@/components/text-field";
 import { StickyFooter } from "@/components/sticky-footer";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ export function TravellerForm({ groupId, planId, passportRequired, onSaved }: Tr
         <TextField label="Last name" name="lastName" autoComplete="family-name" error={errors.lastName} />
       </div>
       <div className="grid grid-cols-2 gap-x-4">
-        <TextField label="Date of birth (day / month / year)" name="birthday" type="date" autoComplete="bday" error={errors.birthday} />
+        <DateField label="Date of birth" name="birthday" autoComplete="bday" error={errors.birthday} />
         <SelectField label="Gender on passport" name="gender" error={errors.gender}>
           <option value="" disabled>
             Choose
@@ -131,7 +132,7 @@ export function TravellerForm({ groupId, planId, passportRequired, onSaved }: Tr
               </option>
               {options}
             </SelectField>
-            <TextField label="Expires" name="passportExpiry" type="date" error={errors["passport.expiry"]} />
+            <DateField label="Passport expires" name="passportExpiry" error={errors["passport.expiry"]} />
           </div>
         </>
       ) : null}

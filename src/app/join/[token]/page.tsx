@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { AboutBlurb } from "@/components/about-blurb";
 import { Avatar } from "@/components/avatar";
+import { DemoNote } from "@/components/demo-note";
 import { AppBar, Screen } from "@/components/screen";
 import { MAX_GROUP_MEMBERS } from "@/domain/group/types";
 import { getContainer } from "@/server/container";
@@ -15,6 +17,7 @@ export default function JoinPage({ params }: PageProps<"/join/[token]">) {
       <Suspense fallback={<div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Opening invite…</div>}>
         <Invite params={params} />
       </Suspense>
+      <DemoNote />
     </Screen>
   );
 }
@@ -56,10 +59,9 @@ async function Invite({ params }: { readonly params: PageProps<"/join/[token]">[
           </p>
         ) : (
           <>
+            <AboutBlurb className="mb-6 w-full rounded-2xl bg-card px-4 py-3 text-left text-sm leading-5 shadow-soft" />
             <JoinForm joinToken={token} />
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              This group plans trips together with an AI helper. To join a booking you will later give traveller details, and a card is held, not charged, until everyone is in.
-            </p>
+            <p className="mt-6 text-center text-xs text-muted-foreground">This group plans trips together with an AI helper. To join a booking you will later give traveller details, and a card is held, not charged, until everyone is in.</p>
           </>
         )}
       </div>

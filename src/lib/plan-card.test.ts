@@ -47,7 +47,7 @@ describe("describeSheet", () => {
   const people = [person("Nev", { isMe: true }), person("Ana", { agreed: true }), person("Ben"), person("Jia", { agreed: true })];
 
   it("counts who agreed, and says who the plan is waiting for, naming the viewer as you", () => {
-    expect(describeSheet(plan({ headcount: 4 }), mineWith(people))).toEqual({ step: "agree", stepNumber: 1, pill: "2/4 agreed", note: "Ana and Jia agreed. Waiting for you and Ben.", actionable: true });
+    expect(describeSheet(plan({ headcount: 4 }), mineWith(people))).toEqual({ step: "agree", stepNumber: 1, pill: "2/4 agreed", note: "Ana and Jia agreed. Waiting for you and Ben.", actionable: true, canRemind: false });
   });
 
   it("has nothing for the viewer to do once they have agreed", () => {
@@ -57,7 +57,21 @@ describe("describeSheet", () => {
 
   it("moves to approving the amount, counting holds instead of agreements", () => {
     const holding = [person("Nev", { isMe: true, agreed: true }), person("Ana", { agreed: true, approved: true, held: true }), person("Ben", { agreed: true, approved: true })];
-    expect(describeSheet(plan({ status: "approving", headcount: 3 }), mineWith(holding, { canAgree: false, agreed: true, needsAmount: true }))).toEqual({ step: "approve", stepNumber: 2, pill: "1/3 held", note: "Ana held. Waiting for you and Ben.", actionable: true });
+    expect(describeSheet(plan({ status: "approving", headcount: 3 }), mineWith(holding, { canAgree: false, agreed: true, needsAmount: true }))).toEqual({ step: "approve", stepNumber: 2, pill: "1/3 held", note: "Ana held. Waiting for you and Ben.", actionable: true, canRemind: false });
+  });
+
+  it("offers a reminder only to someone who has done their part while others have not", () => {
+    const mineDone = [person("Nev", { isMe: true, agreed: true }), person("Ana", { agreed: true }), person("Ben")];
+    expect(describeSheet(plan({ headcount: 3 }), mineWith(mineDone, { canAgree: false, agreed: true })).canRemind).toBe(true);
+    const mineWaiting = [person("Nev", { isMe: true }), person("Ana", { agreed: true }), person("Ben")];
+    expect(describeSheet(plan({ headcount: 3 }), mineWith(mineWaiting)).canRemind).toBe(false);
+    const everyoneDone = [person("Nev", { isMe: true, agreed: true }), person("Ana", { agreed: true })];
+    expect(describeSheet(plan({ headcount: 2 }), mineWith(everyoneDone, { canAgree: false, agreed: true })).canRemind).toBe(false);
+  });
+
+  it("offers it while amounts are approved too, once the person's own card is held", () => {
+    const holdingMine = [person("Nev", { isMe: true, agreed: true, approved: true, held: true }), person("Ana", { agreed: true })];
+    expect(describeSheet(plan({ status: "approving", headcount: 2 }), mineWith(holdingMine, { canAgree: false, agreed: true })).canRemind).toBe(true);
   });
 
   it("says nothing about waiting when everyone is done", () => {

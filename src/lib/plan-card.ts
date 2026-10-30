@@ -89,7 +89,7 @@ export function describePlanCard(planId: string, plans: readonly CardPlan[]): Pl
 }
 
 /** "Ana", "Ana and Ben", "Ana, Ben and Jia". */
-function listOf(names: readonly string[]): string {
+export function listOf(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
@@ -111,6 +111,8 @@ export interface ActionSheetView {
   readonly note: string;
   /** Something for this person to do now, as opposed to waiting. */
   readonly actionable: boolean;
+  /** This person has done their part and others have not, so they may nudge them. */
+  readonly canRemind: boolean;
 }
 
 /**
@@ -137,5 +139,6 @@ export function describeSheet(plan: CardPlan, mine: CardMine): ActionSheetView {
     pill: `${count}/${plan.headcount} ${verb}`,
     note: parts.join(" "),
     actionable: step === "approve" ? mine.needsAmount : mine.canAgree && !mine.agreed,
+    canRemind: waiting.length > 0 && !waiting.some((person) => person.isMe),
   };
 }

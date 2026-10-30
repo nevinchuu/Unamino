@@ -10,6 +10,7 @@ import { describeSheet, type CardMine, type CardPlan } from "@/lib/plan-card";
 import { cn } from "@/lib/utils";
 import { CoverAction } from "./cover-action";
 import { PlanPreview } from "./plan-preview";
+import { remindGroup } from "./actions";
 import { agreeToPlan } from "./plan/[planId]/actions";
 import { ChangeRequestSheet } from "./plan/[planId]/change-request-sheet";
 
@@ -38,6 +39,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
   const [note, setNote] = useState<string | null>(null);
   const [changesOpen, setChangesOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [reminded, setReminded] = useState(false);
   const open = !folded && (chosen ?? view.actionable);
   const big = open && detailsOpen;
 
@@ -51,6 +53,21 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
       if (result.outcome === "price_changed") return setNote(`The price changed to ${formatMinor(result.currentMinor, mine.currency)}. Open the plan to look at it.`);
       if (result.outcome === "plan_ended") return setNote("This plan has ended.");
       // The next poll brings the new count; the person has agreed, so there is nothing left for them to press.
+    } catch {
+      setNote("Couldn't reach the server. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remind() {
+    setBusy(true);
+    setNote(null);
+    try {
+      const result = await remindGroup(groupId, plan.id);
+      if (!result.ok) return setNote(result.error);
+      setReminded(true);
+      setNote("Reminder sent in the chat.");
     } catch {
       setNote("Couldn't reach the server. Try again in a moment.");
     } finally {
@@ -76,6 +93,18 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
         {view.note ? <p className="text-[13px] text-muted-foreground">{view.note}</p> : null}
       </div>
 
+      {!open && view.actionable && share ? (
+        view.step === "agree" ? (
+          <Button type="button" variant="action" className="h-11 rounded-2xl text-sm" disabled={busy} onClick={() => void agree()}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : covered ? "Agree · covered" : `Agree · ${share}`}
+          </Button>
+        ) : (
+          <Link href={`/g/${groupId}/plan/${plan.id}`} className={cn(buttonVariants({ variant: "action" }), "h-11 rounded-2xl text-sm")}>
+            {covered ? "Open the plan" : "Approve your amount"}
+          </Link>
+        )
+      ) : null}
+
       {open ? (
         <>
           {view.step === "agree" && share ? (
@@ -98,8 +127,12 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
             <p className="text-[13px] leading-[19px] text-muted-foreground">
               {covered
                 ? "A friend is covering your whole share, so there is no card to add. Open the plan to give your traveller details."
-                : `Your card is held for up to ${share}, not charged. We only charge when everyone is in, and release anything above today's share.`}
+                : `Nothing is charged until everyone is in. Your card is only held, for up to ${share}, and anything above today's share is let go.`}
             </p>
+          ) : null}
+
+          {view.step === "agree" && view.actionable && share ? (
+            <p className="text-[13px] leading-[19px] text-muted-foreground">Agreeing costs nothing. Next you approve your own amount: your card is only held, and nothing is charged until everyone is in.</p>
           ) : null}
 
           <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} aria-expanded={detailsOpen} className="flex min-h-11 items-center justify-center gap-1 self-center text-sm font-semibold text-link">
@@ -127,6 +160,12 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
               </Link>
             ) : null}
           </div>
+
+          {view.canRemind && !reminded ? (
+            <button type="button" disabled={busy} onClick={() => void remind()} className="min-h-11 self-center text-sm font-semibold text-link">
+              Remind the others
+            </button>
+          ) : null}
 
           {note ? (
             <p role="status" className="text-xs text-muted-foreground">
