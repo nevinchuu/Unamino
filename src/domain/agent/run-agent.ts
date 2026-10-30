@@ -18,6 +18,7 @@ import type { AgentRun, AgentRunRepository, BriefRepository, ConstraintRepositor
 import type { TraceSink } from "./trace";
 
 const CHAT_WINDOW = 200;
+const READING_LABEL = "Reading the chat…";
 const DEFAULT_STALE_RUN_MS = 5 * 60_000;
 /** Every call costs real money, so one person, and one group, can only call the agent so often. */
 export const RUN_LIMITS = {
@@ -146,9 +147,18 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
   const session = newSession();
   const researcher = deps.makeResearcher?.(meter) ?? null;
   const env: ToolEnv = { deps, run, group: group.value, roster, now, constraints: () => limits, planner, session, researcher, note };
-  const say = async (text: string, kind: "status" | "final"): Promise<void> => {
-    await deps.messages.postAgent(run.groupId, text, { replyToMessageId: run.triggerMessageId, planId: kind === "final" && session.planId !== null ? session.planId : undefined });
+  const say = async (text: string): Promise<void> => {
+    await deps.messages.postAgent(run.groupId, text, { replyToMessageId: run.triggerMessageId, planId: session.planId !== null ? session.planId : undefined });
   };
+  // Only what the bubble shows: a failure to record it must never stop the run.
+  const progress = async (text: string): Promise<void> => {
+    try {
+      await deps.runs.setProgress(run.id, text);
+    } catch {
+      /* the bubble just keeps its last words */
+    }
+  };
+  await progress(READING_LABEL);
 
   const end = await runConversation({
     model: deps.makeChatModel(meter),
@@ -157,6 +167,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
     tools: toolSpecsFor(researcher !== null),
     runTool: (name, argumentsJson) => runTool(env, name, argumentsJson),
     say,
+    progress,
     note,
   });
   if (end.status === "replied") return done;
@@ -166,7 +177,7 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
     await deps.messages.postAgent(run.groupId, MESSAGES.plan_ready, { replyToMessageId: run.triggerMessageId, planId: session.planId });
     return done;
   }
-  await say(MESSAGES[end.code === "too_many_steps" ? "too_long" : end.code === "planner_unavailable" ? "planner_unavailable" : "invalid_output"], "final");
+  await say(MESSAGES[end.code === "too_many_steps" ? "too_long" : end.code === "planner_unavailable" ? "planner_unavailable" : "invalid_output"]);
   return failed(end.code);
 }
 

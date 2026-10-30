@@ -36,13 +36,28 @@ Each person pays only for what they take part in: a friend who already lives at 
 
 Muse Spark is the agent's brain, not a text generator bolted on.
 
-- **A reasoning loop with native tool calling** (`src/domain/agent/loop/conversation.ts`). The model takes up to 8 turns. A turn with no tool call is its reply. Text beside a tool call becomes a short status line in the chat.
+- **A reasoning loop with native tool calling** (`src/domain/agent/loop/conversation.ts`). The model takes up to 8 turns. A turn with no tool call is its reply, and it is the only message the group sees. While the model works, a small bubble in the chat says what it is doing ("Searching flights and hotels…", "Putting the plan together…"). That wording is fixed in code, kept on the run and never posted, so a long search does not fill the chat.
 - **Three tools** (`tools.ts`, `propose-plan.ts`, `research.ts`): `search_trip` looks up flights and hotels, `propose_plan` puts a plan in front of the group, and `web_research` looks up trip facts on the web (weather and best months, events, entry rules, safety, areas to stay, local tips). The model chooses between them, or none, from what people say. It can ask one question, brainstorm, research, or search.
 - **Web research is Muse's own search, kept on a short leash.** Meta's built-in `web_search` is not offered on the Chat Completions API that the loop uses, so `web_research` makes a separate single-question call to it on the Responses API (`muse-http.ts`, `muse-researcher.ts`). The call is given today's date so it prefers current events. At most 2 research calls run per turn, the answer is cut to a fixed length, and the model is given only the **names** of the sites it came from, never their addresses. Web pages are treated as information, never as instructions. Flight and hotel prices never come from the web, only from `search_trip`, and questions that are not about travel get one sentence and a steer back to the trip. A research call costs about 2 to 3 cents ($2.50 per 1,000 searches plus tokens); set `MUSE_WEB_SEARCH=off` to switch it off.
 - **It reasons about who needs what.** `search_trip` takes a `flyers` list, so a friend who is already there gets a room and no flight, and flights are priced only for the people who fly.
 - **Structured calls** extract each person's limits from the chat (budget caps, flight windows, own room) and suggest things to do in the free time, which are checked against Google Places opening hours.
 - **The model proposes, the code decides.** Picks are validated against the real offers that a search returned, every person's share is computed by code, and a proposal that does not cover everyone is rejected. `grounding.ts` removes any dollar amount in a reply that did not come from a search result or from the chat.
 - **System prompt:** `src/domain/agent/loop/prompt.ts`. Model client: `src/infrastructure/muse/`. Default model `muse-spark-1.3` through the Meta Model API.
+
+The loop in one picture:
+
+```
+ chat ──► Muse Spark (up to 8 turns, native tool calling)
+              │
+              ├─ search_trip ────► liteAPI sandbox: real flight and hotel offers
+              ├─ web_research ───► Muse web search: facts, never prices
+              └─ propose_plan ───► checks every pick against the offers just searched,
+                                   computes every share in code, rejects a plan that
+                                   leaves someone out
+              │
+              ▼
+   one reply to the group  ◄── amounts it did not get from a search or the chat are removed
+```
 
 Setting `MUSE_TRACE=1` in development writes every model call and every agent step to `.muse-trace/trace.jsonl`, so a turn can be read back step by step.
 
@@ -105,6 +120,16 @@ pnpm lint
 ```
 
 Tests that call real services (Muse, Stripe, liteAPI, the database) are opt-in and skipped by default. Their commands are in the header of each `*.live.test.ts` and `*.db.test.ts` file.
+
+### How well the agent behaves, measured
+
+`src/infrastructure/agent-eval.live.test.ts` runs short group chats through the real agent loop with the real Muse model, against fixed test flights and hotels and in-memory storage, and checks what the agent did rather than how it worded it: a plan that covers everyone, an after-6pm flight honoured, a friend who needs no flight, a question asked when dates are missing, no price quoted that was never looked up, a prompt-extraction attempt and an off-topic request both turned away, past dates refused, one message per call. It costs about ten to twenty cents:
+
+```bash
+EVAL_LIVE=1 EVAL_OUT=eval.md EVAL_TRACE=trace.json node --env-file=.env.local node_modules/vitest/vitest.mjs run agent-eval.live
+```
+
+The latest run passed 22 of 24 checks. Both misses are one weakness that the evaluation found: a change request that alters no limit the agent has recorded (for example "take the cheapest flight") is treated as "nothing has changed", so no replacement plan is made, and the agent then wrongly tells the group it switched. The report also lists what the agent said in each scenario.
 
 ## Where things are
 

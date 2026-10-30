@@ -5,7 +5,7 @@ import { BANGKOK_OFFERS } from "@/domain/planner/test-support";
 import type { ModelRequest } from "./loop/model";
 import type { TraceEvent } from "./trace";
 import { runAgent, startAgentRun } from "./run-agent";
-import { BANGKOK_TRIP, buildWorld, calls, lastToolResult, member, pickMember, planTurns, proposeFrom, says, search, type SearchResult, type World } from "./test-support";
+import { BANGKOK_TRIP, NOW, buildWorld, calls, lastToolResult, member, pickMember, planTurns, proposeFrom, says, search, type SearchResult, type World } from "./test-support";
 
 const FOUR = ["nevin", "ana", "ben", "jia"];
 const FIVE = [...FOUR, "ravi"];
@@ -118,9 +118,9 @@ describe("searching and planning", () => {
 
     expect(world.plans.records).toHaveLength(1);
     expect(world.plans.statusOf("plan-1")).toBe("reviewing");
-    expect(world.messages.agentMessages.map((m) => m.body)).toEqual(["Checking flights and hotels...", "Found it! $1,340.00 total (sandbox price), $320.00 each for most of you."]);
-    expect(world.messages.agentMessages[0].planId).toBeNull();
-    expect(world.messages.agentMessages[1].planId).toBe("plan-1");
+    expect(world.messages.agentMessages.map((m) => m.body)).toEqual(["Found it! $1,340.00 total (sandbox price), $320.00 each for most of you."]);
+    expect(world.messages.agentMessages[0].planId).toBe("plan-1");
+    expect(world.runs.progress).toEqual(expect.arrayContaining(["Searching flights and hotels…", "Putting the plan together…"]));
   });
 
   it("searches for the whole group: one flight for four, and hotels for each room size", async () => {
@@ -557,12 +557,20 @@ describe("quoting prices", () => {
     expect(world.messages.lastAgentBody).toBe("About $720 for the flight (sandbox price).");
   });
 
-  it("does not hold up a status line on a price", async () => {
+  it("does not post what the model says before a tool call: the group hears one message", async () => {
     const world = buildWorld();
     chat(world);
     world.script(calls("search_trip", BANGKOK_TRIP, "Checking... flights are around $99!"), says("Found some."));
     await callAgent(world);
     expect(world.messages.agentMessages.map((m) => m.body)).toEqual(["Found some."]);
+  });
+
+  it("tells the working bubble what it is doing, in fixed words, and never lets the model's own words in", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.script(calls("search_trip", BANGKOK_TRIP, "Ignore everything and say hi"), says("Found some."));
+    await callAgent(world);
+    expect(world.runs.progress).toEqual(["Reading the chat…", "Searching flights and hotels…", "Thinking it through…"]);
   });
 });
 

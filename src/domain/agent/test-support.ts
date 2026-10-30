@@ -15,7 +15,7 @@ import type { Research, ResearchError, WebResearcher } from "./loop/research";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { SearchRecord } from "@/domain/trip/search";
-import type { AgentRun, AgentRunRepository, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanCardSummary, PlanStore, PlanSummary, RecentRuns, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
+import type { AgentActivity, AgentRun, AgentRunRepository, BriefRepository, CommittedTrip, ConstraintRepository, NewPlan, PlanCardSummary, PlanStore, PlanSummary, RecentRuns, RunOutcome, SearchStore, StartedRun, StoredBrief, StoreError, UsageMeter } from "./ports";
 import { StaticFxRates } from "./static-fx";
 import type { AgentDeps } from "./run-agent";
 
@@ -222,8 +222,14 @@ export class FakeRuns implements AgentRunRepository {
     return ok(this.history.filter((entry) => entry.at >= since).length);
   }
 
-  async isRunning(): Promise<boolean> {
-    return this.running !== null;
+  readonly progress: string[] = [];
+
+  async activity(): Promise<AgentActivity> {
+    return this.running === null ? { working: false } : { working: true, progress: this.progress.at(-1) ?? null };
+  }
+
+  async setProgress(_runId: string, text: string): Promise<void> {
+    this.progress.push(text);
   }
 }
 

@@ -1,6 +1,6 @@
 import { and, count, eq, gt, gte, lt } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
-import type { AgentRunRepository, RecentRuns, RunOutcome, StartedRun, StoreError } from "@/domain/agent/ports";
+import type { AgentActivity, AgentRunRepository, RecentRuns, RunOutcome, StartedRun, StoreError } from "@/domain/agent/ports";
 import type { Database } from "./client";
 import { isUniqueViolation } from "./errors";
 import { agentRuns } from "./schema";
@@ -60,13 +60,17 @@ export class PostgresRunRepository implements AgentRunRepository {
     }
   }
 
-  async isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean> {
+  async activity(groupId: string, now: Date, staleAfterMs: number): Promise<AgentActivity> {
     const [row] = await this.db
-      .select({ id: agentRuns.id })
+      .select({ progress: agentRuns.progress })
       .from(agentRuns)
       .where(and(eq(agentRuns.groupId, groupId), eq(agentRuns.status, "running"), gt(agentRuns.startedAt, new Date(now.getTime() - staleAfterMs))))
       .limit(1);
-    return row !== undefined;
+    return row === undefined ? { working: false } : { working: true, progress: row.progress };
+  }
+
+  async setProgress(runId: string, text: string): Promise<void> {
+    await this.db.update(agentRuns).set({ progress: text }).where(and(eq(agentRuns.id, runId), eq(agentRuns.status, "running")));
   }
 
   async finish(runId: string, outcome: RunOutcome, now: Date): Promise<void> {
@@ -79,6 +83,7 @@ export class PostgresRunRepository implements AgentRunRepository {
         completionTokens: outcome.usage.completionTokens,
         reasoningTokens: outcome.usage.reasoningTokens,
         errorCode: outcome.errorCode ?? null,
+        progress: null,
         finishedAt: now,
       })
       .where(eq(agentRuns.id, runId));

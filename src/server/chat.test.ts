@@ -33,7 +33,7 @@ function setup({ stored = [], running = false, plans = [], member = ana }: Setup
       listAfter: async (_group, afterSeq, limit) => (asked.push(`after ${afterSeq} limit ${limit}`), stored.filter((m) => m.seq > afterSeq).slice(0, limit)),
       recent: async (_group, limit) => (asked.push(`recent ${limit}`), stored.slice(-limit)),
     },
-    runs: { isRunning: async () => running },
+    runs: { activity: async () => (running ? { working: true, progress: "Searching flights and hotels…" } : { working: false }) },
     plans: { cards: async () => plans },
     viewerCards: { forPlan: async (planId, memberId) => (cardsFor.push(`${planId}:${memberId}`), MINE) },
     reads: { markRead: async (memberId, seq) => void marked.push(`${memberId}:${seq}`) },
@@ -104,6 +104,7 @@ describe("loadChat", () => {
     const chat = await loadChat(deps, GROUP, { afterSeq: 0, limit: 10 });
     expect(chat.members).toEqual(["Ana", "Ben"]);
     expect(chat.agentWorking).toBe(true);
+    expect(chat.agentStatus).toBe("Searching flights and hotels…");
     expect(chat.plans).toEqual([{ ...paid, mine: null }, { ...PLAN, mine: null }]);
   });
 
@@ -117,7 +118,7 @@ describe("handlePoll", () => {
     const { deps } = setup({ stored: [message(1), message(2)] });
     const response = await poll(deps, "?after=1");
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ messages: [{ seq: 2, senderName: "Ana" }], members: ["Ana", "Ben"], agentWorking: false, plans: [] });
+    expect(await response.json()).toMatchObject({ messages: [{ seq: 2, senderName: "Ana" }], members: ["Ana", "Ben"], agentWorking: false, agentStatus: null, plans: [] });
   });
 
   it("treats a missing starting point as the beginning", async () => {

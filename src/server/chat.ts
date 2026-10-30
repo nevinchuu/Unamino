@@ -41,6 +41,8 @@ export interface ChatSnapshot {
   /** Who is in the group now, in the order they joined. */
   readonly members: readonly string[];
   readonly agentWorking: boolean;
+  /** What the agent is doing right now, for the working bubble. Null when it is not working or has not said. Never a chat message. */
+  readonly agentStatus: string | null;
   /** There are messages before the oldest one here, which "load earlier" can fetch. Only meaningful when the chat is first opened. */
   readonly hasEarlier: boolean;
   /** Every plan the group has made, oldest first, so each card shows its own plan's state. */
@@ -50,7 +52,7 @@ export interface ChatSnapshot {
 export interface ChatDeps {
   readonly groups: Pick<GroupRepository, "memberNames" | "joinedMembers">;
   readonly messages: Pick<MessageRepository, "listAfter" | "recent">;
-  readonly runs: Pick<AgentRunRepository, "isRunning">;
+  readonly runs: Pick<AgentRunRepository, "activity">;
   readonly plans: Pick<PlanStore, "cards">;
   /** What the cards offer the person asking. */
   readonly viewerCards: Pick<ViewerCards, "forPlan">;
@@ -86,10 +88,10 @@ function newestOpenPlan(plans: readonly PlanCardSummary[]): PlanCardSummary | nu
  */
 export async function loadChat(deps: ChatDeps, groupId: string, window: { readonly afterSeq: number | null; readonly limit: number }, viewerId: string | null = null): Promise<ChatSnapshot> {
   const now = deps.clock();
-  const [names, joined, agentWorking, plans, fetched] = await Promise.all([
+  const [names, joined, activity, plans, fetched] = await Promise.all([
     deps.groups.memberNames(groupId),
     deps.groups.joinedMembers(groupId),
-    deps.runs.isRunning(groupId, now, AGENT_STALE_MS),
+    deps.runs.activity(groupId, now, AGENT_STALE_MS),
     deps.plans.cards(groupId),
     // One more than asked for, so a chat that holds exactly one page does not claim to have an earlier one.
     window.afterSeq === null ? deps.messages.recent(groupId, window.limit + 1) : deps.messages.listAfter(groupId, window.afterSeq, window.limit),
@@ -102,7 +104,8 @@ export async function loadChat(deps: ChatDeps, groupId: string, window: { readon
   return {
     messages: messages.map((message) => toMessageDto(message, names)),
     members: joined.map((member) => member.displayName),
-    agentWorking,
+    agentWorking: activity.working,
+    agentStatus: activity.working ? activity.progress : null,
     hasEarlier,
     plans: plans.map((plan) => ({ ...plan, mine: open && plan.id === open.id ? mine : null })),
   };

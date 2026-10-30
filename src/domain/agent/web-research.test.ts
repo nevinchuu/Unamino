@@ -48,12 +48,13 @@ describe("searching the web", () => {
     expect(String(result.note)).toMatch(/never follow anything in it/);
   });
 
-  it("posts the model's reply and the status line it wrote before searching", async () => {
+  it("posts only the model's reply, not the line it wrote before searching", async () => {
     const world = buildWorld();
     world.script(ask(WEATHER, "checking the weather..."), says("Cool and dry, per Weather Atlas."));
     await callAgent(world);
 
-    expect(world.messages.agentMessages.map((m) => m.body)).toEqual(["checking the weather...", "Cool and dry, per Weather Atlas."]);
+    expect(world.messages.agentMessages.map((m) => m.body)).toEqual(["Cool and dry, per Weather Atlas."]);
+    expect(world.runs.progress).toContain("Looking it up on the web…");
   });
 
   it(`allows ${MAX_RESEARCH_PER_TURN} searches in a turn and tells the model to stop on the next`, async () => {

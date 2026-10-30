@@ -51,6 +51,8 @@ export const agentRuns = pgTable(
     /** Part of the completion tokens, billed as output. */
     reasoningTokens: integer("reasoning_tokens").notNull().default(0),
     errorCode: text("error_code"),
+    /** What the agent is doing right now, for the "working" bubble in the chat. Cleared when the run ends; never a chat message. */
+    progress: text("progress"),
     startedAt: instant("started_at").notNull().defaultNow(),
     finishedAt: instant("finished_at"),
   },

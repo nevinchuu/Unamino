@@ -57,6 +57,13 @@
       "when": 1793200147771,
       "tag": "0007_dear_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793248381487,
+      "tag": "0008_ambitious_marvel_apes",
+      "breakpoints": true
     }
   ]
 }

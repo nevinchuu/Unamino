@@ -56,9 +56,13 @@ export interface AgentRunRepository {
   countRecent(groupId: string, memberId: string | null, since: Date): Promise<Result<RecentRuns, StoreError>>;
   /** How many runs started anywhere since `since`. The whole service's ceiling is measured with this. */
   countAll(since: Date): Promise<Result<number, StoreError>>;
-  /** Is the agent working for this group right now? A run left going for longer than `staleAfterMs` no longer counts. */
-  isRunning(groupId: string, now: Date, staleAfterMs: number): Promise<boolean>;
+  /** Is the agent working for this group right now, and what is it doing? A run left going for longer than `staleAfterMs` no longer counts. */
+  activity(groupId: string, now: Date, staleAfterMs: number): Promise<AgentActivity>;
+  /** Says what the run is doing now. Shown while it works and never kept as a message; ending the run clears it. */
+  setProgress(runId: string, text: string): Promise<void>;
 }
+
+export type AgentActivity = { readonly working: false } | { readonly working: true; readonly progress: string | null };
 
 export interface StoredBrief {
   readonly id: string;

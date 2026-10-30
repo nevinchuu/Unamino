@@ -19,6 +19,10 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toMatch(/Do not give medical, legal or financial advice/);
   });
 
+  it("keeps Trippy from posting a line before each tool, because the app shows progress itself", () => {
+    expect(SYSTEM_PROMPT).toMatch(/Do not write a line before using a tool/);
+  });
+
   it("holds no backtick, because it is a template literal", () => {
     expect(SYSTEM_PROMPT).not.toContain("`");
   });

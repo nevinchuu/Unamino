@@ -147,18 +147,18 @@ describe.skipIf(!ENABLED)("the agent on the real database", () => {
       const other = await newGroup();
       const message = await say(groupId, people[0].id, "@trippy go");
       const start = new Date("2026-10-27T00:00:00Z");
-      expect(await runRepo.isRunning(groupId, start, 300_000)).toBe(false);
+      expect((await runRepo.activity(groupId, start, 300_000)).working).toBe(false);
 
       const started = await runRepo.start({ groupId, triggerMessageId: message.id, requestedByMemberId: null, now: start, staleAfterMs: 300_000 });
       if (!started.ok || started.value.status !== "started") throw new Error("expected a started run");
-      expect(await runRepo.isRunning(groupId, new Date(start.getTime() + 60_000), 300_000)).toBe(true);
+      expect((await runRepo.activity(groupId, new Date(start.getTime() + 60_000), 300_000)).working).toBe(true);
       // Another group's run is not this group's.
-      expect(await runRepo.isRunning(other.groupId, new Date(start.getTime() + 60_000), 300_000)).toBe(false);
+      expect((await runRepo.activity(other.groupId, new Date(start.getTime() + 60_000), 300_000)).working).toBe(false);
       // A run that has gone on longer than it should is treated as dead, the same rule that frees the group.
-      expect(await runRepo.isRunning(groupId, new Date(start.getTime() + 301_000), 300_000)).toBe(false);
+      expect((await runRepo.activity(groupId, new Date(start.getTime() + 301_000), 300_000)).working).toBe(false);
 
       await runRepo.finish(started.value.run.id, { status: "done", usage: { calls: 0, promptTokens: 0, completionTokens: 0, reasoningTokens: 0 } }, start);
-      expect(await runRepo.isRunning(groupId, new Date(start.getTime() + 60_000), 300_000)).toBe(false);
+      expect((await runRepo.activity(groupId, new Date(start.getTime() + 60_000), 300_000)).working).toBe(false);
     }, 60_000);
 
     it("lets only one of two simultaneous calls start", async () => {

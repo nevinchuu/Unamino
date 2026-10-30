@@ -38,6 +38,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   const [messages, setMessages] = useState<ChatMessageDto[]>(() => [...initial.messages]);
   const [members, setMembers] = useState<readonly string[]>(initial.members);
   const [agentWorking, setAgentWorking] = useState(initial.agentWorking);
+  const [agentStatus, setAgentStatus] = useState(initial.agentStatus);
   const [plans, setPlans] = useState<readonly PlanCardDto[]>(initial.plans);
   const [pending, setPending] = useState<PendingMessage[]>([]);
   const [replyTo, setReplyTo] = useState<RowModel | null>(null);
@@ -71,6 +72,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
       if (incoming) setAnnouncement(incoming.kind === "system" ? incoming.body : `${incoming.senderName ?? "Someone"}: ${snippet(incoming.body, 160)}`);
       setMembers(snapshot.members);
       setAgentWorking(snapshot.agentWorking);
+      setAgentStatus(snapshot.agentStatus);
       setPlans(snapshot.plans);
     },
     [meId],
@@ -322,7 +324,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
             <div className="min-w-0 flex-1">
               <p className="mb-0.5 text-xs font-bold text-success">Trippy</p>
               <p className="text-[15px] leading-snug text-muted-foreground">
-                Thinking
+                {agentStatus ?? "Thinking"}
                 <span className="ml-1 inline-flex gap-0.5" aria-hidden="true">
                   <span className="size-1 animate-pulse rounded-full bg-muted-foreground" />
                   <span className="size-1 animate-pulse rounded-full bg-muted-foreground [animation-delay:200ms]" />
