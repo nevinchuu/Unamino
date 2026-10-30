@@ -6,6 +6,7 @@ import { getContainer } from "@/server/container";
 import { membershipsFromCookies } from "@/server/member-cookie";
 import { loadTrips } from "@/server/trips";
 import { TripCard } from "./trip-card";
+import { TripMenu } from "./trip-menu";
 
 /** The title row, drawn straight away while the list itself is still being read. */
 export function TripsHeader() {
@@ -33,8 +34,9 @@ export async function TripsHome() {
       <TripsHeader />
       <ul className="flex flex-col gap-3.5 px-4 pt-5 pb-8">
         {trips.map((trip) => (
-          <li key={trip.groupId}>
+          <li key={trip.groupId} className="relative">
             <TripCard trip={trip} now={now} />
+            <TripMenu groupId={trip.groupId} name={trip.name} isAdmin={trip.isAdmin} />
           </li>
         ))}
       </ul>

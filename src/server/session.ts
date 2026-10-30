@@ -24,6 +24,12 @@ export async function rememberMember(groupId: string, memberToken: string): Prom
   (await cookies()).set(name, memberToken, memberCookieOptions(process.env.NODE_ENV === "production"));
 }
 
+/** Forgets this browser's membership of a group, so its card leaves the trips list. Server Action or Route Handler only. */
+export async function forgetMember(groupId: string): Promise<void> {
+  const name = memberCookieName(groupId);
+  if (name) (await cookies()).delete(name);
+}
+
 /** Holds the invite link secret for a while after it is made, because only its hash is stored. Server Action or Route Handler only. */
 export async function rememberInviteToken(groupId: string, joinToken: string): Promise<void> {
   const name = inviteCookieName(groupId);

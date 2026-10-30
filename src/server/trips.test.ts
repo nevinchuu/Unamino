@@ -55,6 +55,13 @@ describe("loadTrips", () => {
     expect(trips.map((trip) => trip.name)).toEqual(["Lisbon", "Bangkok weekend"]);
   });
 
+  it("tells each card whether this person runs the group", async () => {
+    const admin = { ...ana, isOrganiser: true };
+    const deps = setup({ tokens: { ta: admin, tb: ben }, groups: { [GROUP_A]: { name: "A", people: [admin, ben] } } });
+    expect((await loadTrips(deps, [{ groupId: GROUP_A, token: "ta" }]))[0].isAdmin).toBe(true);
+    expect((await loadTrips(deps, [{ groupId: GROUP_A, token: "tb" }]))[0].isAdmin).toBe(false);
+  });
+
   it("leaves out a cookie that no longer opens its group", async () => {
     const deps = setup({ tokens: { ta: ana }, groups: { [GROUP_A]: { name: "A", people: [ana] } } });
     expect(await loadTrips(deps, [{ groupId: GROUP_A, token: "stale" }, { groupId: GROUP_B, token: "ta" }])).toEqual([]);

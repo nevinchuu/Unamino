@@ -27,7 +27,7 @@ export function TripCard({ trip, now }: { readonly trip: TripDto; readonly now: 
     <Link href={`/g/${trip.groupId}`} className="flex gap-3.5 rounded-[22px] bg-card p-3.5 shadow-soft transition-transform active:scale-[0.99]">
       <TripTile name={trip.name} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 pr-8">
           <span className="truncate text-xs font-medium text-muted-foreground">{trip.name}</span>
           {trip.at ? <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(new Date(trip.at), now)}</span> : null}
         </div>

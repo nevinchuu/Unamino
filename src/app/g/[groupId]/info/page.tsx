@@ -3,6 +3,7 @@ import { Avatar } from "@/components/avatar";
 import { AppBar, Screen } from "@/components/screen";
 import { getContainer } from "@/server/container";
 import { readInviteToken, currentMember } from "@/server/session";
+import { GroupDangerZone, ParticipantList } from "../group-controls";
 import { InvitePanel } from "../invite-panel";
 import { NotAMember } from "../not-a-member";
 
@@ -45,19 +46,15 @@ async function Group({ params }: { readonly params: PageProps<"/g/[groupId]/info
           <h2 id="people-heading" className="px-2 pt-2 pb-1 text-sm font-medium text-muted-foreground">
             {plural(people.length)}
           </h2>
-          <ul>
-            {people.map((person) => (
-              <li key={person.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
-                <Avatar name={person.displayName} size={40} />
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {person.displayName}
-                  {person.id === me.id ? <span className="font-normal text-muted-foreground"> (You)</span> : null}
-                </span>
-                {person.isOrganiser ? <span className="rounded-full border border-success px-2 py-0.5 text-xs font-medium text-success">Group admin</span> : null}
-              </li>
-            ))}
-          </ul>
+          <ParticipantList
+            groupId={groupId}
+            viewerIsAdmin={me.isOrganiser}
+            people={people.map((person) => ({ id: person.id, name: person.displayName, isMe: person.id === me.id, isAdmin: person.isOrganiser }))}
+          />
         </section>
+
+        <GroupDangerZone groupId={groupId} groupName={group.value.name} isAdmin={me.isOrganiser} />
+
       </main>
     </>
   );

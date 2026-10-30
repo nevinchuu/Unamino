@@ -26,6 +26,8 @@ export interface TripDto {
   /** Everyone in the group; `done` marks those who have done their part of the plan's current stage. */
   readonly people: readonly { readonly name: string; readonly done: boolean }[];
   readonly status: TripStatus | null;
+  /** This person runs the group, so the card offers them "Delete" rather than "Exit". */
+  readonly isAdmin: boolean;
 }
 
 export interface TripsDeps {
@@ -78,5 +80,6 @@ async function tripFor(deps: TripsDeps, groupId: string, me: Member): Promise<Tr
     unread: last !== null && !mine && last.seq > (read.get(me.id) ?? 0),
     people: joined.map((member) => ({ name: member.displayName, done: doneNames.has(member.displayName) })),
     status: tripStatus(plan, standing),
+    isAdmin: me.isOrganiser,
   };
 }
