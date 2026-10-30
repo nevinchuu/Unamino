@@ -46,6 +46,13 @@ describe("the plan as the screen shows it", () => {
     expect(view()).toMatchObject({ id: "plan-1", groupId: "group-1", title: "Bangkok weekend", city: "Bangkok", dates: "Fri 11 Dec to Sun 13 Dec", headcount: 2, status: "reviewing", deadlineAt: "2026-10-27T01:09:00.000Z", currency: "USD", replacedBy: null });
   });
 
+  it("carries the trip's own dates, and says when a booked trip's data will be deleted", () => {
+    expect(view()).toMatchObject({ tripDates: { departDate: "2026-12-11", returnDate: "2026-12-13" }, keptUntil: null });
+    expect(view({ status: "captured" }).keptUntil).toBe("2027-01-12");
+    expect(view({ status: "booked" }).keptUntil).toBe("2027-01-12");
+    expect(view({ status: "captured", trip: { city: "Bangkok", departDate: null, returnDate: null } }).keptUntil).toBeNull();
+  });
+
   it("lists flights before hotels, with who each is for and why", () => {
     const { items } = view();
     expect(items.map((item) => item.kind)).toEqual(["flight", "hotel"]);

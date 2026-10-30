@@ -16,6 +16,7 @@ import { ChatEffectRunner } from "@/domain/plan/chat-effects";
 import { CompositeEffectRunner, type EffectRunner } from "@/domain/plan/effects";
 import { CoverService } from "@/domain/plan/cover-service";
 import { MembershipService } from "@/domain/group/membership-service";
+import { RetentionService } from "@/domain/retention/retention-service";
 import { PlanService } from "@/domain/plan/service";
 import { SimulatedBookingRunner } from "@/domain/plan/simulated-booking";
 import { SimulatedHoldRunner } from "@/domain/plan/simulated-holds";
@@ -29,6 +30,7 @@ import { PostgresConstraintRepository } from "@/infrastructure/db/postgres-const
 import { PostgresEffectLog } from "@/infrastructure/db/postgres-effect-log";
 import { PostgresEffectRecorder } from "@/infrastructure/db/postgres-effect-recorder";
 import { PostgresGroupAdminStore } from "@/infrastructure/db/postgres-group-admin-store";
+import { PostgresRetentionStore } from "@/infrastructure/db/postgres-retention-store";
 import { PostgresGroupRepository } from "@/infrastructure/db/postgres-group-repository";
 import { PostgresHoldStore } from "@/infrastructure/db/postgres-hold-store";
 import { PostgresMessageRepository } from "@/infrastructure/db/postgres-message-repository";
@@ -86,6 +88,7 @@ export interface Container {
   /** Leaving, removing someone, handing on the admin role and deleting a group. */
   readonly membership: MembershipService;
   /** The scheduled deletion of old groups and old dispute records. */
+  readonly retention: RetentionService;
   readonly planStatus: PlanStatusReader;
   /** What the plan screen reads. */
   readonly views: PlanViewStore;
@@ -250,6 +253,7 @@ function build(): Container {
     plans: planService,
     covers,
     membership,
+    retention: new RetentionService(new PostgresRetentionStore(db)),
     planStatus: new PostgresPlanStatusReader(db),
     views,
     payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, webhook },

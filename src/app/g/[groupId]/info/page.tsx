@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { Avatar } from "@/components/avatar";
 import { AppBar, Screen } from "@/components/screen";
@@ -55,6 +56,12 @@ async function Group({ params }: { readonly params: PageProps<"/g/[groupId]/info
 
         <GroupDangerZone groupId={groupId} groupName={group.value.name} isAdmin={me.isOrganiser} />
 
+        <p className="px-2 text-center text-xs text-muted-foreground">
+          A group with a booked trip is deleted 30 days after the trip ends, and one that never booked after 30 quiet days.{" "}
+          <Link href="/privacy" className="font-medium text-primary underline underline-offset-2">
+            Privacy notice
+          </Link>
+        </p>
       </main>
     </>
   );

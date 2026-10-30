@@ -1,10 +1,13 @@
 import type { BookingSweeper } from "@/domain/booking/sweeper";
 import type { PlanService } from "@/domain/plan/service";
+import type { RetentionService } from "@/domain/retention/retention-service";
 import type { TravellerService } from "@/domain/travellers/service";
 import { isCronAuthorized } from "./cron-auth";
 
 /** How many overdue plans one run looks at. The next run picks up the rest. */
 export const OVERDUE_BATCH = 50;
+/** How many old groups one run deletes. The next run picks up the rest. */
+export const RETENTION_BATCH = 25;
 
 export interface CronDeps {
   readonly secret: string | null;
@@ -13,6 +16,8 @@ export interface CronDeps {
   readonly bookings?: Pick<BookingSweeper, "sweep"> | null;
   /** Null when this server does not take traveller details. */
   readonly travellers?: Pick<TravellerService, "purgeStale"> | null;
+  /** Deletes groups and dispute records that have outlived their retention. Null where the sweep should not do that. */
+  readonly retention?: Pick<RetentionService, "sweep"> | null;
   readonly now: () => Date;
 }
 
@@ -31,5 +36,8 @@ export async function handleExpireOverdue(request: Request, deps: CronDeps): Pro
   const booking = deps.bookings ? await deps.bookings.sweep(OVERDUE_BATCH) : null;
   // Details kept past any plan's life are deleted here whatever else the sweep found, so they never wait on a plan being swept.
   const purged = deps.travellers ? await deps.travellers.purgeStale(deps.now()) : null;
-  return json({ ...swept.value, ...(booking && { booking }), ...(purged?.ok && { travellersPurged: purged.value }) }, 200);
+  // Personal data past its retention is deleted last, so a slow sweep never holds up ending plans and releasing holds.
+  const retained = deps.retention ? await deps.retention.sweep(deps.now(), RETENTION_BATCH) : null;
+  if (retained && !retained.ok) console.error("retention sweep failed");
+  return json({ ...swept.value, ...(booking && { booking }), ...(purged?.ok && { travellersPurged: purged.value }), ...(retained?.ok && { retention: retained.value }) }, 200);
 }

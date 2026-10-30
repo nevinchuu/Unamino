@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, smallint, text, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SupplierBookingStatus } from "@/domain/booking/ports";
 import type { Offer } from "@/domain/offers/schema";
+import type { RecordedPayment, RecordedSupplier } from "@/domain/retention/record";
 import type { SeenQuote } from "@/domain/quote/types";
 import type { VenueFacts } from "@/domain/schedule/venue";
 import type { FxRateTable } from "@/domain/split/types";
@@ -109,6 +110,23 @@ export const planCovers = pgTable(
  * Why a plan's booking failed: which hotel or flight, and the reason, so the group and Trippy can plan something different.
  * A plan has at most one. It goes when the plan goes. `listingId` lets the same listing be kept out of the next plan.
  */
+export const bookingRecords = pgTable(
+  "booking_records",
+  {
+    planId: uuid("plan_id").primaryKey(),
+    reference: text("reference").notNull(),
+    planTitle: text("plan_title").notNull(),
+    city: text("city"),
+    departDate: date("depart_date", { mode: "string" }),
+    returnDate: date("return_date", { mode: "string" }),
+    payments: jsonb("payments").$type<readonly RecordedPayment[]>().notNull(),
+    suppliers: jsonb("suppliers").$type<readonly RecordedSupplier[]>().notNull(),
+    purgeAfter: date("purge_after", { mode: "string" }).notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("booking_records_purge_idx").on(table.purgeAfter)],
+).enableRLS();
+
 /** What was bought for the plan. A snapshot of the offer is kept, because offers expire and change. */
 export const planPicks = pgTable(
   "plan_picks",

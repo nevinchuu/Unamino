@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { err, ok } from "@/lib/result";
 import { MIN_CRON_SECRET_LENGTH } from "./cron-auth";
-import { handleExpireOverdue, OVERDUE_BATCH, type CronDeps } from "./cron-handler";
+import { handleExpireOverdue, OVERDUE_BATCH, RETENTION_BATCH, type CronDeps } from "./cron-handler";
 
 const SECRET = "s".repeat(MIN_CRON_SECRET_LENGTH);
 const NOW = new Date("2026-10-27T12:00:00Z");
@@ -45,6 +45,33 @@ describe("handleExpireOverdue", () => {
     const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
     expect(await response.json()).toEqual({ ...SUMMARY, travellersPurged: 3 });
     expect(calls).toEqual([NOW]);
+  });
+
+  it("also deletes groups and dispute records that have outlived their retention, and says how many", async () => {
+    const calls: [Date, number][] = [];
+    const retention = { sweep: async (now: Date, limit: number) => (calls.push([now, limit]), ok({ groupsDeleted: 2, groupsFailed: 0, recordsPurged: 1 })) };
+    const { deps } = setup({ retention });
+    const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
+    expect(await response.json()).toEqual({ ...SUMMARY, retention: { groupsDeleted: 2, groupsFailed: 0, recordsPurged: 1 } });
+    expect(calls).toEqual([[NOW, RETENTION_BATCH]]);
+  });
+
+  it("still answers when the retention sweep could not run, and the other work stands", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { deps } = setup({ retention: { sweep: async () => err({ message: "db" }) } });
+    const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(SUMMARY);
+  });
+
+  it("runs the retention sweep after plans are ended, so a slow one never holds up releasing holds", async () => {
+    const order: string[] = [];
+    const { deps } = setup({
+      service: { expireOverdue: async () => (order.push("plans"), ok(SUMMARY)) },
+      retention: { sweep: async () => (order.push("retention"), ok({ groupsDeleted: 0, groupsFailed: 0, recordsPurged: 0 })) },
+    });
+    await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
+    expect(order).toEqual(["plans", "retention"]);
   });
 
   it("still answers when the purge could not run", async () => {

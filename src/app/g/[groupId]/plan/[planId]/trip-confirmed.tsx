@@ -1,4 +1,6 @@
-import { CircleCheck } from "lucide-react";
+import { CalendarPlus, CircleCheck, FileText } from "lucide-react";
+import Link from "next/link";
+import { RetentionNotice } from "@/components/retention-notice";
 import type { PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
 
@@ -50,6 +52,24 @@ export function TripConfirmed({ view }: { readonly view: PlanViewDto }) {
           Sandbox trip: no flights or hotel were really booked, so there are no airline or hotel booking numbers.
         </p>
       ) : null}
+
+      <div className="rounded-xl bg-card p-4 shadow-sm">
+        <h2 className="text-sm font-medium text-muted-foreground">Keep your trip</h2>
+        <p className="mt-1 text-sm">Save a copy now. Your trip pack has the bookings, codes and your receipt on one page.</p>
+        <div className="mt-3 flex flex-col gap-2">
+          <Link href={`/g/${view.groupId}/plan/${view.id}/pack`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground">
+            <FileText className="size-4" aria-hidden />
+            Open your trip pack
+          </Link>
+          {view.tripDates.departDate || view.tripDates.returnDate ? (
+            <a href={`/g/${view.groupId}/plan/${view.id}/pack/calendar`} download className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-foreground/30 px-4 text-sm font-semibold hover:bg-muted">
+              <CalendarPlus className="size-4" aria-hidden />
+              Add to calendar
+            </a>
+          ) : null}
+        </div>
+        <RetentionNotice keptUntil={view.keptUntil} className="mt-3 text-xs text-muted-foreground" />
+      </div>
 
       {mine && charged !== null ? (
         <div className="rounded-xl bg-card p-4 shadow-sm">

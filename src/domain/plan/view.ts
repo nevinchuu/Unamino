@@ -1,5 +1,6 @@
 import type { Offer } from "@/domain/offers/schema";
 import type { PaymentsMode } from "@/domain/payments/types";
+import { tripKeptUntil } from "@/domain/retention/policy";
 import { passportRequiredFor } from "@/domain/travellers/requirements";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
 import { planReference } from "@/lib/plan-reference";
@@ -151,6 +152,10 @@ export interface PlanViewDto {
   readonly status: PlanStatus;
   readonly city: string | null;
   readonly dates: string | null;
+  /** The trip's own dates, "YYYY-MM-DD", for a calendar file. */
+  readonly tripDates: { readonly departDate: string | null; readonly returnDate: string | null };
+  /** The day a booked trip's chat, plans and booking details are deleted, "YYYY-MM-DD". Null until the trip is booked, or when it has no dates. */
+  readonly keptUntil: string | null;
   readonly headcount: number;
   /** ISO time. Moves later when the offers are renewed. */
   readonly deadlineAt: string;
@@ -363,6 +368,8 @@ export function buildPlanView(
     status: raw.status,
     city: raw.trip.city,
     dates: dateRange(raw.trip.departDate, raw.trip.returnDate),
+    tripDates: { departDate: raw.trip.departDate, returnDate: raw.trip.returnDate },
+    keptUntil: raw.status === "booked" || raw.status === "captured" ? tripKeptUntil(raw.trip) : null,
     headcount: raw.headcount,
     deadlineAt: raw.deadlineAt.toISOString(),
     replacedBy: raw.replacedByPlanId,
