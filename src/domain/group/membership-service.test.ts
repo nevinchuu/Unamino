@@ -137,14 +137,26 @@ describe("MembershipService", () => {
 
     it("removes the person, ends the open plan and names who did it", async () => {
       const w = world();
-      expect(await w.service.remove(ana, "ben", { resetLink: false })).toEqual({ ok: true, value: { planEnded: true } });
+      expect(await w.service.remove(ana, "ben", { resetLink: false })).toEqual({ ok: true, value: { planEnded: true, removedName: "Ben" } });
       expect(w.groups.leaveCalls).toEqual(["ben"]);
       expect(w.said[0]).toBe("Ana removed Ben from the group. The plan ended and every card hold was released. Mention @trippy to plan again.");
     });
 
+    it("says Trippy is making a new plan when the caller will ask it to", async () => {
+      const w = world();
+      await w.service.remove(ana, "ben", { resetLink: false, replanFollows: true });
+      expect(w.said[0]).toBe("Ana removed Ben from the group. The plan ended and every card hold was released. Trippy is making a new plan for the people left.");
+    });
+
+    it("says nothing about a plan when none was open, even if a new one was to follow", async () => {
+      const w = world({ statuses: [] });
+      await w.service.remove(ana, "ben", { resetLink: false, replanFollows: true });
+      expect(w.said[0]).toBe("Ana removed Ben from the group.");
+    });
+
     it("makes a new invite link when asked, so the person cannot rejoin with the old one", async () => {
       const w = world({ statuses: [] });
-      expect(await w.service.remove(ana, "ben", { resetLink: true })).toEqual({ ok: true, value: { planEnded: false, newJoinToken: "new-secret" } });
+      expect(await w.service.remove(ana, "ben", { resetLink: true })).toEqual({ ok: true, value: { planEnded: false, removedName: "Ben", newJoinToken: "new-secret" } });
     });
 
     it("cannot remove the admin themself, or someone who is not in the group", async () => {

@@ -152,7 +152,7 @@ function ParticipantMenu({ groupId, person }: { readonly groupId: string; readon
         open={confirming === "remove"}
         onOpenChange={(open) => !open && setConfirming(null)}
         title={`Remove ${person.name}?`}
-        description="They leave the chat and can't see it any more. If the group is deciding on a plan, the plan ends and every card hold is released."
+        description="They leave the chat and can't see it any more. If the group is deciding on a plan, the plan ends, every card hold is released, and Trippy makes a new plan for the people left. Everyone agrees again."
         confirmLabel="Remove"
         destructive
         onConfirm={async () => {

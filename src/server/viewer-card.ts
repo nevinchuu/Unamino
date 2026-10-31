@@ -54,6 +54,7 @@ export class ViewerCards {
       canCover: me.actions.cover && people.length > 1,
       shareMinor: me.shareMinor,
       currency,
+      previousShareMinor: people.find((person) => person.isMe)?.previousShareMinor ?? null,
       lines: people.find((person) => person.isMe)?.lines ?? [],
       people: people.map((person) => ({ name: person.name, isMe: person.isMe, agreed: person.agreement === "agreed", approved: person.approval === "approved", held: person.holdPlaced })),
       needsAmount: me.actions.approve || me.awaitingDetails,

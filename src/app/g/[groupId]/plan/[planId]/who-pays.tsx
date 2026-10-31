@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
+import { previousShareNote } from "@/lib/share-change";
 
 /** Where one person stands, in the words of the step the plan is on. */
 function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: PlanViewDto["payments"]): { readonly text: string; readonly icon: ReactNode; readonly good: boolean } {
@@ -31,6 +32,8 @@ function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: 
 /** Everyone's amount and progress. Your own breaks down into its parts, and the total is shown when every share is in one currency. */
 export function WhoPays({ people, status, currency, payments }: { readonly people: readonly PersonDto[]; readonly status: PlanViewDto["status"]; readonly currency: string; readonly payments: PlanViewDto["payments"] }) {
   const amountOf = (person: PersonDto): number | null => (status === "captured" && person.chargedMinor !== null ? person.chargedMinor : person.shareMinor);
+  // Only while the plan is still being decided: afterwards what was charged is what matters.
+  const previousNote = (person: PersonDto): string | null => (status === "captured" ? null : previousShareNote(person.shareMinor, person.previousShareMinor, person.currency));
   const sameCurrency = people.every((person) => person.currency === currency && amountOf(person) !== null);
   const total = sameCurrency ? people.reduce((sum, person) => sum + (amountOf(person) ?? 0), 0) : null;
 
@@ -59,6 +62,7 @@ export function WhoPays({ people, status, currency, payments }: { readonly peopl
                 </div>
                 <p className="shrink-0 font-semibold">{amountOf(person) === null ? "…" : formatMinor(amountOf(person) as number, person.currency)}</p>
               </div>
+              {previousNote(person) ? <p className="mt-1 ml-12 text-xs text-muted-foreground">{previousNote(person)}</p> : null}
               {person.isMe && person.lines.length > 0 ? (
                 <ul className="mt-2 ml-12 space-y-0.5 text-xs text-muted-foreground">
                   {person.lines.map((line) => (

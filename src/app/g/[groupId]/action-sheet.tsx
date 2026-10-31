@@ -9,6 +9,7 @@ import { PlanCountdown } from "@/components/plan-countdown";
 import { StatusChip } from "@/components/status-chip";
 import { formatMinor } from "@/lib/format-money";
 import { describeSheet, type CardMine, type CardPlan } from "@/lib/plan-card";
+import { previousShareNote } from "@/lib/share-change";
 import { cn } from "@/lib/utils";
 import { CoverAction } from "./cover-action";
 import { PlanPreview } from "./plan-preview";
@@ -78,6 +79,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
   }
 
   const share = mine.shareMinor !== null ? formatMinor(mine.shareMinor, mine.currency) : null;
+  const previousNote = previousShareNote(mine.shareMinor, mine.previousShareMinor, mine.currency);
   // A friend covering the whole share leaves nothing to pay, which reads better as a word than as $0.00.
   const covered = mine.shareMinor === 0;
   return (
@@ -125,6 +127,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
                 <span className="text-[13px] text-muted-foreground">Your share</span>
                 <span className="text-xl font-extrabold">{share}</span>
               </div>
+              {previousNote ? <p className="text-right text-xs text-muted-foreground">{previousNote}</p> : null}
             </div>
           ) : null}
 

@@ -35,6 +35,8 @@ export interface CardMine {
   /** Their share, in `currency`'s minor units. The price the Agree button shows, and that the server checks again. */
   readonly shareMinor: number | null;
   readonly currency: string;
+  /** What they would have paid on the plan this one replaced, when there was one and they were in it. */
+  readonly previousShareMinor: number | null;
   /** The parts of their share, such as the flight and the hotel. Empty when the plan cannot be priced in their currency. */
   readonly lines: readonly { readonly label: string; readonly minor: number }[];
   readonly people: readonly CardPerson[];

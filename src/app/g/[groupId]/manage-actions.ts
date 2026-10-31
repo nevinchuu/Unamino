@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+import { runAgent } from "@/domain/agent/run-agent";
 import { getContainer } from "@/server/container";
 import { runDeleteGroup, runIssueAccessLink, runLeave, runMakeAdmin, runRemove, type ManageResult } from "@/server/membership-actions";
 import { currentMember, forgetMember, rememberInviteToken } from "@/server/session";
@@ -13,12 +15,24 @@ export async function leaveGroup(groupId: string): Promise<ManageResult> {
 
 /**
  * The admin removes someone. With `resetLink` the invite link is replaced as well, so the person cannot just join again, and
- * the new link is kept for the admin to copy.
+ * the new link is kept for the admin to copy. If an open plan ended, Trippy then makes a new one for the people left.
  */
 export async function removeMember(groupId: string, targetMemberId: string, resetLink: boolean): Promise<ManageResult> {
-  const result = await runRemove(getContainer(), await currentMember(groupId), { groupId, targetMemberId, resetLink });
+  const container = getContainer();
+  const result = await runRemove(container, await currentMember(groupId), { groupId, targetMemberId, resetLink });
   if (result.ok && result.joinToken) await rememberInviteToken(groupId, result.joinToken);
-  return result.ok ? { ok: true, planEnded: result.planEnded } : result;
+  if (!result.ok) return result;
+
+  // Trippy makes the new plan after the admin has their answer, because a run takes about a minute.
+  const { run } = result;
+  const { agent, personas } = container;
+  if (run || personas) {
+    after(async () => {
+      if (run) await runAgent(agent, run);
+      await personas?.director.kick(groupId);
+    });
+  }
+  return { ok: true, planEnded: result.planEnded };
 }
 
 /**

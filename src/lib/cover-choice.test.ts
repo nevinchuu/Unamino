@@ -4,7 +4,7 @@ import { coverAmount, coverChangeFor, coverNotice, coverTargets, parseMoney } fr
 
 const person = (id: string, overrides: Partial<PersonDto> = {}): PersonDto => ({
   id, name: id, isMe: false, agreement: "pending", approval: "pending", holdPlaced: false, shareMinor: 10_000, currency: "USD",
-  approvedMinor: null, chargedMinor: null, lines: [], ownPartMinor: 10_000, coveredByMe: null, ...overrides,
+  approvedMinor: null, chargedMinor: null, lines: [], ownPartMinor: 10_000, previousShareMinor: null, coveredByMe: null, ...overrides,
 });
 const cover = (sponsorId: string, beneficiaryId: string, amountMinor: number): CoverDto => ({ sponsorId, sponsorName: sponsorId, beneficiaryId, beneficiaryName: beneficiaryId, amountMinor, whole: false, percent: null });
 

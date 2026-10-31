@@ -93,6 +93,8 @@ export interface PersonDto {
   readonly lines: readonly { readonly label: string; readonly minor: number }[];
   /** What they take part in, before any friend covers part of it, in the plan's currency. The most a friend can cover for them. Null if the offers cannot be priced. */
   readonly ownPartMinor: number | null;
+  /** What they would have paid on the plan this one replaced, when there was one and they were in it. */
+  readonly previousShareMinor: number | null;
   /** What the viewer is covering of this person, if anything. */
   readonly coveredByMe: { readonly whole: boolean; readonly percent: number | null; readonly amountMinor: number } | null;
 }
@@ -323,6 +325,9 @@ export function buildPlanView(
   const names = new Map(raw.members.map((member) => [member.id, member.name]));
   const priced = currentShares(raw, raw.picks);
   const shares = new Map(priced.ok ? priced.value.map((share) => [share.memberId, share]) : []);
+  // What each person would have paid before, from the plan this one replaced. Left out when that plan cannot be priced now.
+  const before = raw.previous ? currentShares(raw.previous, raw.previous.picks) : null;
+  const previousShares = new Map(before?.ok ? before.value.map((share) => [share.memberId, share.shareMinor]) : []);
 
   const covers: CoverDto[] = raw.covers.map((cover) => ({
     sponsorId: cover.sponsorId,
@@ -350,6 +355,7 @@ export function buildPlanView(
       chargedMinor: member.chargedMinor,
       lines: share && share.currency === raw.baseCurrency ? [...share.lines.map((line) => ({ label: line.label, minor: line.baseMinor })), ...share.coverLines.map((line) => coverLineOf(line, names))] : [],
       ownPartMinor: share?.baseShareMinor ?? null,
+      previousShareMinor: previousShares.get(member.id) ?? null,
       coveredByMe: mine ? { whole: mine.whole, percent: mine.percent, amountMinor: mine.amountMinor } : null,
     };
   });

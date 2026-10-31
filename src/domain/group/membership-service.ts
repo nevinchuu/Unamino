@@ -1,3 +1,4 @@
+import { REPLANNING_NOTE } from "@/lib/replan-request";
 import { err, ok, type Result } from "@/lib/result";
 import { applyPlanEvent } from "@/domain/plan/apply-event";
 import type { EffectRunner } from "@/domain/plan/effects";
@@ -29,10 +30,11 @@ export interface MembershipDeps {
   readonly clock: () => Date;
 }
 
-/** `planEnded`: an open plan was ended because the people in it changed. `newJoinToken`: the invite link was replaced, shown once. */
+/** `planEnded`: an open plan was ended because the people in it changed. `newJoinToken`: the invite link was replaced, shown once. `removedName`: who the admin removed. */
 export interface MembershipOutcome {
   readonly planEnded: boolean;
   readonly newJoinToken?: string;
+  readonly removedName?: string;
 }
 
 /** Once booking has begun, suppliers hold bookings and money has moved, so the group is frozen. */
@@ -63,7 +65,8 @@ export class MembershipService {
     return ok({ planEnded: ended.value });
   }
 
-  async remove(actor: Member, targetMemberId: string, options: { readonly resetLink: boolean }): Promise<Result<MembershipOutcome, MembershipError>> {
+  /** With `replanFollows`, the chat says Trippy is making a new plan: the caller must then ask it to. */
+  async remove(actor: Member, targetMemberId: string, options: { readonly resetLink: boolean; readonly replanFollows?: boolean }): Promise<Result<MembershipOutcome, MembershipError>> {
     if (!actor.isOrganiser) return err(NOT_ADMIN);
     const target = await this.findPerson(actor.groupId, targetMemberId);
     if (!target.ok) return target;
@@ -73,12 +76,13 @@ export class MembershipService {
     if (!ended.ok) return ended;
     const left = await this.deps.groups.leave(target.value.id);
     if (!left.ok) return err(UNAVAILABLE);
-    await this.announce(actor.groupId, `${actor.displayName} removed ${target.value.displayName} from the group.`, ended.value);
+    await this.announce(actor.groupId, `${actor.displayName} removed ${target.value.displayName} from the group.`, ended.value, options.replanFollows === true);
 
-    if (!options.resetLink) return ok({ planEnded: ended.value });
+    const outcome = { planEnded: ended.value, removedName: target.value.displayName };
+    if (!options.resetLink) return ok(outcome);
     // The link never expires, so without a new one the person could simply join again.
     const replaced = await this.deps.groups.replaceJoinLink(actor.groupId, actor.id);
-    return replaced.ok ? ok({ planEnded: ended.value, newJoinToken: replaced.value }) : ok({ planEnded: ended.value });
+    return ok(replaced.ok ? { ...outcome, newJoinToken: replaced.value } : outcome);
   }
 
   async makeAdmin(actor: Member, targetMemberId: string): Promise<Result<void, MembershipError>> {
@@ -153,8 +157,8 @@ export class MembershipService {
     return ok(ended);
   }
 
-  private async announce(groupId: string, line: string, planEnded: boolean): Promise<void> {
-    const note = planEnded ? " The plan ended and every card hold was released. Mention @trippy to plan again." : "";
+  private async announce(groupId: string, line: string, planEnded: boolean, replanFollows = false): Promise<void> {
+    const note = planEnded ? (replanFollows ? REPLANNING_NOTE : " The plan ended and every card hold was released. Mention @trippy to plan again.") : "";
     await this.deps.messages.postSystem(groupId, `${line}${note}`);
   }
 }

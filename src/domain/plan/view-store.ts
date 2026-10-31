@@ -53,6 +53,9 @@ export interface ViewFailure {
   readonly retryable: boolean;
 }
 
+/** What is needed to work out what each person would have paid on the plan this one replaced. */
+export type PreviousPlan = Pick<PlanViewRaw, "baseCurrency" | "fx" | "members" | "covers" | "picks">;
+
 /** Everything the plan screen shows, as stored. `buildPlanView` turns it into what is sent to the browser. */
 export interface PlanViewRaw {
   readonly id: string;
@@ -76,6 +79,8 @@ export interface PlanViewRaw {
   readonly bookings: readonly ViewBooking[];
   /** Why booking failed, for a plan that ended that way. Absent (or null) for every other plan. */
   readonly failure?: ViewFailure | null;
+  /** The plan this one replaced, while this one is still being decided, so people can see how their amount moved. Absent (or null) otherwise. */
+  readonly previous?: PreviousPlan | null;
 }
 
 export interface PlanViewStore {

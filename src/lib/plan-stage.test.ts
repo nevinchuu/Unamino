@@ -3,7 +3,7 @@ import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "@/domain/p
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
 import { clockText, countdownText, describeStage, isUrgent, priceHoldElapsed } from "./plan-stage";
 
-const person = (id: string, agreement: PlanAgreementStatus = "pending", approval: ApprovalStatus = "pending"): PersonDto => ({ id, name: id, isMe: id === "ana", agreement, approval, holdPlaced: false, shareMinor: 30_000, currency: "USD", approvedMinor: null, chargedMinor: null, lines: [], ownPartMinor: 30_000, coveredByMe: null });
+const person = (id: string, agreement: PlanAgreementStatus = "pending", approval: ApprovalStatus = "pending"): PersonDto => ({ id, name: id, isMe: id === "ana", agreement, approval, holdPlaced: false, shareMinor: 30_000, currency: "USD", approvedMinor: null, chargedMinor: null, lines: [], ownPartMinor: 30_000, previousShareMinor: null, coveredByMe: null });
 
 function view(status: PlanStatus, people: PersonDto[], overrides: Partial<PlanViewDto> = {}, inPlan = true): PlanViewDto {
   const mine = people.find((p) => p.isMe);

@@ -100,6 +100,33 @@ describe("the plan as the screen shows it", () => {
   });
 });
 
+describe("what each person would have paid on the plan before", () => {
+  const before = (memberIds: readonly string[], people = [member("ana", "Ana"), member("ben", "Ben"), member("cai", "Cai")]): PlanViewRaw["previous"] => ({
+    baseCurrency: "USD",
+    fx: { baseCurrency: "USD", source: "test", ratesPerBase: {} },
+    members: people,
+    covers: [],
+    picks: [{ id: "old-hotel", offer: hotel({ totalMinor: 30_000, guests: memberIds.length }), memberIds, reason: "r", notes: {} }],
+  });
+
+  it("is each person's share on the plan this one replaced, so they can see how it moved", () => {
+    const now = view({ previous: before(["ana", "ben", "cai"]) });
+    const shares = now.people.map((person) => [person.id, person.previousShareMinor]);
+    expect(shares).toEqual([["ana", 10_000], ["ben", 10_000]]);
+  });
+
+  it("is empty for someone who was not in the previous plan, and when there was no previous plan", () => {
+    const newcomer = view({ previous: before(["ben"], [member("ben", "Ben")]) });
+    expect(newcomer.people.find((person) => person.id === "ana")?.previousShareMinor).toBeNull();
+    expect(view().people.map((person) => person.previousShareMinor)).toEqual([null, null]);
+  });
+
+  it("is left out when the previous plan cannot be priced now", () => {
+    const broken = view({ previous: { ...before(["ana", "ben", "cai"])!, baseCurrency: "SGD" } });
+    expect(broken.people.map((person) => person.previousShareMinor)).toEqual([null, null]);
+  });
+});
+
 describe("a plan whose booking failed", () => {
   const failure = { reason: "rejected", cause: "meal_plan_changed", part: { kind: "hotel", title: "Riverside Hotel - near the pier" }, undone: [{ kind: "flight", title: "SIN to BKK" }], retryable: false } as const;
 
