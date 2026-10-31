@@ -3,6 +3,7 @@ import { DemoNote } from "@/components/demo-note";
 import { AppBar, Screen } from "@/components/screen";
 import { GROUP_CURRENCY } from "@/server/group-currency";
 import { CreateGroupForm } from "../create-group-form";
+import { DemoButton } from "../demo-button";
 
 export default function NewGroup() {
   return (
@@ -11,6 +12,7 @@ export default function NewGroup() {
       <div className="px-6 pt-5">
         <AboutBlurb />
       </div>
+      <DemoButton />
       <CreateGroupForm currency={GROUP_CURRENCY} />
       <DemoNote />
     </Screen>

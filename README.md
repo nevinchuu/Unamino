@@ -88,9 +88,9 @@ Setting `MUSE_TRACE=1` in development writes every model call and every agent st
 
 You do not need other people: simulated friends can fill the group. A group of one can try the whole flow too.
 
-1. Open [unamino.vercel.app](https://unamino.vercel.app), tap **+** and make a group (any name).
-2. Tap the flask in the chat header and add two **test friends**, for example Maya (tight budget) and Leo (wants his own room). They chat in character, agree, approve and place a Stripe test hold on their own. They are for the hotel only and never fly.
-3. Write: `@trippy plan a Bangkok hotel stay for the 3 of us, hotel only, we are all already there, 11 to 13 Dec 2026, about $200 each`. Planning takes 30 to 40 seconds.
+1. Open [unamino.vercel.app](https://unamino.vercel.app) and tap **Try the demo with test friends**. It makes a group called "Bangkok demo" with three simulated friends (Maya has a tight budget, Leo wants his own room, Priya is easygoing) and asks Trippy for a Bangkok hotel plan in your name. The friends chat in character, agree, approve and place a Stripe test hold on their own. They are for the hotel only and never fly. The plan is ready in about a minute, while you read the chat.
+2. Prefer to set it up yourself? Tap **+**, make a group, tap the flask in the chat header to add test friends, and write: `@trippy plan a Bangkok hotel stay for the 3 of us, hotel only, we are all already there, 11 to 13 Dec 2026, about $200 each`.
+3. Look at the plan Trippy put up. It already respects Maya's budget and Leo's room, because the code refuses a plan that breaks anyone's limits.
 4. Tap **Agree**, then **Approve**, give made-up traveller details, and use the test card `4242 4242 4242 4242` with any future expiry and any CVC.
 5. Watch the progress list: hotel, charge. To see the rollback, tap **Back out** on the plan page before the last hold lands: every hold is released and nobody is charged.
 6. Try the commitment features: tap **I need changes** and watch Trippy adjust the plan, or remove a test friend in Group info (the menu next to their name) and watch Trippy make a new plan for the people left.
