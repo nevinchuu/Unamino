@@ -74,7 +74,7 @@ describe("demoStartVerdict", () => {
   });
 
   it("counts both demo buttons together, and stops at the daily limit even when the last hour was quiet", async () => {
-    const both = [...demos(1, minutesAgo(5), "me", NAMES[0]), ...demos(1, minutesAgo(5), "me", NAMES[1])];
+    const both = [...demos(PER_PERSON_DEMO_LIMITS.perHour - 1, minutesAgo(5), "me", NAMES[0]), ...demos(1, minutesAgo(5), "me", NAMES[1])];
     expect(await demoStartVerdict(counterOf(both), NOW, "me", NAMES)).toBe("person_limit");
     expect(await demoStartVerdict(counterOf(demos(PER_PERSON_DEMO_LIMITS.perDay, minutesAgo(180), "me")), NOW, "me", NAMES)).toBe("person_limit");
   });

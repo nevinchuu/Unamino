@@ -20,7 +20,7 @@ You do not need other people: simulated friends can fill the group. A group of o
 6. **To see what happens when booking fails,** tap **Try the demo where booking fails** on the new-group page instead of the first button. It is the same group and plan, but once the hotel is really booked in the sandbox, a final fare check fails on purpose, and the screen says so (it is labelled a demo). The hotel is cancelled with the supplier, every hold is released and the plan says nothing was charged. Tapping **Back out** before the last hold lands is a different thing: it is a person ending the plan, which also releases every hold.
 7. Try the commitment features: tap **I need changes** and watch Trippy adjust the plan, tap **Cover a friend's share** to pay some or all of someone else's amount (the plan goes back to step 1 so everyone sees the new split, and a friend covered in full has nothing to hold), or remove a test friend in Group info (the menu next to their name) and watch Trippy make a new plan for the people left.
 
-Simulated friends exist only for judging and can be switched off with `PERSONAS=off`. Each demo tap makes about twenty paid model calls, so the demo buttons are limited to 2 an hour and 6 a day per person (and 10 an hour and 40 a day for the whole site). If you reach the limit, your earlier demo groups are in the **Trips** list.
+Simulated friends exist only for judging and can be switched off with `PERSONAS=off`. Each demo tap makes about twenty paid model calls, so the demo buttons are limited to 5 an hour and 6 a day per person (and 10 an hour and 40 a day for the whole site). If you reach the limit, your earlier demo groups are in the **Trips** list.
 
 ## What was written during the hackathon
 

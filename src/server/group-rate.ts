@@ -11,7 +11,7 @@ export const GROUP_CREATION_LIMITS = { perHour: 30, perDay: 200 } as const;
  * The same, for the demo button only. Each tap makes a group with three simulated friends and starts a plan, which is
  * about twenty paid model calls, so it is held far lower than ordinary groups.
  */
-export const PER_PERSON_DEMO_LIMITS = { perHour: 2, perDay: 6 } as const;
+export const PER_PERSON_DEMO_LIMITS = { perHour: 5, perDay: 6 } as const;
 export const DEMO_START_LIMITS = { perHour: 10, perDay: 40 } as const;
 
 export const TOO_MANY_BY_YOU = "You've made several groups in a short time. Please try again in a little while.";
