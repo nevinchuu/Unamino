@@ -1,4 +1,4 @@
-import { and, asc, count, eq, gte } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
 import { generateToken, hashToken } from "@/lib/tokens";
 import { MAX_GROUP_MEMBERS, MAX_NAME_LENGTH, type Group, type GroupError, type JoinLinkPreview, type Member } from "@/domain/group/types";
@@ -41,14 +41,14 @@ function personProblem(person: { readonly displayName: string; readonly currency
 /** Stores groups and who is in them. Secrets are only ever stored as hashes. */
 export class PostgresGroupRepository implements GroupRepository {
   /** How many groups were made since a moment, for the limit on making them. Not part of what the app asks of a group. */
-  async createdSince(since: Date): Promise<number> {
-    const [row] = await this.db.select({ total: count() }).from(groups).where(gte(groups.createdAt, since));
+  async createdSince(since: Date, names?: readonly string[]): Promise<number> {
+    const [row] = await this.db.select({ total: count() }).from(groups).where(and(gte(groups.createdAt, since), names && inArray(groups.name, [...names])));
     return row.total;
   }
 
   /** How many groups one person (by their key) made since a moment. */
-  async createdBySince(creatorKey: string, since: Date): Promise<number> {
-    const [row] = await this.db.select({ total: count() }).from(groups).where(and(eq(groups.creatorKey, creatorKey), gte(groups.createdAt, since)));
+  async createdBySince(creatorKey: string, since: Date, names?: readonly string[]): Promise<number> {
+    const [row] = await this.db.select({ total: count() }).from(groups).where(and(eq(groups.creatorKey, creatorKey), gte(groups.createdAt, since), names && inArray(groups.name, [...names])));
     return row.total;
   }
 

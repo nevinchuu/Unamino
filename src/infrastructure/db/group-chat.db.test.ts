@@ -49,6 +49,21 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
       expect(memberToken).not.toEqual(joinToken);
     }, 30_000);
 
+    it("counts groups by name when asked, so the demo limit sees only demo groups", async () => {
+      const key = `db-test-${Date.now()}`;
+      for (const name of ["db-test-demo-count", "db-test-other"]) {
+        const made = await groupRepo.create({ name, baseCurrency: "USD", organiser: ME, creatorKey: key });
+        if (!made.ok) throw new Error(made.error.message);
+        created.push(made.value.group.id);
+      }
+      const since = new Date(Date.now() - 60_000);
+
+      expect(await groupRepo.createdBySince(key, since)).toBe(2);
+      expect(await groupRepo.createdBySince(key, since, ["db-test-demo-count"])).toBe(1);
+      expect(await groupRepo.createdBySince(key, since, ["no-such-name"])).toBe(0);
+      expect(await groupRepo.createdSince(since, ["db-test-demo-count"])).toBeGreaterThanOrEqual(1);
+    }, 30_000);
+
     it("keeps whether a group is the demo whose booking fails, false unless asked and for an unknown group", async () => {
       const ordinary = await newGroup();
       const made = await groupRepo.create({ name: "db-test-demo-failure", baseCurrency: "USD", organiser: ME, demoFailure: true });

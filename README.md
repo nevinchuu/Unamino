@@ -8,6 +8,20 @@ Built for the Meta Global AI Developer Hackathon (Indie Developer track, "Build 
 
 > **Everything here runs on test data.** Flights and hotels come from the liteAPI sandbox, and cards are in Stripe test mode. No real booking is made and no real money moves. See [Sandbox and test mode](#sandbox-and-test-mode).
 
+## A 60-second path for judges
+
+You do not need other people: simulated friends can fill the group. A group of one can try the whole flow too.
+
+1. Open [unamino.vercel.app](https://unamino.vercel.app) and tap **Try the demo with test friends**. It makes a group called "Bangkok demo" with three simulated friends (Maya has a tight budget, Leo wants his own room, Priya is easygoing) and asks Trippy for a Bangkok hotel plan in your name. The friends chat in character, agree, approve and place a Stripe test hold on their own. They are for the hotel only and never fly. The plan is ready in about a minute, while you read the chat.
+2. Prefer to set it up yourself? Tap **+**, make a group, tap the flask in the chat header to add test friends, and write: `@trippy plan a Bangkok hotel stay for the 3 of us, hotel only, we are all already there, 11 to 13 Dec 2026, about $200 each`.
+3. Look at the plan Trippy put up. It already respects Maya's budget and Leo's room, because the code refuses a plan that breaks anyone's limits.
+4. Tap **Agree**, then **Approve**, give made-up traveller details, and use the test card `4242 4242 4242 4242` with any future expiry and any CVC.
+5. Watch the progress list: hotel, charge. The plan then says **Trip confirmed**.
+6. **To see what happens when booking fails,** tap **Try the demo where booking fails** on the new-group page instead of the first button. It is the same group and plan, but once the hotel is really booked in the sandbox, a final fare check fails on purpose, and the screen says so (it is labelled a demo). The hotel is cancelled with the supplier, every hold is released and the plan says nothing was charged. Tapping **Back out** before the last hold lands is a different thing: it is a person ending the plan, which also releases every hold.
+7. Try the commitment features: tap **I need changes** and watch Trippy adjust the plan, tap **Cover a friend's share** to pay some or all of someone else's amount (the plan goes back to step 1 so everyone sees the new split, and a friend covered in full has nothing to hold), or remove a test friend in Group info (the menu next to their name) and watch Trippy make a new plan for the people left.
+
+Simulated friends exist only for judging and can be switched off with `PERSONAS=off`. Each demo tap makes about twenty paid model calls, so the demo buttons are limited to 2 an hour and 6 a day per person (and 10 an hour and 40 a day for the whole site). If you reach the limit, your earlier demo groups are in the **Trips** list.
+
 ## What was written during the hackathon
 
 Everything in this repository was written during the event: the first commit is dated 27 October 2026. Open-source dependencies are listed in `package.json`.
@@ -28,7 +42,7 @@ The planner is the way in. The product is the commitment engine behind it:
 ### The rules the code enforces
 
 - **Nobody is charged unless everyone has approved.** A pure state machine (`src/domain/plan/transition.ts`) decides every step.
-- **The cap rule.** A charge can never exceed what the person approved. It is checked in four places: the state machine, the hold service, a database constraint, and Stripe itself.
+- **The cap rule.** A charge can never exceed what the person approved. It is checked in four places: the state machine (`planCaptures` and the `member_charged` step in `src/domain/plan/transition.ts`), the hold service (`captureHolds` in `src/domain/payments/hold-service.ts`), a database constraint (`plan_members_charge_within_cap`, in `drizzle/0000_dashing_medusa.sql`), and Stripe itself, which refuses to capture more than the hold was authorised for. The fake Stripe used in the tests mirrors that last rule, so the real one is only exercised by the opt-in live tests.
 - **Book first, charge last.** Cards are charged only after the suppliers confirm.
 - **The rollback is true because of the order things are booked in.** Whatever can be cancelled for free is booked first and the part that cannot is booked last (`src/domain/booking/order.ts`), so a failure always leaves what was already booked undoable. The hotel search asks liteAPI for refundable rates as well as the cheapest ones, and a free-cancel room is always on the shortlist. If two or more parts of a plan cannot be cancelled for free, the plan page says plainly which part a later failed booking would not refund. The rollback is tested against the real liteAPI sandbox: a free-cancel hotel is really booked, a stand-in airline refuses the flight, and the runner must cancel the hotel and release the holds (`src/infrastructure/liteapi/rollback.live.test.ts`).
 - **People's limits are firm.** A cabin class, free cancellation, a meal need, their own room, a budget and flight times are not preferences. A plan that breaks any of them is refused and saved nowhere. When no option meets a need, Trippy says so honestly and suggests one alternative, and only that person can relax their own need. A need that cannot be checked from the data, such as halal meals, holds the plan until the person says they will confirm it themselves.
@@ -77,25 +91,12 @@ The loop in one picture:
    one reply to the group  ◄── amounts it did not get from a search or the chat are removed
               │
               ▼
-   agree ► approve your cap ► hold ► everyone in ► book (free-cancel first) ► charge
+   agree ► approve your cap ► hold ► everyone has approved ► book (free-cancel first) ► charge
                                          │
                                          └─ any failure: cancel what was booked, release every hold
 ```
 
 Setting `MUSE_TRACE=1` in development writes every model call and every agent step to `.muse-trace/trace.jsonl`, so a turn can be read back step by step.
-
-## A 60-second path for judges
-
-You do not need other people: simulated friends can fill the group. A group of one can try the whole flow too.
-
-1. Open [unamino.vercel.app](https://unamino.vercel.app) and tap **Try the demo with test friends**. It makes a group called "Bangkok demo" with three simulated friends (Maya has a tight budget, Leo wants his own room, Priya is easygoing) and asks Trippy for a Bangkok hotel plan in your name. The friends chat in character, agree, approve and place a Stripe test hold on their own. They are for the hotel only and never fly. The plan is ready in about a minute, while you read the chat.
-2. Prefer to set it up yourself? Tap **+**, make a group, tap the flask in the chat header to add test friends, and write: `@trippy plan a Bangkok hotel stay for the 3 of us, hotel only, we are all already there, 11 to 13 Dec 2026, about $200 each`.
-3. Look at the plan Trippy put up. It already respects Maya's budget and Leo's room, because the code refuses a plan that breaks anyone's limits.
-4. Tap **Agree**, then **Approve**, give made-up traveller details, and use the test card `4242 4242 4242 4242` with any future expiry and any CVC.
-5. Watch the progress list: hotel, charge. To see the rollback, tap **Back out** on the plan page before the last hold lands: every hold is released and nobody is charged.
-6. Try the commitment features: tap **I need changes** and watch Trippy adjust the plan, or remove a test friend in Group info (the menu next to their name) and watch Trippy make a new plan for the people left.
-
-Simulated friends exist only for judging and can be switched off with `PERSONAS=off`.
 
 ## Identity and recovery
 
@@ -166,12 +167,12 @@ Optionally run `stripe listen --forward-to localhost:3000/api/stripe/webhook` an
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm test        # about 1,700 tests
+pnpm test        # about 1,800 tests run by default; the opt-in ones are skipped
 pnpm typecheck   # also generates the route types a fresh clone needs
 pnpm lint
 ```
 
-Tests that call real services (Muse, Stripe, liteAPI, the database) are opt-in and skipped by default. Their commands are in the header of each `*.live.test.ts` and `*.db.test.ts` file. The rollback check, which books and cancels a real sandbox hotel, is `rollback.live.test.ts`.
+Tests that call real services (Muse, Stripe, liteAPI, the database) are opt-in and skipped by default. `pnpm test` needs no keys. The two measured results below (the agent check and the nudge check) were produced with the author's own Muse, Stripe and liteAPI sandbox keys, so reproducing them needs your own. Their commands are in the header of each `*.live.test.ts` and `*.db.test.ts` file. The rollback check, which books and cancels a real sandbox hotel, is `rollback.live.test.ts`.
 
 ### How well the agent behaves, measured
 

@@ -9,17 +9,22 @@ import { clientAddressOf, creatorKeyFor } from "@/server/client-key";
 import { getContainer } from "@/server/container";
 import { GROUP_CURRENCY } from "@/server/group-currency";
 import { groupErrorMessage, parseCreateGroup, type FormState } from "@/server/forms";
-import { groupCreationVerdict, TOO_MANY_BY_YOU, TOO_MANY_GROUPS } from "@/server/group-rate";
+import { demoStartVerdict, groupCreationVerdict, TOO_MANY_BY_YOU, TOO_MANY_DEMOS, TOO_MANY_DEMOS_BY_YOU, TOO_MANY_GROUPS } from "@/server/group-rate";
 import { sendChatMessage } from "@/server/send-message";
 import { rememberInviteToken, rememberMember } from "@/server/session";
 
 /** The group that was made, or what to tell the person when it was not. Nothing here redirects, so a caller can carry on before it does. */
 type MadeGroup = { readonly ok: true; readonly groupId: string } | { readonly ok: false; readonly state: FormState };
 
+/** Who is asking, as a keyed hash of their network address, for limiting what one person starts. Null when the address is not known. */
+async function creatorKeyOfRequest(): Promise<string | null> {
+  return creatorKeyFor(clientAddressOf(await headers()), getContainer().cronSecret);
+}
+
 /** Makes a group and signs its creator in as the organiser, keeping the invite link for them to share. Holds a person to the limit on how many groups they may make. */
 async function makeGroup(groupName: string, yourName: string, demoFailure = false): Promise<MadeGroup> {
-  const { groups, groupCounter, cronSecret } = getContainer();
-  const creatorKey = creatorKeyFor(clientAddressOf(await headers()), cronSecret);
+  const { groups, groupCounter } = getContainer();
+  const creatorKey = await creatorKeyOfRequest();
   const verdict = await groupCreationVerdict(groupCounter, new Date(), creatorKey);
   if (verdict !== "allowed") return { ok: false, state: { message: verdict === "person_limit" ? TOO_MANY_BY_YOU : TOO_MANY_GROUPS, values: { groupName, yourName } } };
 
@@ -64,8 +69,12 @@ export async function startFailingDemoGroup(): Promise<FormState> {
 }
 
 async function runDemo(groupName: string, demoFailure: boolean): Promise<FormState> {
-  const { personas, groups, messages, agent } = getContainer();
+  const { personas, groups, messages, agent, groupCounter } = getContainer();
   if (!personas) return { message: "The demo is switched off on this server." };
+
+  // Each demo costs about twenty model calls, so it has its own, lower limits, checked before anything is made.
+  const verdict = await demoStartVerdict(groupCounter, new Date(), await creatorKeyOfRequest(), [DEMO_GROUP_NAME, DEMO_FAILING_GROUP_NAME]);
+  if (verdict !== "allowed") return { message: verdict === "person_limit" ? TOO_MANY_DEMOS_BY_YOU : TOO_MANY_DEMOS };
 
   const made = await makeGroup(groupName, DEMO_ORGANISER_NAME, demoFailure);
   if (!made.ok) return made.state;
