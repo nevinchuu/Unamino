@@ -11,6 +11,7 @@ import { formatMinor } from "@/lib/format-money";
 import { describeSheet, type CardMine, type CardPlan } from "@/lib/plan-card";
 import { previousShareNote } from "@/lib/share-change";
 import { cn } from "@/lib/utils";
+import { ApprovalList, ApprovalStrip } from "./approval-strip";
 import { CoverAction } from "./cover-action";
 import { PlanPreview } from "./plan-preview";
 import { remindGroup } from "./actions";
@@ -30,7 +31,7 @@ interface ActionSheetProps {
 }
 
 /**
- * The panel above the composer for the plan the group is deciding on. It shows where the plan stands ("2/4 agreed")
+ * The panel above the composer for the plan the group is deciding on. It shows where the plan stands ("1/4 approved", with a ring for each person)
  * and offers this person their next step: agree to it, ask for changes, or approve their amount. A small button at the side
  * covers a friend's share without opening the full plan. It opens by itself
  * while there is something to do and folds away while the person is only waiting, and either can be changed by tapping the handle.
@@ -95,9 +96,12 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
         </span>
       </button>
 
+      <ApprovalStrip people={mine.people} />
+
       <div className="flex flex-col gap-0.5">
         <h2 className="text-base font-extrabold">{view.step === "approve" ? "Approve your amount" : plan.title}</h2>
         {view.note ? <p className="text-[13px] text-muted-foreground">{view.note}</p> : null}
+        {!open && view.step === "agree" && view.actionable ? <p className="text-[13px] text-muted-foreground">Agree first, it costs nothing. Approving your amount comes next.</p> : null}
       </div>
 
       {!open && view.actionable && share ? (
@@ -114,6 +118,8 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
 
       {open ? (
         <>
+          <ApprovalList people={mine.people} />
+
           {view.step === "agree" && share ? (
             <div className="flex flex-col gap-2 rounded-2xl bg-background px-3.5 py-3">
               {mine.lines.map((line) => (

@@ -69,12 +69,12 @@ describe("tripStatus", () => {
     expect(tripStatus(plan(), [])).toEqual({ label: "2 of 4 agreed", tone: "success" });
   });
 
-  it("counts who is in once amounts are being approved", () => {
-    expect(tripStatus(plan({ status: "approving" }), [person("Ana", { held: true }), person("Ben")])).toEqual({ label: "1 of 4 in", tone: "pending" });
+  it("counts who has approved once amounts are being approved", () => {
+    expect(tripStatus(plan({ status: "approving" }), [person("Ana", { held: true }), person("Ben")])).toEqual({ label: "1 of 4 approved", tone: "pending" });
   });
 
-  it("says everyone is in once every hold is placed", () => {
-    expect(tripStatus(plan({ status: "held" }), [])).toEqual({ label: "Everyone's in", tone: "pending" });
+  it("says everyone has approved once every hold is placed", () => {
+    expect(tripStatus(plan({ status: "held" }), [])).toEqual({ label: "Everyone has approved", tone: "pending" });
   });
 
   it("calls a paid trip booked, and an ended plan ended", () => {

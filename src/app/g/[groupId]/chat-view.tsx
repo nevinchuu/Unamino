@@ -4,7 +4,6 @@ import { ArrowDown, ArrowLeft, ArrowUp, Loader2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentAvatar, AvatarStack } from "@/components/avatar";
-import { commitmentOf } from "@/lib/commitment";
 import { mentionsAgent } from "@/domain/group/mention";
 import { layoutMessages, snippet } from "@/lib/chat-format";
 import { lastSeq, mergeMessages, visiblePending, type PendingMessage } from "@/lib/chat-state";
@@ -245,7 +244,6 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
   // The server gives the person's own next step only on the group's newest open plan, so that is the plan the sheet is about.
   const decidingOn = plans.find((plan) => plan.mine) ?? null;
   // Each person's ring in the header: how far they have got on the plan being decided.
-  const standing = new Map((decidingOn?.mine?.people ?? []).map((person) => [person.name, commitmentOf(person)] as const));
   // When the sheet is not about the current plan (it is booked, or the person is not in it), a strip keeps it one tap away.
   const current = latestPlan(plans);
 
@@ -260,7 +258,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
             <h1 className="truncate text-lg leading-tight font-extrabold">{groupName}</h1>
             <p className="truncate text-xs text-muted-foreground">{members.length > 0 ? members.join(", ") : "Tap for group info"}</p>
           </div>
-          <AvatarStack people={members.map((name) => ({ name, commitment: standing.get(name) ?? null }))} max={4} size={28} />
+          <AvatarStack people={members.map((name) => ({ name }))} max={4} size={28} />
         </Link>
         <PersonasSheet groupId={groupId} />
       </header>

@@ -11,16 +11,14 @@ interface AvatarProps {
   readonly size?: number;
   /** A small green dot at the bottom right: this person has agreed or put their card on hold. */
   readonly dot?: boolean;
-  /** How far this person has got towards committing, drawn as a ring: dashed grey, amber, solid amber, and green with a tick once they are in. */
+  /** Whether this person has approved, drawn as a ring: dashed grey until then, and solid green with a tick once they have. */
   readonly commitment?: Commitment | null;
   readonly className?: string;
 }
 
 const RING: Readonly<Record<Commitment, string>> = {
   not_yet: "border-dashed border-muted-foreground/40",
-  agreed: "border-pending-foreground/45",
-  approved: "border-pending-foreground",
-  in: "border-success",
+  approved: "border-success",
 };
 
 /** A round coloured circle with initials, the way a chat shows someone who has no photo. */
@@ -37,7 +35,7 @@ export function Avatar({ name, size = 40, dot = false, commitment = null, classN
       {dot ? (
         <span className="absolute -right-0.5 -bottom-0.5 rounded-full border-[1.5px] border-card bg-presence" style={{ width: Math.max(8, size * 0.3), height: Math.max(8, size * 0.3) }} />
       ) : null}
-      {commitment === "in" ? (
+      {commitment === "approved" ? (
         <span className="absolute -right-1 -bottom-1 flex items-center justify-center rounded-full border-[1.5px] border-card bg-success text-primary-foreground" style={{ width: Math.max(10, size * 0.38), height: Math.max(10, size * 0.38) }}>
           <Check style={{ width: "70%", height: "70%" }} strokeWidth={3.5} />
         </span>

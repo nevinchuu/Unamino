@@ -16,19 +16,19 @@ function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: 
   if (status === "captured" && person.chargedMinor !== null) return { text: "Paid", icon: tick, good: true };
 
   if (status === "reviewing" || status === "draft") {
-    if (person.agreement === "agreed") return { text: commitmentLabel("agreed"), icon: tick, good: true };
+    if (person.agreement === "agreed") return { text: "Agreed", icon: tick, good: true };
     if (person.agreement === "declined") return { text: "Declined", icon: cross, good: false };
     return { text: commitmentLabel("not_yet"), icon: wait, good: false };
   }
   if (person.approval === "approved") {
-    if (person.holdPlaced) return { text: commitmentLabel("in"), icon: tick, good: true };
-    // With real cards the hold is made when they approve and the card is added to it afterwards.
-    return payments === "stripe" ? { text: commitmentLabel("approved", true), icon: wait, good: false } : { text: commitmentLabel("approved"), icon: tick, good: true };
+    if (person.holdPlaced) return { text: commitmentLabel("approved"), icon: tick, good: true };
+    // With real cards the hold is made when they approve and the card is added to it afterwards, so they are not approved until then.
+    return payments === "stripe" ? { text: "Card to add", icon: wait, good: false } : { text: commitmentLabel("approved"), icon: tick, good: true };
   }
   if (person.approval === "needs_reapproval") return { text: "Needs to approve again", icon: wait, good: false };
   if (person.approval === "declined") return { text: "Declined", icon: cross, good: false };
   // They agreed to the plan, which is how the plan got to this step, and have not approved their amount yet.
-  return { text: commitmentLabel("agreed"), icon: wait, good: false };
+  return { text: "Agreed", icon: wait, good: false };
 }
 
 /** Everyone's amount and progress. Your own breaks down into its parts, and the total is shown when every share is in one currency. */
@@ -51,7 +51,7 @@ export function WhoPays({ people, status, currency, payments }: { readonly peopl
           return (
             <li key={person.id} className="rounded-lg px-2 py-2">
               <div className="flex items-center gap-3">
-                <Avatar name={person.name} size={36} commitment={commitmentOf({ agreed: person.agreement === "agreed", approved: person.approval === "approved", held: person.holdPlaced })} />
+                <Avatar name={person.name} size={36} commitment={commitmentOf({ held: person.holdPlaced || (payments !== "stripe" && person.approval === "approved") })} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">
                     {person.name}

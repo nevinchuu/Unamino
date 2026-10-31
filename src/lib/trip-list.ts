@@ -52,9 +52,9 @@ export function tripStatus(plan: CardPlan | null, people: readonly CardPerson[])
     case "reviewing":
       return { label: `${plan.agreedCount} of ${plan.headcount} agreed`, tone: "success" };
     case "approving":
-      return { label: `${people.filter((person) => person.held).length} of ${plan.headcount} in`, tone: "pending" };
+      return { label: `${people.filter((person) => person.held).length} of ${plan.headcount} approved`, tone: "pending" };
     case "held":
-      return { label: "Everyone's in", tone: "pending" };
+      return { label: "Everyone has approved", tone: "pending" };
     case "booking":
       return { label: "Booking now", tone: "pending" };
     case "booked":
