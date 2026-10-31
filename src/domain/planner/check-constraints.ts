@@ -1,11 +1,12 @@
 import type { ConstraintSet, MemberConstraints } from "@/domain/constraints/schema";
+import { cabinLabel, cabinRank, type CabinClass } from "@/domain/offers/cabin";
 import { clockTime } from "@/domain/offers/local-time";
-import type { FlightOffer, Offer } from "@/domain/offers/schema";
+import type { FlightOffer, HotelOffer, Offer } from "@/domain/offers/schema";
 import type { MemberShare } from "@/domain/split/types";
 import { formatMinor } from "@/lib/format-money";
 import type { ValidatedPlan } from "./validate";
 
-export type ViolationKind = "departure_window" | "return_window" | "own_room" | "skipped_activity" | "budget_cap";
+export type ViolationKind = "departure_window" | "return_window" | "own_room" | "skipped_activity" | "budget_cap" | "cabin_class" | "free_cancellation" | "meal_unverified";
 
 export interface ConstraintViolation {
   readonly memberId: string;
@@ -46,18 +47,36 @@ function checkDeparture(
   };
 }
 
+/** A fare in a lower cabin than the member needs. A fare with no cabin recorded counts as economy. */
+function checkCabin(memberId: string, flight: FlightOffer, needed: CabinClass | undefined): ConstraintViolation | null {
+  const actual = flight.cabin ?? "ECONOMY";
+  if (needed === undefined || cabinRank(actual) >= cabinRank(needed)) return null;
+  return { memberId, kind: "cabin_class", offerId: flight.id, message: `${memberId} needs ${cabinLabel(needed)} class but ${flight.title} is ${cabinLabel(actual)}` };
+}
+
+const present = (found: readonly (ConstraintViolation | null)[]): ConstraintViolation[] => found.filter((violation): violation is ConstraintViolation => violation !== null);
+
+function checkFreeCancellation(memberId: string, offer: FlightOffer | HotelOffer, constraints: MemberConstraints): ConstraintViolation | null {
+  if (!constraints.freeCancellation) return null;
+  const free = offer.kind === "flight" ? offer.refundable : offer.freeCancellationUntil !== undefined;
+  return free ? null : { memberId, kind: "free_cancellation", offerId: offer.id, message: `${memberId} needs free cancellation but ${offer.title} cannot be cancelled for free` };
+}
+
 /** Where one offer breaks what one member asked for, ignoring budget, which depends on the whole plan. */
 export function checkOffer(memberId: string, offer: Offer, constraints: MemberConstraints): ConstraintViolation[] {
   switch (offer.kind) {
     case "flight":
-      return [
+      return present([
         checkDeparture(memberId, offer, "outbound", constraints.outboundDeparture),
         checkDeparture(memberId, offer, "inbound", constraints.returnDeparture),
-      ].filter((violation): violation is ConstraintViolation => violation !== null);
+        checkCabin(memberId, offer, constraints.cabinClass),
+        checkFreeCancellation(memberId, offer, constraints),
+      ]);
     case "hotel":
-      return constraints.ownRoom && offer.guests > 1
-        ? [{ memberId, kind: "own_room", offerId: offer.id, message: `${memberId} wants their own room but ${offer.title} (${offer.roomName}) is shared by ${offer.guests}` }]
-        : [];
+      return present([
+        constraints.ownRoom && offer.guests > 1 ? { memberId, kind: "own_room", offerId: offer.id, message: `${memberId} wants their own room but ${offer.title} (${offer.roomName}) is shared by ${offer.guests}` } : null,
+        checkFreeCancellation(memberId, offer, constraints),
+      ]);
     case "activity":
       return constraints.skipActivityCategories?.includes(offer.category.toLowerCase())
         ? [{ memberId, kind: "skipped_activity", offerId: offer.id, message: `${memberId} does not want ${offer.category} activities but is in ${offer.title}` }]
@@ -77,6 +96,15 @@ function checkBudget(memberId: string, constraints: MemberConstraints, share: Me
 }
 
 /**
+ * A meal need cannot be checked: neither the flight nor the hotel data says anything about meals. It only counts as met
+ * when the member said they will confirm it themselves, so the plan never promises something nobody can verify.
+ */
+function checkMeal(memberId: string, constraints: MemberConstraints, booksAnything: boolean): ConstraintViolation | null {
+  if (!booksAnything || constraints.mealRequirement === undefined || constraints.mealSelfConfirmed === true) return null;
+  return { memberId, kind: "meal_unverified", message: `${memberId} needs ${constraints.mealRequirement} meals, which cannot be checked from the flight or hotel data` };
+}
+
+/**
  * Lists where a valid plan breaks what members asked for. The planner's pick is checked here, not trusted:
  * a plan may still be the best available, and the violations tell members who is not fully served.
  */
@@ -93,6 +121,8 @@ export function findConstraintViolations(input: {
     }
     const budget = checkBudget(memberId, memberConstraints, shares.find((share) => share.memberId === memberId));
     if (budget) violations.push(budget);
+    const meal = checkMeal(memberId, memberConstraints, plan.picks.some((pick) => pick.memberIds.includes(memberId) && pick.offer.kind !== "activity"));
+    if (meal) violations.push(meal);
   }
   return violations;
 }

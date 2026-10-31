@@ -47,7 +47,7 @@ export function buildFlightRequest(query: FlightQuery, options: FlightRequestOpt
   if (query.returnDate) {
     legs.push({ origin: query.destination, destination: query.origin, date: query.returnDate, direction: "INBOUND" });
   }
-  return { legs, adults: query.guests, currency: options.currency, cabinClass: "ECONOMY" };
+  return { legs, adults: query.guests, currency: options.currency, cabinClass: query.cabinClass ?? "ECONOMY" };
 }
 
 /**
@@ -88,6 +88,8 @@ export function mapFlightOffers(
           direction: segment.direction === "OUTBOUND" ? ("outbound" as const) : ("inbound" as const),
         })),
         refundable: fare.terms?.refundable ?? false,
+        // The search asks for one cabin only, so every fare it returns is in that cabin.
+        cabin: query.cabinClass ?? "ECONOMY",
         expiresAt: fare.expiration,
       };
       const checked = offerSchema.safeParse(candidate);

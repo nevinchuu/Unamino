@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ConstraintSet } from "@/domain/constraints/schema";
 import { computeMemberShares } from "@/domain/split/shares";
-import { findConstraintViolations } from "./check-constraints";
+import { flight, hotel } from "@/domain/plan/test-support";
+import { checkOffer, findConstraintViolations } from "./check-constraints";
 import { toLineItems } from "./line-items";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, FX, MEMBERS, MEMBER_IDS, NOW, WIREFRAME_PLAN, pick, withPicks } from "./test-support";
 import { validatePlan, type ValidatedPlan } from "./validate";
@@ -117,5 +118,50 @@ describe("silent members", () => {
   it("have no constraints to break", () => {
     expect(violationsFor(wireframe(), {})).toEqual([]);
     expect(violationsFor(wireframe(), { nevin: {} })).toEqual([]);
+  });
+});
+
+describe("cabin class", () => {
+  it("flags an economy fare for someone who needs business, and says what it is", () => {
+    const violations = checkOffer("ana", flight({ cabin: "ECONOMY" }), { cabinClass: "BUSINESS" });
+    expect(violations).toEqual([expect.objectContaining({ kind: "cabin_class", memberId: "ana" })]);
+    expect(violations[0].message).toBe("ana needs business class but SIN to BKK is economy");
+  });
+
+  it("counts a fare with no cabin recorded as economy", () => {
+    expect(checkOffer("ana", flight(), { cabinClass: "PREMIUM_ECONOMY" })).toHaveLength(1);
+    expect(checkOffer("ana", flight(), { cabinClass: "ECONOMY" })).toEqual([]);
+  });
+
+  it("accepts a higher cabin than the one asked for", () => {
+    expect(checkOffer("ana", flight({ cabin: "FIRST" }), { cabinClass: "BUSINESS" })).toEqual([]);
+    expect(checkOffer("ana", flight({ cabin: "BUSINESS" }), { cabinClass: "BUSINESS" })).toEqual([]);
+  });
+});
+
+describe("free cancellation", () => {
+  it("flags a non-refundable flight and a hotel with no free cancellation, and passes ones that have it", () => {
+    expect(checkOffer("dan", flight({ refundable: false }), { freeCancellation: true })).toEqual([expect.objectContaining({ kind: "free_cancellation" })]);
+    expect(checkOffer("dan", flight({ refundable: true }), { freeCancellation: true })).toEqual([]);
+    expect(checkOffer("dan", hotel(), { freeCancellation: true })).toEqual([expect.objectContaining({ kind: "free_cancellation" })]);
+    expect(checkOffer("dan", hotel({ freeCancellationUntil: "2026-12-10T12:00:00Z" }), { freeCancellation: true })).toEqual([]);
+  });
+
+  it("asks nothing of someone who did not say it matters", () => {
+    expect(checkOffer("dan", hotel(), {})).toEqual([]);
+  });
+});
+
+describe("meal needs", () => {
+  const plan = () => planOf([pick("fx-flt-early", ALL)]);
+
+  it("can never be checked from the offers, so a plan that books the person is flagged until they confirm it themselves", () => {
+    expect(violationsFor(plan(), { ana: { mealRequirement: "halal" } })).toEqual([expect.objectContaining({ memberId: "ana", kind: "meal_unverified" })]);
+    expect(violationsFor(plan(), { ana: { mealRequirement: "halal", mealSelfConfirmed: true } })).toEqual([]);
+  });
+
+  it("flags a person once, however many things they are booked on", () => {
+    const many = violationsFor(wireframe(), { ana: { mealRequirement: "vegan" } });
+    expect(many.filter((violation) => violation.kind === "meal_unverified")).toHaveLength(1);
   });
 });

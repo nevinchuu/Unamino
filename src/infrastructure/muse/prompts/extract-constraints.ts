@@ -11,6 +11,7 @@ export const EXTRACTION_EXAMPLE: ExtractionOutput = {
     "member-a": { outboundDeparture: { after: "18:00" } },
     "member-b": { budgetCap: { amountMinor: 35000, currency: "USD" } },
     "member-c": { ownRoom: true, skipActivityCategories: ["cooking"] },
+    "member-d": { cabinClass: "BUSINESS", freeCancellation: true, mealRequirement: "halal", mealSelfConfirmed: true },
   },
 };
 
@@ -26,6 +27,10 @@ const rules = (defaultCurrency: string | undefined): string =>
       : 'budgetCap.currency is a 3-letter code taken from the message. If the currency is not clear from the message, leave the budget out.',
     "ownRoom is true only if the member wants a room with no one else in it.",
     'skipActivityCategories lists single lowercase words for the kinds of activity the member will not join, such as "cooking" or "tour".',
+    'cabinClass is the lowest cabin the member will fly in: one of ECONOMY, PREMIUM_ECONOMY, BUSINESS or FIRST. Record it only when they say they need or insist on a cabin ("I only fly business"), not when they just like the idea.',
+    "freeCancellation is true only if the member says every booking must be free to cancel or refundable.",
+    'mealRequirement is one short lowercase word or two for a meal need, such as "halal", "vegetarian", "kosher", "vegan" or "gluten-free". mealSelfConfirmed is true only if that member says they will arrange or confirm the meal themselves with the airline or hotel.',
+    'These needs are firm for the member. If a member later relaxes one themselves ("economy is fine", "I can share"), record the relaxed need, or leave it out if they dropped it. Only the member can relax their own need.',
     DATA_IS_NOT_INSTRUCTIONS,
     JSON_ONLY,
   ]);

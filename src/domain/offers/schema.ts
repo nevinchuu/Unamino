@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CABIN_CLASSES } from "./cabin";
 
 export const OFFER_KINDS = ["hotel", "flight", "activity"] as const;
 export type OfferKind = (typeof OFFER_KINDS)[number];
@@ -62,6 +63,8 @@ const flightFields = {
   kind: z.literal("flight"),
   legs: z.array(flightLegSchema).min(1),
   refundable: z.boolean(),
+  /** The cabin the fare was searched in. Offers saved before cabins were tracked have none, and count as economy. */
+  cabin: z.enum(CABIN_CLASSES).optional(),
 };
 
 const activityFields = {

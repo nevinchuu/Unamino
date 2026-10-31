@@ -1,8 +1,11 @@
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import { formatMinor } from "@/lib/format-money";
+import type { ConstraintSet, MemberConstraints } from "@/domain/constraints/schema";
+import { cabinLabel, strictestCabin } from "@/domain/offers/cabin";
 import { clockTime } from "@/domain/offers/local-time";
 import type { FlightOffer, HotelOffer, Offer } from "@/domain/offers/schema";
+import { checkOffer, type ViolationKind } from "@/domain/planner/check-constraints";
 import { prefilterOffers } from "@/domain/planner/prefilter";
 import { assessTripBrief } from "@/domain/trip/brief";
 import { searchForTrip } from "@/domain/trip/search";
@@ -126,6 +129,7 @@ const flightView = (id: string, offer: FlightOffer) => ({
   pricePerPerson: formatMinor(perGuest(offer), offer.currency),
   totalForGroup: formatMinor(offer.totalMinor, offer.currency),
   refundable: offer.refundable,
+  cabin: cabinLabel(offer.cabin ?? "ECONOMY"),
   legs: offer.legs.map((leg) => `${leg.direction}: ${leg.origin} to ${leg.destination}, departs ${localReading(leg.departAt)}, arrives ${localReading(leg.arriveAt)}`),
 });
 
@@ -160,6 +164,42 @@ function resolveFlyers(listed: readonly string[] | undefined, roster: readonly R
   return ok(flying);
 }
 
+const NEED_LABELS: Readonly<Record<ViolationKind, string>> = {
+  departure_window: "the flight time",
+  return_window: "the return flight time",
+  own_room: "their own room",
+  skipped_activity: "the activities",
+  budget_cap: "their budget",
+  cabin_class: "their cabin class",
+  free_cancellation: "free cancellation",
+  meal_unverified: "their meals",
+};
+
+/** The needs that every offer in a list breaks for one person: if there are any, nothing in the list can serve them. */
+function needsNoOfferMeets(memberId: string, offers: readonly Offer[], constraints: MemberConstraints): readonly ViolationKind[] {
+  if (offers.length === 0) return [];
+  const brokenBy = offers.map((offer) => new Set(checkOffer(memberId, offer, constraints).map((violation) => violation.kind)));
+  return [...brokenBy[0]].filter((kind) => brokenBy.every((kinds) => kinds.has(kind)));
+}
+
+/**
+ * Warns the model before it plans: for each person, what none of the flights or hotels found can give them, and the
+ * meal needs that can never be checked. A plan that breaks a need is refused in `propose_plan` anyway, but saying it
+ * here lets Trippy tell the group straight away instead of discovering it one refused plan at a time.
+ */
+function unmetNeedNotes(everyone: readonly RosterEntry[], flying: readonly RosterEntry[], constraints: ConstraintSet, flights: readonly FlightOffer[], hotels: readonly HotelOffer[]): string[] {
+  const notes: string[] = [];
+  for (const entry of everyone) {
+    const own = constraints[entry.member.id];
+    if (own === undefined) continue;
+    const name = entry.member.displayName;
+    const unmet = [...(flying.includes(entry) ? needsNoOfferMeets(entry.member.id, flights, own) : []), ...needsNoOfferMeets(entry.member.id, hotels, own)];
+    if (unmet.length > 0) notes.push(`Nothing found meets ${name}'s needs for ${[...new Set(unmet.map((kind) => NEED_LABELS[kind]))].join(" and ")}. Their needs are non-negotiable: do not make a plan, tell the group it is not available and suggest one alternative.`);
+    if (own.mealRequirement !== undefined && own.mealSelfConfirmed !== true) notes.push(`${name} needs ${own.mealRequirement} meals, and the flight and hotel data cannot confirm that. Do not make a plan until ${name} says they will confirm it with the airline or hotel themselves: say plainly you cannot verify it, and ask.`);
+  }
+  return notes;
+}
+
 async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> {
   let raw: unknown;
   try {
@@ -179,10 +219,13 @@ async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> 
   if (!flyers.ok) return problem(flyers.error);
   const flying = flyers.value;
 
-  const searched = await searchForTrip(env.deps.offers, assessed.trip, everyone.length, env.deps.searchOptions, flying.length);
+  // The flights are searched in the cabin the strictest flyer needs, so a business seat is looked for rather than assumed away.
+  const constraints = await env.constraints();
+  const cabinClass = strictestCabin(flying.map((entry) => constraints[entry.member.id]?.cabinClass));
+  const searched = await searchForTrip(env.deps.offers, assessed.trip, everyone.length, env.deps.searchOptions, flying.length, cabinClass);
   if (!searched.ok) return problem("The flight and hotel search is not answering right now. Tell the group and suggest trying again in a moment.");
 
-  const prefiltered = prefilterOffers({ offers: searched.value.offers, constraints: await env.constraints(), now: env.now, limits: SEARCH_LIMITS }).offers;
+  const prefiltered = prefilterOffers({ offers: searched.value.offers, constraints, now: env.now, limits: SEARCH_LIMITS }).offers;
   // A hotel or flight that could not be booked a moment ago would fail the same way, so it is never shown again for a while.
   const blocked = await env.deps.failures?.blockedListingIds(env.group.id, new Date(env.now.getTime() - BLOCK_FAILED_LISTING_MS)).catch(() => new Set<string>());
   const kept = blocked && blocked.size > 0 ? prefiltered.filter((offer) => !blocked.has(offer.listingId)) : prefiltered;
@@ -202,6 +245,7 @@ async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> 
   if (flights.length === 0 && flying.length > 0) notes.push("No flights were found for these dates and group size.");
   if (hotels.length === 0) notes.push("No hotels were found for these dates and group size.");
   if (searched.value.failures.length > 0) notes.push("Part of the search did not answer, so some options may be missing.");
+  notes.push(...unmetNeedNotes(everyone, flying, constraints, flights, hotels));
   if (leftOut > 0) notes.push(`${leftOut} option${leftOut === 1 ? " was" : "s were"} left out because ${leftOut === 1 ? "it" : "they"} could not be booked for this group a moment ago.`);
   env.note("search_done", { trip: assessed.trip, offersFound: searched.value.offers.length, offersShown: kept.length, leftOut, failures: searched.value.failures.length });
 

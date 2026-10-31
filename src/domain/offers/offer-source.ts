@@ -1,4 +1,5 @@
 import type { Result } from "@/lib/result";
+import type { CabinClass } from "./cabin";
 import type { Offer } from "./schema";
 
 interface QueryBase {
@@ -24,6 +25,8 @@ export interface FlightQuery extends QueryBase {
   readonly departDate: string;
   /** When present the offers are round trips. */
   readonly returnDate?: string;
+  /** The cabin to search in. Economy when left out. */
+  readonly cabinClass?: CabinClass;
 }
 
 export interface ActivityQuery extends QueryBase {

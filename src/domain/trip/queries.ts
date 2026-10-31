@@ -1,3 +1,4 @@
+import type { CabinClass } from "@/domain/offers/cabin";
 import type { OfferQuery } from "@/domain/offers/offer-source";
 import type { CompleteTrip } from "./brief";
 
@@ -10,7 +11,7 @@ export const MAX_ROOM_SIZE = 4;
  * Someone already at the destination needs a room but no flight, so `flyers` can be fewer than `headcount`, even none.
  * Activities are not searched: no source provides them yet.
  */
-export function tripToQueries(trip: CompleteTrip, headcount: number, flyers: number = headcount): readonly OfferQuery[] {
+export function tripToQueries(trip: CompleteTrip, headcount: number, flyers: number = headcount, cabinClass?: CabinClass): readonly OfferQuery[] {
   if (!Number.isInteger(headcount) || headcount < 1) return [];
   if (!Number.isInteger(flyers) || flyers < 0 || flyers > headcount) return [];
 
@@ -22,6 +23,7 @@ export function tripToQueries(trip: CompleteTrip, headcount: number, flyers: num
     departDate: trip.departDate,
     returnDate: trip.returnDate,
     guests: flyers,
+    ...(cabinClass && { cabinClass }),
   };
 
   const roomSizes = Array.from({ length: Math.min(headcount, MAX_ROOM_SIZE) }, (_, index) => index + 1);

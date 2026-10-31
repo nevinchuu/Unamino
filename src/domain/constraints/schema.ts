@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CABIN_CLASSES } from "@/domain/offers/cabin";
 
 const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected a time as HH:mm");
 
@@ -27,6 +28,14 @@ export const memberConstraintsSchema = z.object({
   ownRoom: z.boolean().optional(),
   /** Lowercase activity categories this member will not join, e.g. "cooking". */
   skipActivityCategories: z.array(z.string().trim().toLowerCase().min(1)).optional(),
+  /** The lowest cabin they will fly in, e.g. "BUSINESS". Economy is what everyone gets by default, so asking for it means nothing. */
+  cabinClass: z.enum(CABIN_CLASSES).optional(),
+  /** Every hotel and flight they are on must be free to cancel. */
+  freeCancellation: z.boolean().optional(),
+  /** A meal need such as "halal" or "vegetarian". Neither the flight nor the hotel data says anything about meals, so it cannot be checked. */
+  mealRequirement: z.string().trim().toLowerCase().min(1).max(40).optional(),
+  /** They said they will arrange or confirm that meal need themselves with the airline or hotel, which is the only way it can count as met. */
+  mealSelfConfirmed: z.boolean().optional(),
 });
 
 export type MemberConstraints = z.infer<typeof memberConstraintsSchema>;

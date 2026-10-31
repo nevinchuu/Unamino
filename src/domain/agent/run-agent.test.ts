@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { err } from "@/lib/result";
+import { err, ok } from "@/lib/result";
+import type { ConstraintSet } from "@/domain/constraints/schema";
 import type { FlightOffer, HotelOffer } from "@/domain/offers/schema";
 import { BANGKOK_OFFERS } from "@/domain/planner/test-support";
 import type { ModelRequest } from "./loop/model";
@@ -174,15 +175,60 @@ describe("searching and planning", () => {
     expect(outcome.usage.calls).toBe(4);
   });
 
-  it("reports who is not fully served, by name, for the model to say", async () => {
+  it("refuses a plan that breaks what someone needs, by name, and saves nothing", async () => {
     const world = buildWorld();
     chat(world);
-    world.script(search(), (request) => proposeFrom(request, FOUR, "13:05"), says("done"));
+    world.script(search(), (request) => proposeFrom(request, FOUR, "13:05"), says("Not available, sorry."));
     await callAgent(world);
-    const result = JSON.parse(toolMessages(world).at(-1) as string) as { notFullyServed: string[] };
-    expect(result.notFullyServed.length).toBeGreaterThan(0);
-    expect(result.notFullyServed.join(" ")).toContain("Ana");
-    expect(result.notFullyServed.join(" ")).not.toMatch(/\bm\d\b/);
+    const { error } = JSON.parse(toolMessages(world).at(-1) as string) as { error: string };
+    expect(error).toContain("non-negotiable");
+    expect(error).toContain("Ana");
+    expect(error).not.toMatch(/\bm\d\b/);
+    expect(error).toContain("ONE concrete alternative");
+    expect(world.plans.records).toEqual([]);
+  });
+});
+
+describe("what people need is firm", () => {
+  // The planner sees people as m1, m2, ...: here m2 is Ana and m3 is Ben.
+  const needing = (constraints: ConstraintSet) => buildWorld({ constraints: () => ok(constraints) });
+
+  it("searches flights in the cabin the strictest flyer needs", async () => {
+    const world = needing({ m2: { cabinClass: "BUSINESS" }, m3: { cabinClass: "PREMIUM_ECONOMY" } });
+    chat(world);
+    world.script(search(), says("Looking."));
+    await callAgent(world);
+    expect(world.source.queries.find((q) => q.kind === "flight")).toMatchObject({ cabinClass: "BUSINESS" });
+  });
+
+  it("tells the model up front when nothing found meets someone's need", async () => {
+    const world = needing({ m2: { cabinClass: "BUSINESS" } });
+    chat(world);
+    world.script(search(), says("No business seats, sorry."));
+    await callAgent(world);
+    const { notes } = JSON.parse(toolMessages(world)[0]) as { notes: string[] };
+    expect(notes.join(" ")).toContain("Nothing found meets Ana's needs for their cabin class");
+    expect(notes.join(" ")).toContain("non-negotiable");
+  });
+
+  it("says a meal need cannot be checked, and refuses a plan until the person confirms it themselves", async () => {
+    const world = needing({ m2: { mealRequirement: "halal" } });
+    chat(world);
+    world.script(search(), (request) => proposeFrom(request), says("I can't verify halal, Ana: will you confirm it with the airline?"));
+    await callAgent(world);
+    const first = JSON.parse(toolMessages(world)[0]) as { notes: string[] };
+    expect(first.notes.join(" ")).toContain("Ana needs halal meals");
+    const { error } = JSON.parse(toolMessages(world).at(-1) as string) as { error: string };
+    expect(error).toContain("halal meals, which cannot be checked");
+    expect(world.plans.records).toEqual([]);
+  });
+
+  it("makes the plan once the person says they will confirm the meal themselves", async () => {
+    const world = needing({ m2: { mealRequirement: "halal", mealSelfConfirmed: true } });
+    chat(world);
+    world.script(...planTurns("Plan is up!"));
+    await callAgent(world);
+    expect(world.plans.records).toHaveLength(1);
   });
 });
 

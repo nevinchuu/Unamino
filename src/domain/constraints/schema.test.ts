@@ -8,6 +8,11 @@ describe("memberConstraintsSchema", () => {
     expect(memberConstraintsSchema.safeParse({ ownRoom: true, skipActivityCategories: ["cooking"] }).success).toBe(true);
   });
 
+  it("accepts a cabin, free cancellation and a meal need, and refuses a cabin that does not exist", () => {
+    expect(memberConstraintsSchema.safeParse({ cabinClass: "BUSINESS", freeCancellation: true, mealRequirement: " Halal ", mealSelfConfirmed: true }).data).toMatchObject({ mealRequirement: "halal" });
+    expect(memberConstraintsSchema.safeParse({ cabinClass: "LUXURY" }).success).toBe(false);
+  });
+
   it("treats an empty object as no restriction", () => {
     expect(memberConstraintsSchema.safeParse({}).success).toBe(true);
   });

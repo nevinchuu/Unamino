@@ -26,6 +26,13 @@ const FINISHED_STATUSES: readonly PlanStatus[] = ["expired", "captured"];
 const asJson = (value: unknown): string => JSON.stringify(value);
 const problem = (message: string): string => asJson({ error: message });
 
+/** What the model is told when a pick breaks what someone said they need. Nothing was saved. */
+const unmetNeedsMessage = (reasons: readonly string[]): string =>
+  `Not saved: this plan breaks what people said they need, and those needs are non-negotiable. ${reasons.join("; ")}. ` +
+  "Do not propose a plan that breaks a need. Search again for options that meet it. If none exist, or a need cannot be checked (such as a meal requirement), do not make a plan at all: " +
+  "tell the group honestly that it is not available, suggest ONE concrete alternative (for example economy instead of business), and ask that person whether they accept it. " +
+  "For a meal need that cannot be checked, ask whether they will confirm it with the airline or hotel themselves.";
+
 /** Turns the model's short ids (F1, m2) back into real ones. Reports every id it cannot place, not just the first. */
 function toRealIds(output: PlannerOutput, env: ToolEnv): Result<PlannerOutput, string> {
   const realMember = new Map(env.roster.map((entry) => [entry.alias, entry.member.id]));
@@ -109,6 +116,10 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
   });
   if (!built.ok) return problem(built.error.message);
   const { plan, shares, violations } = built.value;
+  if (violations.length > 0) {
+    env.note("plan_refused", { violations: violations.map((violation) => violation.message) });
+    return problem(unmetNeedsMessage(violations.map((violation) => nameMembers(violation.message, people))));
+  }
   env.note("plan_built", { title: plan.title, totalMinor: plan.totalMinor, currency: plan.currency, picks: plan.picks.map((pick) => ({ offerId: pick.offer.id, kind: pick.offer.kind, members: pick.memberIds.map((id) => people.find((member) => member.id === id)?.displayName), reason: pick.reason })), shares, violations: violations.map((violation) => violation.message) });
 
   const deadlines = computePlanDeadlines({ createdAt: env.now, offers: plan.picks.map((pick) => pick.offer) });

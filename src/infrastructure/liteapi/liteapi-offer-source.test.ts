@@ -114,6 +114,14 @@ describe("flight search", () => {
     });
   });
 
+  it("asks for the cabin the group needs and records it on every fare, so a business need can be checked", async () => {
+    const { source, calls } = sourceWith(() => json(flightsRoundTrip));
+    const result = await source.search({ ...flightQuery, cabinClass: "BUSINESS" });
+    expect(calls[0].body.cabinClass).toBe("BUSINESS");
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.value.map((offer) => offer.kind === "flight" && offer.cabin)).toEqual(["BUSINESS", "BUSINESS", "BUSINESS"]);
+  });
+
   it("asks for one leg when there is no return date", async () => {
     const { source, calls } = sourceWith(() => json(flightsRoundTrip));
     await source.search({ ...flightQuery, returnDate: undefined });
