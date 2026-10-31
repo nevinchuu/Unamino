@@ -73,7 +73,7 @@ const STATUS_DETAIL: Record<PlanStatus, (plan: CardPlan) => string> = {
   draft: (plan) => `${plan.agreedCount} of ${plan.headcount} agreed`,
   reviewing: (plan) => `${plan.agreedCount} of ${plan.headcount} agreed`,
   approving: () => "Everyone agreed. Now each person approves their amount",
-  held: () => "Everyone approved. Getting ready to book",
+  held: () => "Everyone's in. Getting ready to book",
   booking: () => "Booking now",
   booked: () => "Booked. Taking payment",
   captured: () => "Booked and paid",
@@ -109,7 +109,7 @@ export interface ActionSheetView {
   readonly step: SheetStep;
   /** Which of the three steps (agree, approve, book) this is, for the dots. */
   readonly stepNumber: 1 | 2;
-  /** "2/4 agreed" or "1/4 held". */
+  /** "2/4 agreed" or "1/4 in". */
   readonly pill: string;
   /** One quiet line of who is done and who the plan is waiting for. */
   readonly note: string;
@@ -130,9 +130,11 @@ export function describeSheet(plan: CardPlan, mine: CardMine): ActionSheetView {
   const waitingNames = waiting.map((person) => (person.isMe ? "you" : person.name));
 
   const finished = mine.people.filter((person) => done(person) && !person.isMe).map((person) => person.name);
-  const verb = step === "approve" ? "held" : "agreed";
+  const verb = step === "approve" ? "in" : "agreed";
+  // "Ana is in." or "Ana and Ben are in.", and "Ana agreed." for the first step.
+  const finishedText = step === "approve" ? `${listOf(finished)} ${finished.length === 1 ? "is" : "are"} in.` : `${listOf(finished)} agreed.`;
   const parts = [
-    finished.length > 0 ? `${listOf(finished)} ${verb}.` : "",
+    finished.length > 0 ? finishedText : "",
     waitingNames.length > 0 ? `Waiting for ${listOf(waitingNames)}.` : "",
   ].filter((part) => part !== "");
 
