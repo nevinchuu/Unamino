@@ -33,9 +33,9 @@ describe("handleExpireOverdue", () => {
 
   it("also settles stuck bookings and says what it did", async () => {
     const sweeps: number[] = [];
-    const { deps } = setup({ bookings: { sweep: async (limit) => (sweeps.push(limit), { settled: 1, cancelled: 2, failed: 0 }) } });
+    const { deps } = setup({ bookings: { sweep: async (limit) => (sweeps.push(limit), { settled: 1, booked: 0, cancelled: 2, failed: 0 }) } });
     const response = await handleExpireOverdue(request(`Bearer ${SECRET}`), deps);
-    expect(await response.json()).toEqual({ ...SUMMARY, booking: { settled: 1, cancelled: 2, failed: 0 } });
+    expect(await response.json()).toEqual({ ...SUMMARY, booking: { settled: 1, booked: 0, cancelled: 2, failed: 0 } });
     expect(sweeps).toEqual([OVERDUE_BATCH]);
   });
 

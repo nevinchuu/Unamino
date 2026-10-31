@@ -55,6 +55,16 @@ export class MemoryBookingStore implements SupplierBookingStore {
   /** The plans that count as stuck booking, and the plans that count as ended, for the sweeps. */
   stuck: string[] = [];
   ended: string[] = [];
+  /** The plans that count as waiting to start booking, for the sweeps. */
+  stalled: string[] = [];
+
+  async stalledPlans(): Promise<Result<readonly string[], BookingStoreError>> {
+    return ok(this.stalled);
+  }
+
+  async isStalled(planId: string): Promise<Result<boolean, BookingStoreError>> {
+    return ok(this.stalled.includes(planId));
+  }
 
   async stuckPlans(): Promise<Result<readonly string[], BookingStoreError>> {
     return ok(this.stuck);

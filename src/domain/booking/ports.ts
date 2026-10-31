@@ -90,6 +90,10 @@ export interface SupplierBookingStore {
   stuckPlans(before: Date, limit: number): Promise<Result<readonly string[], BookingStoreError>>;
   /** Whether this plan has been booking since before `before`. */
   isStuck(planId: string, before: Date): Promise<Result<boolean, BookingStoreError>>;
+  /** Plans that reached "everyone is in" before `before` and have not started booking: the request to book was probably lost. Oldest first. */
+  stalledPlans(before: Date, limit: number): Promise<Result<readonly string[], BookingStoreError>>;
+  /** Whether this plan has been waiting to start booking since before `before`. */
+  isStalled(planId: string, before: Date): Promise<Result<boolean, BookingStoreError>>;
   /** Plans that ended while a supplier booking was still not cancelled, oldest first. */
   unsettledPlans(limit: number): Promise<Result<readonly string[], BookingStoreError>>;
 }

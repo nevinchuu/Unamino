@@ -56,6 +56,24 @@ export class PostgresBookingStore implements SupplierBookingStore {
     }
   }
 
+  async stalledPlans(before: Date, limit: number): Promise<Result<readonly string[], BookingStoreError>> {
+    try {
+      const rows = await this.db.select({ id: plans.id }).from(plans).where(and(eq(plans.status, "held"), lt(plans.updatedAt, before))).orderBy(asc(plans.updatedAt), asc(plans.id)).limit(limit);
+      return ok(rows.map((row) => row.id));
+    } catch {
+      return unavailable();
+    }
+  }
+
+  async isStalled(planId: string, before: Date): Promise<Result<boolean, BookingStoreError>> {
+    try {
+      const rows = await this.db.select({ id: plans.id }).from(plans).where(and(eq(plans.id, planId), eq(plans.status, "held"), lt(plans.updatedAt, before))).limit(1);
+      return ok(rows.length > 0);
+    } catch {
+      return unavailable();
+    }
+  }
+
   async unsettledPlans(limit: number): Promise<Result<readonly string[], BookingStoreError>> {
     try {
       const rows = await this.db

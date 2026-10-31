@@ -104,6 +104,21 @@ describe.skipIf(!ENABLED)("PostgresBookingStore on the real database", () => {
     expect(none.ok && none.value).not.toContain(planId);
   }, 30_000);
 
+  it("finds a plan that has been everyone-is-in for a while without booking, and not one that is booking or new", async () => {
+    await handle.db.update(plans).set({ status: "held", updatedAt: new Date("2026-10-27T00:00:00.000Z") }).where(eq(plans.id, planId));
+    const later = new Date("2026-10-27T00:02:00.000Z");
+
+    const stalled = await store.stalledPlans(later, 10);
+    expect(stalled.ok && stalled.value).toContain(planId);
+    expect(await store.isStalled(planId, later)).toEqual({ ok: true, value: true });
+
+    expect(await store.isStalled(planId, new Date("2026-10-26T00:00:00.000Z"))).toEqual({ ok: true, value: false });
+    await handle.db.update(plans).set({ status: "booking" }).where(eq(plans.id, planId));
+    expect(await store.isStalled(planId, later)).toEqual({ ok: true, value: false });
+    const none = await store.stalledPlans(later, 10);
+    expect(none.ok && none.value).not.toContain(planId);
+  }, 30_000);
+
   it("finds an ended plan that still has a booking to cancel, and stops once all are cancelled", async () => {
     await handle.db.update(plans).set({ status: "booked" }).where(eq(plans.id, planId));
     const whileBooked = await store.unsettledPlans(50);
