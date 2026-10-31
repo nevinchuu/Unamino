@@ -17,7 +17,7 @@ export interface PlanViewDeps {
   readonly travellers?: Pick<TravellerService, "haveDetails"> | null;
   /** Asks for the offers to be checked again once the response is on its way. Never waited for. */
   readonly scheduleRefresh: (planId: string) => void;
-  /** Asks for a plan that has been booking for too long to be settled once the response is on its way. Never waited for. */
+  /** Asks for a plan that has been booking for too long, or has been waiting to start booking for too long, to be settled once the response is on its way. Never waited for. */
   readonly scheduleSettle?: (planId: string) => void;
   /** Asks for the holds of a plan that is waiting for them to be checked against the payment provider once the response is on its way. Never waited for. */
   readonly scheduleReconcile?: (plan: PlanViewRaw) => void;
@@ -40,8 +40,8 @@ export async function loadPlanViewFor(deps: PlanViewDeps, planId: string): Promi
 
   // Prices are checked after the answer is sent, so nobody waits for the airline and hotel searches.
   if (LIVE_PLAN_STATUSES.includes(raw.value.status)) deps.scheduleRefresh(planId);
-  // A plan stuck booking would otherwise wait for the next scheduled sweep, which on the free plan can be a day away.
-  if (raw.value.status === "booking") deps.scheduleSettle?.(planId);
+  // A plan stuck booking, or stuck waiting to start booking after the last hold, would otherwise wait for the next scheduled sweep, which on the free plan can be a day away.
+  if (raw.value.status === "booking" || raw.value.status === "held") deps.scheduleSettle?.(planId);
   // A person may have closed the page after putting a card on the hold and before the app heard about it.
   if (raw.value.status === "approving") deps.scheduleReconcile?.(raw.value);
   return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking, travellers: await travellerStatus(deps, member.id) }) };

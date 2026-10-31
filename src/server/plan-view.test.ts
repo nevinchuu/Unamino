@@ -59,7 +59,7 @@ describe("loadPlanViewFor, recording holds that were never reported", () => {
   });
 });
 
-describe("loadPlanViewFor, settling a stuck booking", () => {
+describe("loadPlanViewFor, settling a stuck or never-started booking", () => {
   it("asks for a plan that is booking to be checked for being stuck, and does not refresh its prices", async () => {
     const { deps, settled, refreshed } = setup({ status: "booking" });
     await loadPlanViewFor(deps, PLAN_ID);
@@ -67,14 +67,22 @@ describe("loadPlanViewFor, settling a stuck booking", () => {
     expect(refreshed).toEqual([]);
   });
 
-  it("does not ask for any other plan", async () => {
+  it("asks for a plan that everyone has approved to be checked for a lost request to book", async () => {
     const { deps, settled } = setup({ status: "held" });
     await loadPlanViewFor(deps, PLAN_ID);
-    expect(settled).toEqual([]);
+    expect(settled).toEqual([PLAN_ID]);
+  });
+
+  it("does not ask for a plan in any other state", async () => {
+    for (const status of ["draft", "reviewing", "approving", "booked", "captured", "expired"] as const) {
+      const { deps, settled } = setup({ status });
+      await loadPlanViewFor(deps, PLAN_ID);
+      expect(settled, status).toEqual([]);
+    }
   });
 
   it("does not ask for a stranger's view", async () => {
-    const { deps, settled } = setup({ status: "booking", member: null });
+    const { deps, settled } = setup({ status: "held", member: null });
     await loadPlanViewFor(deps, PLAN_ID);
     expect(settled).toEqual([]);
   });

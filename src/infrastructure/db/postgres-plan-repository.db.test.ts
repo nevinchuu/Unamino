@@ -107,6 +107,24 @@ describe.skipIf(!ENABLED)("PostgresPlanRepository on the real database", () => {
     expect(again.ok && again.value.plan).toEqual(next);
   }, 30_000);
 
+  it("moves updatedAt only when the status changes, so a plan that is only being looked at does not look fresh", async () => {
+    const planId = await seedPlan("held");
+    const old = new Date("2026-10-27T00:00:00.000Z");
+    await handle.db.update(plans).set({ updatedAt: old }).where(eq(plans.id, planId));
+    const loaded = await repository.load(planId);
+    if (!loaded.ok) throw new Error(loaded.error.message);
+
+    const sameStatus = await repository.save(loaded.value, { ...loaded.value.plan, deadlineAt: new Date("2026-10-27T00:18:00.000Z") });
+    if (!sameStatus.ok) throw new Error(sameStatus.error.message);
+    const [afterSame] = await handle.db.select({ updatedAt: plans.updatedAt }).from(plans).where(eq(plans.id, planId));
+    expect(afterSame.updatedAt.getTime()).toBe(old.getTime());
+
+    const moved = await repository.save(sameStatus.value, { ...sameStatus.value.plan, status: "booking" });
+    expect(moved.ok).toBe(true);
+    const [afterMove] = await handle.db.select({ updatedAt: plans.updatedAt }).from(plans).where(eq(plans.id, planId));
+    expect(afterMove.updatedAt.getTime()).toBeGreaterThan(old.getTime());
+  }, 30_000);
+
   it("refuses a save made from an old version and changes nothing", async () => {
     const planId = await seedPlan();
     const first = await repository.load(planId);

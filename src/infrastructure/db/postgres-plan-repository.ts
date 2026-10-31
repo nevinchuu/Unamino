@@ -68,7 +68,9 @@ export class PostgresPlanRepository implements PlanRepository {
       const version = await this.db.transaction(async (tx) => {
         const updated = await tx
           .update(plans)
-          .set({ status: next.status, deadlineAt: next.deadlineAt, version: sql`${plans.version} + 1`, updatedAt: new Date() })
+          // updatedAt is when the status last changed, which is what the booking sweeps measure "stuck" from. A save that only
+          // re-checks prices or extends the deadline, as every look at a live plan does, must not make a stalled plan look fresh.
+          .set({ status: next.status, deadlineAt: next.deadlineAt, version: sql`${plans.version} + 1`, updatedAt: next.status === stored.plan.status ? sql`${plans.updatedAt}` : new Date() })
           .where(and(eq(plans.id, stored.id), eq(plans.version, stored.version)))
           .returning({ version: plans.version });
 
