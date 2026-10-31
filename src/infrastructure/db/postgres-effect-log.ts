@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, lt, or, sql } from "drizzle-orm";
-import { MONEY_EFFECT_TYPES, type EffectLog, type EffectOutcome, type LoggedEffect } from "@/domain/plan/effect-log";
+import { MONEY_EFFECT_TYPES, type EffectLog, type EffectOutcome, type LoggedEffect, type RetryableQuery } from "@/domain/plan/effect-log";
 import type { PlanEffect } from "@/domain/plan/types";
 import type { Database } from "./client";
 import { effectLog } from "./schema";
@@ -19,12 +19,14 @@ export class PostgresEffectLog implements EffectLog {
       .where(eq(effectLog.effectKey, key));
   }
 
-  async retryable(input: { now: Date; pendingOlderThanMs: number; maxAttempts: number; limit: number }): Promise<readonly LoggedEffect[]> {
+  async retryable(input: RetryableQuery): Promise<readonly LoggedEffect[]> {
     const staleBefore = new Date(input.now.getTime() - input.pendingOlderThanMs);
+    const lastTriedBefore = input.failedOlderThanMs === undefined ? undefined : new Date(input.now.getTime() - input.failedOlderThanMs);
+    const failedAndDue = and(eq(effectLog.status, "failed"), lt(effectLog.attempts, input.maxAttempts), lastTriedBefore && lt(effectLog.completedAt, lastTriedBefore));
     const rows = await this.db
       .select()
       .from(effectLog)
-      .where(and(inArray(effectLog.type, [...MONEY_EFFECT_TYPES]), or(and(eq(effectLog.status, "failed"), lt(effectLog.attempts, input.maxAttempts)), and(eq(effectLog.status, "pending"), lt(effectLog.createdAt, staleBefore)))))
+      .where(and(inArray(effectLog.type, [...MONEY_EFFECT_TYPES]), input.planId === undefined ? undefined : eq(effectLog.planId, input.planId), or(failedAndDue, and(eq(effectLog.status, "pending"), lt(effectLog.createdAt, staleBefore)))))
       .orderBy(asc(effectLog.createdAt), asc(effectLog.id))
       .limit(input.limit);
     return rows.map((row) => ({ key: row.effectKey, planId: row.planId, effect: row.payload as unknown as PlanEffect, attempts: row.attempts }));

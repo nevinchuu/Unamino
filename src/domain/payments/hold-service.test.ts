@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { err } from "@/lib/result";
 import { applyPlanEvent } from "@/domain/plan/apply-event";
 import type { PlanStatus } from "@/domain/plan/statuses";
 import { approved, DEADLINE, HARD, MemoryEffectRunner, MemoryPlanRepository, memberSnapshot, NOW } from "@/domain/plan/test-support";
@@ -276,6 +277,34 @@ describe("captureHolds", () => {
     expect(await s.service.captureHolds(PLAN, s.captures)).toEqual({ ok: true, value: undefined });
     expect(await s.service.captureHolds(PLAN, s.captures)).toEqual({ ok: true, value: undefined });
     expect(s.provider.all().map((h) => h.chargedMinor)).toEqual([25_000, 30_000]);
+    expect(s.plans.plan.status).toBe("captured");
+  });
+
+  it("charges nobody when one hold has gone bad, because it checks every hold before charging any", async () => {
+    const s = await booked();
+    await s.provider.release(s.store.holdIdOf(PLAN, "ben") as string);
+
+    const result = await s.service.captureHolds(PLAN, s.captures);
+
+    expect(result).toMatchObject({ ok: false, error: { kind: "payment", message: expect.stringContaining("Nobody more was charged") } });
+    expect(s.provider.all().map((h) => h.chargedMinor)).toEqual([0, 0]);
+    expect(s.plans.plan.status).toBe("booked");
+  });
+
+  it("writes each charge on the plan as it lands, so who has been charged shows when a later charge fails, and finishes without charging twice", async () => {
+    const s = await booked();
+    const capture = s.provider.capture.bind(s.provider);
+    let benDown = true;
+    s.provider.capture = async (holdId, amountMinor) => (benDown && holdId === s.store.holdIdOf(PLAN, "ben") ? err({ code: "unavailable", message: "capture is down" }) : capture(holdId, amountMinor));
+
+    expect(await s.service.captureHolds(PLAN, s.captures)).toMatchObject({ ok: false, error: { kind: "payment" } });
+    expect(s.plans.plan.status).toBe("booked");
+    expect(s.plans.plan.members.map((m) => [m.id, m.chargedMinor])).toEqual([["ana", 25_000], ["ben", null]]);
+
+    benDown = false;
+    expect(await s.service.captureHolds(PLAN, s.captures)).toEqual({ ok: true, value: undefined });
+    expect(s.provider.all().map((h) => h.chargedMinor)).toEqual([25_000, 30_000]);
+    expect(s.plans.plan.members.map((m) => m.chargedMinor)).toEqual([25_000, 30_000]);
     expect(s.plans.plan.status).toBe("captured");
   });
 

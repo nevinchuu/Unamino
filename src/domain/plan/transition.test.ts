@@ -360,6 +360,31 @@ describe("booking", () => {
     expect(errorCode(heldPlan(), { type: "booking_failed", at: minutes(3) })).toBe("invalid_status");
   });
 
+  describe("recording a charge as it is made", () => {
+    const booked = () => run(startBooking(heldPlan()), { type: "booking_succeeded", at: minutes(3) }).plan;
+
+    it("records one person's charge and leaves the plan booked until every charge is in", () => {
+      const { plan, effects } = run(booked(), { type: "member_charged", at: minutes(4), memberId: "ana", chargedMinor: 19500 });
+      expect(plan.status).toBe("booked");
+      expect(effects).toEqual([]);
+      expect(byId(plan, "ana").chargedMinor).toBe(19500);
+      expect(byId(plan, "ben").chargedMinor).toBeNull();
+    });
+
+    it("keeps a recorded charge when the plan is marked paid, and fills in the others", () => {
+      const partly = run(booked(), { type: "member_charged", at: minutes(4), memberId: "ana", chargedMinor: 19000 }).plan;
+      const paid = run(partly, { type: "capture_succeeded", at: minutes(5) }).plan;
+      expect(byId(paid, "ana").chargedMinor).toBe(19000);
+      expect(byId(paid, "ben").chargedMinor).toBe(15000);
+    });
+
+    it("refuses a charge above what the person approved, a charge for someone unknown, and a charge outside a booked plan", () => {
+      expect(errorCode(booked(), { type: "member_charged", at: minutes(4), memberId: "ana", chargedMinor: 20001 })).toBe("invalid_amount");
+      expect(errorCode(booked(), { type: "member_charged", at: minutes(4), memberId: "zoe", chargedMinor: 1 })).toBe("unknown_member");
+      expect(errorCode(heldPlan(), { type: "member_charged", at: minutes(4), memberId: "ana", chargedMinor: 1 })).toBe("invalid_status");
+    });
+  });
+
   it("only captures a booked plan", () => {
     expect(errorCode(heldPlan(), { type: "capture_succeeded", at: minutes(3) })).toBe("invalid_status");
   });

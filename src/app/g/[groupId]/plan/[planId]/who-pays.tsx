@@ -2,18 +2,23 @@ import { Check, Clock, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
+import { chargeProgressOf, owesCharge } from "@/lib/charge-progress";
 import { commitmentLabel, commitmentOf } from "@/lib/commitment";
 import { formatMinor } from "@/lib/format-money";
 import { previousShareNote } from "@/lib/share-change";
 
 /** Where one person stands, in the words of the step the plan is on. */
-function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: PlanViewDto["payments"]): { readonly text: string; readonly icon: ReactNode; readonly good: boolean } {
+function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: PlanViewDto["payments"], partlyCharged: boolean): { readonly text: string; readonly icon: ReactNode; readonly good: boolean } {
   const tick = <Check className="size-3.5" />;
   const wait = <Clock className="size-3.5" />;
   const cross = <X className="size-3.5" />;
 
   // Once the trip is paid for, what matters is what was charged.
   if (status === "captured" && person.chargedMinor !== null) return { text: "Paid", icon: tick, good: true };
+  // Booked with some cards charged and others not: say which is which.
+  if (status === "booked" && partlyCharged && owesCharge(person)) {
+    return person.chargedMinor !== null ? { text: "Charged", icon: tick, good: true } : { text: "Still to charge", icon: wait, good: false };
+  }
 
   if (status === "reviewing" || status === "draft") {
     if (person.agreement === "agreed") return { text: "Agreed", icon: tick, good: true };
@@ -33,7 +38,8 @@ function progressOf(person: PersonDto, status: PlanViewDto["status"], payments: 
 
 /** Everyone's amount and progress. Your own breaks down into its parts, and the total is shown when every share is in one currency. */
 export function WhoPays({ people, status, currency, payments }: { readonly people: readonly PersonDto[]; readonly status: PlanViewDto["status"]; readonly currency: string; readonly payments: PlanViewDto["payments"] }) {
-  const amountOf = (person: PersonDto): number | null => (status === "captured" && person.chargedMinor !== null ? person.chargedMinor : person.shareMinor);
+  const amountOf = (person: PersonDto): number | null => ((status === "captured" || status === "booked") && person.chargedMinor !== null ? person.chargedMinor : person.shareMinor);
+  const partlyCharged = chargeProgressOf(people).partial;
   // Only while the plan is still being decided: afterwards what was charged is what matters.
   const previousNote = (person: PersonDto): string | null => (status === "captured" ? null : previousShareNote(person.shareMinor, person.previousShareMinor, person.currency));
   const sameCurrency = people.every((person) => person.currency === currency && amountOf(person) !== null);
@@ -47,7 +53,7 @@ export function WhoPays({ people, status, currency, payments }: { readonly peopl
       <p className="px-2 pb-1 text-xs text-muted-foreground">Each share is the flights, your bed and only the things you take part in.</p>
       <ul>
         {people.map((person) => {
-          const progress = progressOf(person, status, payments);
+          const progress = progressOf(person, status, payments, partlyCharged);
           return (
             <li key={person.id} className="rounded-lg px-2 py-2">
               <div className="flex items-center gap-3">

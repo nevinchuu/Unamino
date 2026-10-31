@@ -35,7 +35,7 @@ describe.skipIf(!ENABLED)("PostgresEffectLog on the real database", () => {
   }
 
   const rowOf = async (key: string) => (await handle.db.select().from(effectLog).where(eq(effectLog.effectKey, key)))[0];
-  const retryable = async (overrides: Partial<{ now: Date; pendingOlderThanMs: number; maxAttempts: number; limit: number }> = {}) =>
+  const retryable = async (overrides: Partial<{ now: Date; pendingOlderThanMs: number; maxAttempts: number; limit: number; failedOlderThanMs: number; planId: string }> = {}) =>
     (await log.retryable({ now: NOW, pendingOlderThanMs: 60_000, maxAttempts: MAX, limit: 100, ...overrides })).filter((logged) => logged.planId === planId);
 
   beforeAll(async () => {
@@ -109,6 +109,17 @@ describe.skipIf(!ENABLED)("PostgresEffectLog on the real database", () => {
     const keys = (await retryable({ now: new Date(Date.now() + 3_600_000) })).map((l) => l.key);
     expect(keys).not.toContain(message);
     expect(keys).not.toContain(booking);
+  }, 30_000);
+
+  it("leaves a failed effect alone until its last try is old enough, and only offers this plan's when asked for one plan", async () => {
+    const [key] = await record([CAPTURE]);
+    await log.finish(key, { status: "failed", error: "just now" });
+    const gap = 120_000;
+
+    expect((await retryable({ now: new Date(), failedOlderThanMs: gap })).map((l) => l.key)).not.toContain(key);
+    expect((await retryable({ now: new Date(Date.now() + gap + 60_000), failedOlderThanMs: gap })).map((l) => l.key)).toContain(key);
+    expect((await retryable({ now: new Date(), planId })).map((l) => l.key)).toContain(key);
+    expect(await log.retryable({ now: new Date(), pendingOlderThanMs: 60_000, maxAttempts: MAX, limit: 100, planId: "00000000-0000-4000-8000-000000000000" })).toEqual([]);
   }, 30_000);
 
   it("offers the oldest first and no more than the limit", async () => {

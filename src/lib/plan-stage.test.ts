@@ -14,6 +14,33 @@ function view(status: PlanStatus, people: PersonDto[], overrides: Partial<PlanVi
   };
 }
 
+describe("describeStage once the trip is booked", () => {
+  const owing = (id: string, chargedMinor: number | null, approvedMinor: number | null = 30_000): PersonDto => ({ ...person(id, "agreed", "approved"), approvedMinor, chargedMinor });
+
+  it("says the cards are being charged before any has been", () => {
+    expect(describeStage(view("booked", [owing("ana", null), owing("ben", null)])).detail).toBe("Everything is booked. The cards are being charged.");
+  });
+
+  it("says how many cards have been charged when only some have, and that the rest are tried again", () => {
+    const stage = describeStage(view("booked", [owing("ana", 30_000), owing("ben", 30_000), owing("jia", null), owing("kai", null)]));
+    expect(stage).toMatchObject({ headline: "Booked", tone: "good" });
+    expect(stage.detail).toBe("The trip is booked. 2 of 4 cards have been charged and we are trying the rest again. Nobody is charged more than they approved.");
+  });
+
+  it("says has, not have, for one card", () => {
+    expect(describeStage(view("booked", [owing("ana", 30_000), owing("ben", null), owing("jia", null)])).detail).toContain("1 of 3 cards has been charged");
+  });
+
+  it("does not wait for someone a friend covers in full, who has no card to charge", () => {
+    const stage = describeStage(view("booked", [owing("ana", 30_000), owing("ben", null), owing("jia", null, 0)]));
+    expect(stage.detail).toContain("1 of 2 cards has been charged");
+  });
+
+  it("says everyone has been charged once the plan is paid", () => {
+    expect(describeStage(view("captured", [owing("ana", 30_000), owing("ben", 30_000)])).headline).toBe("Booked and paid");
+  });
+});
+
 describe("describeStage", () => {
   it("asks a person who has not agreed to look over the plan, and says nothing is charged yet", () => {
     const stage = describeStage(view("reviewing", [person("ana"), person("ben", "agreed"), person("jia")]));

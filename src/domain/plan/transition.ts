@@ -277,13 +277,25 @@ const handlers: HandlerMap = {
     return expire(plan);
   },
 
+  member_charged: (plan, event) => {
+    const wrongStatus = requireStatus(plan, ["booked"], event.type);
+    if (wrongStatus) return wrongStatus;
+    const member = findMember(plan, event.memberId);
+    if (!member) return fail("unknown_member", `No member ${event.memberId}`);
+    if (!isNonNegativeInteger(event.chargedMinor) || member.approvedMinor === null || event.chargedMinor > member.approvedMinor) {
+      return fail("invalid_amount", "A charge must be a whole number of minor units, no more than the person approved");
+    }
+    return succeed(replaceMember(plan, { ...member, chargedMinor: event.chargedMinor }));
+  },
+
   capture_succeeded: (plan, event) => {
     const wrongStatus = requireStatus(plan, ["booked"], event.type);
     if (wrongStatus) return wrongStatus;
     return succeed({
       ...plan,
       status: "captured",
-      members: plan.members.map((member) => ({ ...member, chargedMinor: member.currentShareMinor })),
+      // A charge already recorded as it happened stays as it was; the rest are what they owed.
+      members: plan.members.map((member) => ({ ...member, chargedMinor: member.chargedMinor ?? member.currentShareMinor })),
     });
   },
 

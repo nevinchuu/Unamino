@@ -7,7 +7,7 @@ import { currentMember } from "@/server/session";
 export async function GET(_request: Request, context: RouteContext<"/api/plans/[planId]/view">): Promise<Response> {
   const { planId } = await context.params;
   const { views, plans, payments, travellers, bookingSweeper } = getContainer();
-  const { reconciler } = payments;
+  const { reconciler, chargeCatchUp } = payments;
   return handlePlanView(planId, {
     views,
     memberOf: currentMember,
@@ -20,6 +20,9 @@ export async function GET(_request: Request, context: RouteContext<"/api/plans/[
     },
     scheduleReconcile: (plan) => {
       if (reconciler) after(() => reconciler.reconcile(plan));
+    },
+    scheduleCatchUp: (id) => {
+      if (chargeCatchUp) after(() => chargeCatchUp.catchUp(id));
     },
   });
 }

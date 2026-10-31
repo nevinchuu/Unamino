@@ -32,6 +32,12 @@ describe("EffectRetrier", () => {
     expect(asked()).toEqual({ now: NOW, pendingOlderThanMs: 120_000, maxAttempts: MAX_EFFECT_ATTEMPTS, limit: 25 });
   });
 
+  it("narrows to one plan, and leaves a recent failure alone, when asked to", async () => {
+    const { retrier, asked } = setup([]);
+    await retrier.retry({ planId: "plan-9", failedOlderThanMs: 120_000 });
+    expect(asked()).toEqual({ now: NOW, pendingOlderThanMs: 120_000, maxAttempts: MAX_EFFECT_ATTEMPTS, limit: 25, planId: "plan-9", failedOlderThanMs: 120_000 });
+  });
+
   it("does nothing, and says so, when nothing is due", async () => {
     const { retrier, ran } = setup([]);
     expect(await retrier.retry()).toEqual({ tried: 0, succeeded: 0, failed: 0, gaveUp: 0 });

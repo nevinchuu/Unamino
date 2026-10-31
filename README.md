@@ -217,6 +217,7 @@ MUSE_LIVE=1 MUSE_LIVE_OUT=nudges.txt node --env-file=.env.local node_modules/vit
 - Sandbox and test mode only, as described above. How liteAPI behaves for real flights, payments and cancellation charges has not been verified.
 - Everyone pays in USD.
 - A hold lasts as long as the card's bank allows, typically up to about 7 days. The app books as soon as everyone has approved and cancels the holds if the plan ends first, but it cannot control when a bank frees the money.
+- **Booking happens before the charges, and card charges cannot be made as one transaction.** Before charging anyone the app checks that every hold is still good, and each person's charge is written down as it lands. If a charge still fails (the payment service is down, say), the trip stays booked, the plan screen shows who has been charged and who is still to be, and the failed charges are tried again when someone opens the plan and by the daily retry, up to five tries. After that the group is told that the organiser needs to sort it out. Nobody is ever charged more than they approved, and a charge is never made twice, but in that case some people can be charged while others are not yet.
 - There is no refund or dispute path in the app after a charge.
 - The comparison "Was $X on the previous plan" finds the earlier plan from the same group and dates, so it can occasionally compare with the wrong one.
 - Nudges are manual: Trippy never messages anyone on its own, and there are no notifications outside the app.

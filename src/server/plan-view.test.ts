@@ -28,6 +28,7 @@ function setup({ status, member = ana, load }: Setup = {}) {
   const loaded: string[] = [];
   const settled: string[] = [];
   const reconciled: string[] = [];
+  const caughtUp: string[] = [];
   const deps: PlanViewDeps = {
     views: { load: load ?? (async (id) => (loaded.push(id), ok(raw(status)))) },
     memberOf: async () => member,
@@ -35,8 +36,9 @@ function setup({ status, member = ana, load }: Setup = {}) {
     scheduleRefresh: (id) => void refreshed.push(id),
     scheduleSettle: (id) => void settled.push(id),
     scheduleReconcile: (plan) => void reconciled.push(plan.id),
+    scheduleCatchUp: (id) => void caughtUp.push(id),
   };
-  return { deps, refreshed, loaded, settled, reconciled };
+  return { deps, refreshed, loaded, settled, reconciled, caughtUp };
 }
 
 describe("loadPlanViewFor, recording holds that were never reported", () => {
@@ -166,5 +168,25 @@ describe("traveller details in the loaded view", () => {
   it("does not ask when details are not taken here, or when the store cannot be reached", async () => {
     expect(await approving(null)).toMatchObject({ needed: false });
     expect(await approving({ haveDetails: async () => err({ kind: "unavailable" as const }) })).toMatchObject({ needed: false });
+  });
+});
+
+describe("loadPlanViewFor, charges that have not gone through", () => {
+  it("asks for the charges of a booked plan to be tried again", async () => {
+    const { deps, caughtUp } = setup({ status: "booked" });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(caughtUp).toEqual([PLAN_ID]);
+  });
+
+  it.each<PlanStatus>(["draft", "reviewing", "approving", "held", "booking", "captured", "expired"])("does not ask when the plan is %s", async (status) => {
+    const { deps, caughtUp } = setup({ status });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(caughtUp).toEqual([]);
+  });
+
+  it("does not ask for someone who is not in the group", async () => {
+    const { deps, caughtUp } = setup({ status: "booked", member: null });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(caughtUp).toEqual([]);
   });
 });

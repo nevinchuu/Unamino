@@ -21,6 +21,8 @@ export interface PlanViewDeps {
   readonly scheduleSettle?: (planId: string) => void;
   /** Asks for the holds of a plan that is waiting for them to be checked against the payment provider once the response is on its way. Never waited for. */
   readonly scheduleReconcile?: (plan: PlanViewRaw) => void;
+  /** Asks for the charges of a booked plan that have not gone through to be tried again once the response is on its way. Never waited for. */
+  readonly scheduleCatchUp?: (planId: string) => void;
 }
 
 export type LoadedPlanView = { readonly ok: true; readonly view: PlanViewDto } | { readonly ok: false; readonly reason: "not_found" | "unavailable" };
@@ -44,6 +46,8 @@ export async function loadPlanViewFor(deps: PlanViewDeps, planId: string): Promi
   if (raw.value.status === "booking" || raw.value.status === "held") deps.scheduleSettle?.(planId);
   // A person may have closed the page after putting a card on the hold and before the app heard about it.
   if (raw.value.status === "approving") deps.scheduleReconcile?.(raw.value);
+  // A booked plan is not paid for until every charge is in; one that failed for a moment should not wait for the next scheduled retry.
+  if (raw.value.status === "booked") deps.scheduleCatchUp?.(planId);
   return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking, travellers: await travellerStatus(deps, member.id) }) };
 }
 

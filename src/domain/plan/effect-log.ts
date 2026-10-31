@@ -11,6 +11,17 @@ export interface LoggedEffect {
 
 export type EffectOutcome = { readonly status: "done" } | { readonly status: "failed"; readonly error: string };
 
+export interface RetryableQuery {
+  readonly now: Date;
+  readonly pendingOlderThanMs: number;
+  readonly maxAttempts: number;
+  readonly limit: number;
+  /** Only this plan's effects. Left out, every plan's. */
+  readonly planId?: string;
+  /** A failed effect is left alone until its last try is this old, so tries are spread out instead of used up in a minute. Left out, none is left alone. */
+  readonly failedOlderThanMs?: number;
+}
+
 /** What was asked of the outside world and how it went, so that what failed can be done again and nothing is done twice. */
 export interface EffectLog {
   /** Writes down how an effect went. A failure counts as one more attempt. */
@@ -19,7 +30,7 @@ export interface EffectLog {
    * The money effects that still need doing: those that failed and have attempts left, and those still pending long
    * after they were asked for (the server stopped before it could try). Oldest first.
    */
-  retryable(input: { readonly now: Date; readonly pendingOlderThanMs: number; readonly maxAttempts: number; readonly limit: number }): Promise<readonly LoggedEffect[]>;
+  retryable(input: RetryableQuery): Promise<readonly LoggedEffect[]>;
 }
 
 /** The effects that are work to be done later, as opposed to messages that are done the moment they are written down. */

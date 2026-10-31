@@ -59,6 +59,8 @@ export type PlanEvent =
   | { readonly type: "plan_replaced"; readonly at: Date }
   | { readonly type: "booking_succeeded"; readonly at: Date }
   | { readonly type: "booking_failed"; readonly at: Date }
+  /** One person's hold was charged, for `chargedMinor`: recorded as it happens, so a charge that lands before the others is not lost from view. */
+  | { readonly type: "member_charged"; readonly at: Date; readonly memberId: string; readonly chargedMinor: number }
   | { readonly type: "capture_succeeded"; readonly at: Date }
   | { readonly type: "deadline_passed"; readonly at: Date }
   /** The offers were renewed and still match, so the deadline moves later. */

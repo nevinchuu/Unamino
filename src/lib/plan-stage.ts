@@ -1,4 +1,5 @@
 import type { PlanViewDto } from "@/domain/plan/view";
+import { chargeProgressOf } from "./charge-progress";
 
 export interface StageView {
   /** "Step 1 of 2" while people are deciding, otherwise null. */
@@ -26,7 +27,12 @@ export function describeStage(view: PlanViewDto): StageView {
     };
   }
   if (status === "booking") return { step: null, headline: "Booking now", detail: "Everyone is in. The flights and hotel are being booked.", tone: "good" };
-  if (status === "booked") return { step: null, headline: "Booked", detail: "Everything is booked. The cards are being charged.", tone: "good" };
+  if (status === "booked") {
+    const { charged, owing, partial } = chargeProgressOf(view.people);
+    // Some cards are charged and the rest are not: the trip is booked either way, so say who is still to be charged instead of letting it look finished.
+    if (partial) return { step: null, headline: "Booked", detail: `The trip is booked. ${charged} of ${owing} cards ${charged === 1 ? "has" : "have"} been charged and we are trying the rest again. Nobody is charged more than they approved.`, tone: "good" };
+    return { step: null, headline: "Booked", detail: "Everything is booked. The cards are being charged.", tone: "good" };
+  }
   if (status === "captured") return { step: null, headline: "Booked and paid", detail: "The trip is booked and everyone has been charged.", tone: "good" };
   if (status === "held") return { step: null, headline: "Everyone's in", detail: "Every hold is in place. Booking is next.", tone: "good" };
 

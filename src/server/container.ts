@@ -61,6 +61,7 @@ import { traceSinkFromEnv } from "@/infrastructure/trace/file-trace";
 import { createStripeClient } from "@/infrastructure/stripe/stripe-client";
 import { StripePaymentProvider } from "@/infrastructure/stripe/stripe-provider";
 import { StripeTestCard } from "@/infrastructure/stripe/test-card";
+import { ChargeCatchUp } from "./charge-catch-up";
 import { HoldReconciler } from "./hold-reconcile";
 import { DeferredBookingRunner } from "./deferred-runner";
 import { buildPersonas, type Personas } from "./personas";
@@ -111,6 +112,8 @@ export interface Container {
     readonly retrier: EffectRetrier | null;
     /** Records a hold that was placed but never reported, when someone looks at the plan. Null unless holds are real. */
     readonly reconciler: HoldReconciler | null;
+    /** Null when this server does not take real card holds, so no charge can fail. */
+    readonly chargeCatchUp: ChargeCatchUp | null;
     readonly webhook: { readonly secret: string | null; readonly verify: (body: string, signature: string, secret: string) => StripeEventLike } | null;
   };
   /** Null when there is no encryption key, in which case details cannot be taken. */
@@ -278,7 +281,7 @@ function build(): Container {
     retention: new RetentionService(new PostgresRetentionStore(db)),
     planStatus: new PostgresPlanStatusReader(db),
     views,
-    payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, reconciler: holds ? new HoldReconciler({ holds, clock: agent.clock }) : null, webhook },
+    payments: { mode, demoBooking: bookingSimulation.value, holds, holdStore, retrier, reconciler: holds ? new HoldReconciler({ holds, clock: agent.clock }) : null, chargeCatchUp: retrier ? new ChargeCatchUp({ retrier, clock: agent.clock }) : null, webhook },
     travellers,
     bookingSweeper,
     offers,

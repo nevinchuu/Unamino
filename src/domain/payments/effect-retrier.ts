@@ -28,6 +28,12 @@ export interface EffectRetrierDeps {
 
 const BATCH = 25;
 
+/** Which effects to retry when it is not all of them: one plan's, with a failed one left alone until its last try is this old. */
+export interface RetryOnly {
+  readonly planId: string;
+  readonly failedOlderThanMs: number;
+}
+
 /** What to tell the group when a money effect could not be done after every try. Never an amount or anyone's card. */
 export function giveUpLine(effect: PlanEffect): string | null {
   switch (effect.type) {
@@ -53,9 +59,10 @@ export function giveUpLine(effect: PlanEffect): string | null {
 export class EffectRetrier {
   constructor(private readonly deps: EffectRetrierDeps) {}
 
-  async retry(): Promise<RetrySummary> {
+  /** `only` narrows it to one plan's effects, and leaves a failed effect alone until its last try is a while old. */
+  async retry(only?: RetryOnly): Promise<RetrySummary> {
     const maxAttempts = this.deps.maxAttempts ?? MAX_EFFECT_ATTEMPTS;
-    const due = await this.deps.log.retryable({ now: this.deps.clock(), pendingOlderThanMs: this.deps.pendingAfterMs ?? PENDING_RETRY_AFTER_MS, maxAttempts, limit: this.deps.limit ?? BATCH });
+    const due = await this.deps.log.retryable({ now: this.deps.clock(), pendingOlderThanMs: this.deps.pendingAfterMs ?? PENDING_RETRY_AFTER_MS, maxAttempts, limit: this.deps.limit ?? BATCH, ...only });
 
     let succeeded = 0;
     let failed = 0;

@@ -46,6 +46,14 @@ export interface HoldServiceDeps {
   readonly clock: () => Date;
 }
 
+/** One person's charge, checked and ready: `chargedMinor` is set when it was already made. */
+interface ChargeToMake {
+  readonly memberId: string;
+  readonly holdId: string;
+  readonly captureMinor: number;
+  readonly chargedMinor: number | null;
+}
+
 const fromStore = (error: HoldStoreError): HoldFailure => ({ kind: "store", message: error.message });
 const fromPayment = (error: PaymentError): HoldFailure => ({ kind: "payment", message: error.message });
 const notApplicable = (message: string): HoldFailure => ({ kind: "not_applicable", message });
@@ -175,28 +183,29 @@ export class HoldService {
 
   /**
    * Charges each person today's share of their hold and lets go of the rest. Nobody is charged more than they approved,
-   * whatever is asked of this. Once every charge has gone through the plan is marked paid; if any has not, nothing is
-   * marked and the whole thing can be run again, because charges already made are not made twice.
+   * whatever is asked of this. Every hold is checked first, so one that has gone bad is found before anyone is charged
+   * and nobody is charged for a trip that cannot be paid for in full. Each charge is written on the plan as it lands, so
+   * the screen shows who has been charged if a later one fails. Once every charge has gone through the plan is marked
+   * paid; if any has not, nothing is marked and the whole thing can be run again, because charges already made are not
+   * made twice.
    */
   async captureHolds(planId: string, captures: readonly HoldCapture[]): Promise<Result<void, HoldFailure>> {
+    const ready = await this.checkBeforeCharging(planId, captures);
+    if (!ready.ok) return err(ready.error);
+
     const failures: string[] = [];
-    for (const capture of captures) {
-      const found = await this.deps.store.find(planId, capture.memberId);
-      if (!found.ok) {
-        failures.push(found.error.message);
-        continue;
+    for (const { memberId, holdId, captureMinor, chargedMinor } of ready.value) {
+      let charged = chargedMinor;
+      if (charged === null) {
+        const captured = await this.deps.provider.capture(holdId, captureMinor, `capture:${holdId}`);
+        if (!captured.ok) {
+          failures.push(captured.error.message);
+          continue;
+        }
+        charged = captured.value.chargedMinor;
       }
-      const { holdId, approvedMinor } = found.value;
-      if (!holdId) {
-        failures.push("A member has no hold to charge");
-        continue;
-      }
-      if (approvedMinor === null || capture.captureMinor > approvedMinor) {
-        failures.push("A charge is above what the person approved, so it was not made");
-        continue;
-      }
-      const captured = await this.deps.provider.capture(holdId, capture.captureMinor, `capture:${holdId}`);
-      if (!captured.ok) failures.push(captured.error.message);
+      // Only for the screen: the plan fills in anything missing when it is marked paid, so a failure here is not a failed charge.
+      await applyPlanEvent(this.deps.plans, planId, { type: "member_charged", at: this.deps.clock(), memberId, chargedMinor: charged });
     }
     if (failures.length > 0) return err({ kind: "payment", message: failures.join("; ") });
 
@@ -205,6 +214,48 @@ export class HoldService {
     if (applied.error.kind === "repository") return err({ kind: "store", message: applied.error.error.message });
     // Already marked paid, by an earlier run, is the same as done.
     return applied.error.error.code === "plan_closed" ? ok(undefined) : err({ kind: "plan", message: applied.error.error.message });
+  }
+
+  /**
+   * Looks at every hold that is to be charged before any is. `chargedMinor` is set for one that was already charged
+   * (by an earlier run), so it is not charged again. Any hold that cannot be charged stops all of them.
+   */
+  private async checkBeforeCharging(planId: string, captures: readonly HoldCapture[]): Promise<Result<readonly ChargeToMake[], HoldFailure>> {
+    const ready: ChargeToMake[] = [];
+    const problems: string[] = [];
+    for (const capture of captures) {
+      const found = await this.deps.store.find(planId, capture.memberId);
+      if (!found.ok) {
+        problems.push(found.error.message);
+        continue;
+      }
+      const { holdId, approvedMinor, currency } = found.value;
+      if (!holdId) {
+        problems.push("A member has no hold to charge");
+        continue;
+      }
+      if (approvedMinor === null || capture.captureMinor > approvedMinor) {
+        problems.push("A charge is above what the person approved, so it was not made");
+        continue;
+      }
+      const fetched = await this.deps.provider.getHold(holdId);
+      if (!fetched.ok) {
+        problems.push(fetched.error.message);
+        continue;
+      }
+      const hold = fetched.value;
+      if (hold.status === "captured" && hold.owner.planId === planId && hold.owner.memberId === capture.memberId) {
+        ready.push({ memberId: capture.memberId, holdId, captureMinor: capture.captureMinor, chargedMinor: hold.chargedMinor });
+        continue;
+      }
+      const checked = checkHold(hold, { owner: { planId, memberId: capture.memberId }, amountMinor: approvedMinor, currency });
+      if (!checked.ok) {
+        problems.push(`A member's hold cannot be charged (${checked.reason})`);
+        continue;
+      }
+      ready.push({ memberId: capture.memberId, holdId, captureMinor: capture.captureMinor, chargedMinor: null });
+    }
+    return problems.length === 0 ? ok(ready) : err({ kind: "payment", message: `Nobody more was charged: ${problems.join("; ")}` });
   }
 
   private async create(planId: string, memberId: string, known?: HoldRecord): Promise<Result<CardForm, HoldFailure>> {
