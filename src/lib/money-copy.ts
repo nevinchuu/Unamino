@@ -27,6 +27,8 @@ export interface MoneyExplainer {
   readonly heading: string;
   /** The few plain lines that are always shown. */
   readonly lead: readonly string[];
+  /** The whole story in one line, for small spaces. */
+  readonly summary: string;
   readonly toggle: string;
   readonly analogy: string;
   readonly points: readonly { readonly label: string; readonly text: string }[];
@@ -57,6 +59,7 @@ export function moneyExplainer(input: MoneyExplainerInput): MoneyExplainer {
       `When you add your card, your bank sets aside ${amount} for this trip. It is still your money, but you cannot spend it until the trip is booked or the hold ends.`,
       "Only after everyone is in and every booking is confirmed do we take your share. Anything left over goes back to you.",
     ],
+    summary: `Nothing is taken now. When you add your card, your bank sets aside ${amount}, and we take your share only after everyone is in and the trip is booked.`,
     toggle: "What is a hold?",
     analogy: "A hold works like the deposit a hotel asks for at check-in. The hotel does not take your money. It asks your bank to keep that amount free in case it is needed.",
     points: [

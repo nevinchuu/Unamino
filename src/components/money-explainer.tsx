@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, Landmark } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { isTestKey } from "@/lib/stripe-browser";
 import { MONEY_STEPS, moneyExplainer } from "@/lib/money-copy";
@@ -15,6 +16,8 @@ interface MoneyExplainerProps {
   readonly currency: string;
   /** Booking and holds are only pretended. */
   readonly demo?: boolean;
+  /** For small spaces such as the chat panel: the steps and one line, with a link to where the whole explanation is. */
+  readonly compact?: { readonly moreHref: string };
   readonly className?: string;
 }
 
@@ -22,7 +25,7 @@ interface MoneyExplainerProps {
  * Tells a person where their money is before they approve an amount, in plain words: three lines always shown, and a
  * "What is a hold?" line that opens the comparison, what their banking app will show, and a worked example.
  */
-export function MoneyExplainer({ amountMinor, currency, demo = false, className }: MoneyExplainerProps) {
+export function MoneyExplainer({ amountMinor, currency, demo = false, compact, className }: MoneyExplainerProps) {
   const [open, setOpen] = useState(false);
   const text = moneyExplainer({ amountMinor, currency, supportEmail: SUPPORT_EMAIL, testMode: PUBLISHABLE_KEY !== null && isTestKey(PUBLISHABLE_KEY), demo });
 
@@ -42,16 +45,27 @@ export function MoneyExplainer({ amountMinor, currency, demo = false, className 
         ))}
       </ol>
 
-      {text.lead.map((line) => (
-        <p key={line}>{line}</p>
-      ))}
+      {compact ? (
+        <>
+          <p>{text.summary}</p>
+          <Link href={compact.moreHref} className="flex min-h-11 items-center font-semibold text-link">
+            {text.toggle}
+          </Link>
+        </>
+      ) : (
+        <>
+          {text.lead.map((line) => (
+            <p key={line}>{line}</p>
+          ))}
 
-      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-11 items-center gap-1 font-semibold text-link">
-        {text.toggle}
-        <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
-      </button>
+          <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-11 items-center gap-1 font-semibold text-link">
+            {text.toggle}
+            <ChevronDown className={cn("size-4 transition-transform", open && "rotate-180")} />
+          </button>
+        </>
+      )}
 
-      {open ? (
+      {open && !compact ? (
         <div className="space-y-2 text-muted-foreground">
           <p>{text.analogy}</p>
           <ul className="list-disc space-y-1.5 pl-5">

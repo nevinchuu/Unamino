@@ -34,6 +34,12 @@ describe("moneyExplainer", () => {
     expect(text.lead[2]).toContain("Only after everyone is in and every booking is confirmed");
   });
 
+  it("has a one-line summary with the person's amount that does not call the hold a charge", () => {
+    const { summary } = moneyExplainer(input);
+    expect(summary).toContain("your bank sets aside $64.22");
+    expect(summary).toContain("only after everyone is in");
+  });
+
   it("shows the support line only when there is an address", () => {
     expect(moneyExplainer(input).support).toBeNull();
     expect(moneyExplainer({ ...input, supportEmail: "help@example.com" }).support).toBe("Something wrong with a charge? Email help@example.com.");

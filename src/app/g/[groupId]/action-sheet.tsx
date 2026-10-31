@@ -132,7 +132,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
             covered ? (
               <p className="text-[13px] leading-[19px] text-muted-foreground">A friend is covering your whole share, so there is no card to add. Open the plan to give your traveller details.</p>
             ) : mine.shareMinor !== null ? (
-              <MoneyExplainer amountMinor={mine.shareMinor} currency={mine.currency} />
+              <MoneyExplainer amountMinor={mine.shareMinor} currency={mine.currency} compact={{ moreHref: `/g/${groupId}/plan/${plan.id}` }} />
             ) : null
           ) : null}
 
