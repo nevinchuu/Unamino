@@ -400,7 +400,7 @@ describe("a paid trip", () => {
       for (const status of ["draft", "reviewing", "approving", "captured", "expired"] as const) expect(view({ status }).progress).toEqual([]);
     });
 
-    it("says the holds are in, and that booking is next, once everyone is in but booking has not started", () => {
+    it("says the holds are in, and that booking is next, once everyone has approved but booking has not started", () => {
       expect(states(view({ status: "held" }))).toEqual(["holds:done", "hotel:waiting", "flight:waiting", "charge:waiting"]);
     });
 

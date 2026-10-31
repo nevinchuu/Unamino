@@ -21,5 +21,5 @@ export function reminderLine(sender: string, waiting: readonly string[]): string
 export function fallbackNudge(name: string, step: ReminderStep): string {
   return step === "agree"
     ? `${name}, the plan is waiting for you to agree. Agreeing costs nothing and your money is not touched.`
-    : `${name}, the plan is waiting for you to approve your amount and add a card. Nothing is charged until everyone is in and the trip is booked.`;
+    : `${name}, the plan is waiting for you to approve your amount and add a card. Nothing is charged until everyone has approved and the trip is booked.`;
 }

@@ -60,7 +60,7 @@ describe("runRemind", () => {
     const { deps, posted, postedByTrippy } = setup(raw("approving", [person("ana", "Ana", { ...agreed, holdPlaced: true }), person("ben", "Ben", agreed)]));
     expect(await runRemind(deps, ana, input)).toEqual({ ok: true });
     expect(posted).toEqual(["Ana asked Trippy to nudge Ben."]);
-    expect(postedByTrippy).toEqual(["Ben, the plan is waiting for you to approve your amount and add a card. Nothing is charged until everyone is in and the trip is booked."]);
+    expect(postedByTrippy).toEqual(["Ben, the plan is waiting for you to approve your amount and add a card. Nothing is charged until everyone has approved and the trip is booked."]);
   });
 
   it("posts the model's wording for each person when it follows the rules", async () => {

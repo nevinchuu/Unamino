@@ -146,7 +146,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
           ) : null}
 
           {view.step === "agree" && view.actionable && share ? (
-            <p className="text-[13px] leading-[19px] text-muted-foreground">Agreeing costs nothing and your money is not touched. Next you approve your own amount, and only then does your bank set that amount aside. Nothing is charged until everyone is in and the trip is booked.</p>
+            <p className="text-[13px] leading-[19px] text-muted-foreground">Agreeing costs nothing and your money is not touched. Next you approve your own amount, and only then does your bank set that amount aside. Nothing is charged until everyone has approved and the trip is booked.</p>
           ) : null}
 
           <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} aria-expanded={detailsOpen} className="flex min-h-11 items-center justify-center gap-1 self-center text-sm font-semibold text-link">

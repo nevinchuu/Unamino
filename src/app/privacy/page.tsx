@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <AppBar title="Privacy notice" backHref="/" />
       <main className="flex flex-1 flex-col gap-5 px-5 py-6 text-sm leading-6">
         <p className="text-muted-foreground">
-          Unamino helps a group plan a trip together, agree to it, and pay for it only when everyone is in. This notice says what we keep about you, why, and for how long.
+          Unamino helps a group plan a trip together, agree to it, and pay for it only when everyone has approved. This notice says what we keep about you, why, and for how long.
         </p>
 
         <section className="space-y-2">

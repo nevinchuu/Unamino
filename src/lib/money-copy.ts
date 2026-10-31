@@ -8,7 +8,7 @@ const MIN_EXAMPLE_MINOR = 1_000;
 /** The three steps money goes through, in the order they happen. */
 export const MONEY_STEPS = [
   { when: "Now", what: "Set aside at your bank" },
-  { when: "Everyone's in", what: "Trip booked" },
+  { when: "Everyone approved", what: "Trip booked" },
   { when: "Then", what: "Your share is charged" },
 ] as const;
 
@@ -57,16 +57,16 @@ export function moneyExplainer(input: MoneyExplainerInput): MoneyExplainer {
     lead: [
       "Right now it is in your own bank account. Nothing has been taken.",
       `When you add your card, your bank sets aside ${amount} for this trip. It is still your money, but you cannot spend it until the trip is booked or the hold ends.`,
-      "Only after everyone is in and every booking is confirmed do we take your share. Anything left over goes back to you.",
+      "Only after everyone has approved and every booking is confirmed do we take your share. Anything left over goes back to you.",
     ],
-    summary: `Nothing is taken now. When you add your card, your bank sets aside ${amount}, and we take your share only after everyone is in and the trip is booked.`,
+    summary: `Nothing is taken now. When you add your card, your bank sets aside ${amount}, and we take your share only after everyone has approved and the trip is booked.`,
     toggle: "What is a hold?",
     analogy: "A hold works like the deposit a hotel asks for at check-in. The hotel does not take your money. It asks your bank to keep that amount free in case it is needed.",
     points: [
       { label: "In your banking app", text: `you will see a pending payment of ${amount}, and your available balance will be ${amount} lower. Your real balance has not changed.` },
       ...(example ? [{ label: "Example", text: `you approve ${amount}. By booking time the price is ${example.finalText}. We take ${example.finalText}, and the other ${example.releasedText} is released straight away.` }] : []),
       { label: "If the trip does not happen", text: "the hold is cancelled. Most banks free the money within a few days." },
-      { label: "How long it can last", text: "up to about 7 days. We book as soon as everyone is in, and cancel the hold if the plan ends first." },
+      { label: "How long it can last", text: "up to about 7 days. We book as soon as everyone has approved, and cancel the hold if the plan ends first." },
       { label: "Who has it", text: "your bank keeps it set aside; Stripe, our payment processor, asks them to. Unamino never holds your money and never sees your card number." },
     ],
     goodToKnow: "Good to know: everyone pays in USD, so a card in another currency may add your bank's conversion fee. Unamino adds no fee.",

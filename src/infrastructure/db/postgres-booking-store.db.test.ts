@@ -104,7 +104,7 @@ describe.skipIf(!ENABLED)("PostgresBookingStore on the real database", () => {
     expect(none.ok && none.value).not.toContain(planId);
   }, 30_000);
 
-  it("finds a plan that has been everyone-is-in for a while without booking, and not one that is booking or new", async () => {
+  it("finds a plan that has been fully approved for a while without booking, and not one that is booking or new", async () => {
     await handle.db.update(plans).set({ status: "held", updatedAt: new Date("2026-10-27T00:00:00.000Z") }).where(eq(plans.id, planId));
     const later = new Date("2026-10-27T00:02:00.000Z");
 

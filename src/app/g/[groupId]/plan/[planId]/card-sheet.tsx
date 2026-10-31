@@ -54,7 +54,7 @@ export function CardSheet({ open, onOpenChange, groupId, planId, amountText, amo
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                 {detailsNeeded
                   ? `The airline and the hotel need these to book your place.${cardRequired ? " Then you add your card." : " A friend covers your share, so there is no card to add."}`
-                  : `Your bank will set aside ${amountText} for this trip. That is a hold, not a charge: we only take your share once everyone is in and the trip is booked, and the hold is cancelled if the plan ends.`}
+                  : `Your bank will set aside ${amountText} for this trip. That is a hold, not a charge: we only take your share once everyone has approved and the trip is booked, and the hold is cancelled if the plan ends.`}
               </Dialog.Description>
             </div>
             <Dialog.Close aria-label="Close" className="-mt-1 -mr-1 rounded-full p-2 text-muted-foreground hover:bg-muted">

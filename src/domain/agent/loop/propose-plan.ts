@@ -175,7 +175,7 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
     perPerson: shares.map((share) => ({ name: nameOf.get(share.memberId) ?? "Someone", share: formatMinor(share.shareMinor, share.currency) })),
     notFullyServed: violations.map((violation) => nameMembers(violation.message, people)),
     ...(lostIfLaterFails.length > 0 && { notRefundable: `${lostIfLaterFails.map((pick) => pick.offer.title).join(" and ")} cannot be cancelled for free. If a booking made after ${lostIfLaterFails.length === 1 ? "it" : "them"} failed, ${lostIfLaterFails.length === 1 ? "it" : "they"} would not be refunded. Tell the group this plainly in one line.` }),
-    next: "The plan is now in front of the group. Everyone agrees to it, then each person approves their own amount. Nothing is charged until everyone is in.",
+    next: "The plan is now in front of the group. Everyone agrees to it, then each person approves their own amount. Nothing is charged until everyone has approved.",
   });
 }
 

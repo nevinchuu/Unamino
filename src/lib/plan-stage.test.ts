@@ -62,7 +62,7 @@ describe("describeStage", () => {
   it("tells someone who approved how many have, and that nothing is charged yet", () => {
     const stage = describeStage(view("approving", [person("ana", "agreed", "approved"), person("ben", "agreed", "approved"), person("jia", "agreed")]));
     expect(stage).toMatchObject({ headline: "You've approved", tone: "waiting" });
-    expect(stage.detail).toBe("2 of 3 have approved. Nothing is charged until everyone is in.");
+    expect(stage.detail).toBe("2 of 3 have approved. Nothing is charged until everyone has approved.");
   });
 
   it("asks someone who approved to add their card, until it is on the hold", () => {
@@ -77,8 +77,8 @@ describe("describeStage", () => {
     expect(stage).toMatchObject({ headline: "Your price went up", tone: "action" });
   });
 
-  it("says everyone is in once every hold is placed", () => {
-    expect(describeStage(view("held", [person("ana", "agreed", "approved")]))).toMatchObject({ headline: "Everyone's in", tone: "good", step: null });
+  it("says everyone has approved once every hold is placed", () => {
+    expect(describeStage(view("held", [person("ana", "agreed", "approved")]))).toMatchObject({ headline: "Everyone has approved", tone: "good", step: null });
   });
 
   it("describes the booking states", () => {

@@ -31,13 +31,13 @@ describe("moneyExplainer", () => {
   it("never calls the hold a charge before the trip is booked", () => {
     const text = moneyExplainer(input);
     expect(text.lead[1]).not.toMatch(/charge/i);
-    expect(text.lead[2]).toContain("Only after everyone is in and every booking is confirmed");
+    expect(text.lead[2]).toContain("Only after everyone has approved and every booking is confirmed");
   });
 
   it("has a one-line summary with the person's amount that does not call the hold a charge", () => {
     const { summary } = moneyExplainer(input);
     expect(summary).toContain("your bank sets aside $64.22");
-    expect(summary).toContain("only after everyone is in");
+    expect(summary).toContain("only after everyone has approved");
   });
 
   it("shows the support line only when there is an address", () => {
@@ -60,6 +60,6 @@ describe("moneyExplainer", () => {
 
 describe("MONEY_STEPS", () => {
   it("runs from set aside, to booked, to charged", () => {
-    expect(MONEY_STEPS.map((step) => step.when)).toEqual(["Now", "Everyone's in", "Then"]);
+    expect(MONEY_STEPS.map((step) => step.when)).toEqual(["Now", "Everyone approved", "Then"]);
   });
 });

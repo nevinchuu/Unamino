@@ -6,7 +6,7 @@ import type { SupplierBookingStore } from "./ports";
 /** A plan that has been booking this long is not coming back: the supplier calls take well under a minute. */
 export const STUCK_AFTER_MS = 10 * 60_000;
 /**
- * A plan that has been "everyone is in" this long without booking started has lost its request to book: the last hold
+ * A plan that has been "everyone has approved" (held) this long without booking started has lost its request to book: the last hold
  * is followed by booking within seconds. It is well under the time a plan has before its deadline, and long enough that
  * the normal booking, which starts straight after the response, is never raced.
  */

@@ -26,6 +26,6 @@ describe("fallbackNudge", () => {
   it("asks a person to approve and add a card, and says nothing is charged yet", () => {
     const line = fallbackNudge("Ben", "approve");
     expect(line).toContain("approve your amount and add a card");
-    expect(line).toContain("Nothing is charged until everyone is in");
+    expect(line).toContain("Nothing is charged until everyone has approved");
   });
 });

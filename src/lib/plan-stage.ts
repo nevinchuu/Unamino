@@ -26,7 +26,7 @@ export function describeStage(view: PlanViewDto): StageView {
       tone: "ended",
     };
   }
-  if (status === "booking") return { step: null, headline: "Booking now", detail: "Everyone is in. The flights and hotel are being booked.", tone: "good" };
+  if (status === "booking") return { step: null, headline: "Booking now", detail: "Everyone has approved. The flights and hotel are being booked.", tone: "good" };
   if (status === "booked") {
     const { charged, owing, partial } = chargeProgressOf(view.people);
     // Some cards are charged and the rest are not: the trip is booked either way, so say who is still to be charged instead of letting it look finished.
@@ -34,7 +34,7 @@ export function describeStage(view: PlanViewDto): StageView {
     return { step: null, headline: "Booked", detail: "Everything is booked. The cards are being charged.", tone: "good" };
   }
   if (status === "captured") return { step: null, headline: "Booked and paid", detail: "The trip is booked and everyone has been charged.", tone: "good" };
-  if (status === "held") return { step: null, headline: "Everyone's in", detail: "Every hold is in place. Booking is next.", tone: "good" };
+  if (status === "held") return { step: null, headline: "Everyone has approved", detail: "Every hold is in place. Booking is next.", tone: "good" };
 
   if (!me.inPlan) {
     return { step: null, headline: "You joined after this plan was made", detail: "Mention @trippy in the chat and it will make a plan that includes you.", tone: "waiting" };
@@ -46,11 +46,11 @@ export function describeStage(view: PlanViewDto): StageView {
     if (me.cardNeeded) {
       return { step: "Step 2 of 2", headline: "Add your card", detail: "You've approved. Add a card to place your hold, so the trip can be booked once everyone has.", tone: "action" };
     }
-    if (me.approval === "approved") return { step: "Step 2 of 2", headline: "You've approved", detail: `${approved} of ${total} have approved. Nothing is charged until everyone is in.`, tone: "waiting" };
+    if (me.approval === "approved") return { step: "Step 2 of 2", headline: "You've approved", detail: `${approved} of ${total} have approved. Nothing is charged until everyone has approved.`, tone: "waiting" };
     if (me.approval === "needs_reapproval") {
       return { step: "Step 2 of 2", headline: "Your price went up", detail: "It is now above what you approved. Approve the new amount to stay in.", tone: "action" };
     }
-    return { step: "Step 2 of 2", headline: "Approve your amount", detail: "This is the most you'll be charged. Nothing is taken until everyone is in and the trip is booked.", tone: "action" };
+    return { step: "Step 2 of 2", headline: "Approve your amount", detail: "This is the most you'll be charged. Nothing is taken until everyone has approved and the trip is booked.", tone: "action" };
   }
 
   // Reviewing, or a draft that is about to be.

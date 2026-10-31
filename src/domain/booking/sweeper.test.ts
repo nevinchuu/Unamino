@@ -60,7 +60,7 @@ describe("BookingSweeper", () => {
     expect(world.plans.plan.status).toBe("expired");
   });
 
-  it("books a plan that reached everyone-is-in but whose request to book was lost", async () => {
+  it("books a plan that reached everyone-has-approved but whose request to book was lost", async () => {
     const { world, sweeper } = setup();
     expect(world.plans.plan.status).toBe("held");
     world.bookings.stalled = ["plan-1"];
