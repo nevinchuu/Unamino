@@ -1,3 +1,4 @@
+import { failureSummary, undoneSentence } from "@/domain/booking/announce";
 import type { Offer } from "@/domain/offers/schema";
 import type { PaymentsMode } from "@/domain/payments/types";
 import { tripKeptUntil } from "@/domain/retention/policy";
@@ -144,6 +145,16 @@ export interface MeDto {
   readonly actions: PlanActions;
 }
 
+/** Why a plan's booking failed, in the words the chat uses, for the plan screen. */
+export interface FailureDto {
+  /** Which part could not be booked and why. */
+  readonly summary: string;
+  /** What had already been booked and was cancelled again. Null when nothing had been. */
+  readonly undone: string | null;
+  /** The same plan may work if tried again. */
+  readonly retryable: boolean;
+}
+
 export interface PlanViewDto {
   readonly id: string;
   readonly groupId: string;
@@ -174,6 +185,8 @@ export interface PlanViewDto {
   readonly confirmations: readonly ConfirmationDto[];
   /** The steps of booking the trip, while it is being booked. Empty at any other time. */
   readonly progress: readonly ProgressStepDto[];
+  /** Why booking failed, for a plan that ended that way. Null for every other plan. */
+  readonly failure: FailureDto | null;
   readonly people: readonly PersonDto[];
   /** Who is covering whom. Empty when everybody pays their own part. */
   readonly covers: readonly CoverDto[];
@@ -382,6 +395,7 @@ export function buildPlanView(
     ideas: raw.ideas.map(ideaOf),
     confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],
     progress: bookingProgressOf(raw),
+    failure: raw.failure ? { summary: failureSummary(raw.failure), undone: undoneSentence(raw.failure.undone), retryable: raw.failure.retryable } : null,
     people,
     covers,
     me: {

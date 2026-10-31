@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { boolean, check, date, index, integer, jsonb, pgTable, primaryKey, smallint, text, uniqueIndex, uuid, type AnyPgColumn } from "drizzle-orm/pg-core";
 import type { SupplierBookingStatus } from "@/domain/booking/ports";
 import type { Offer } from "@/domain/offers/schema";
-import { BOOKING_FAILURE_KINDS, type BookingFailureKind, type PartKind, type UndonePart } from "@/domain/booking/failure";
+import { BOOKING_FAILURE_KINDS, FAILURE_CAUSES, type BookingFailureKind, type FailureCause, type PartKind, type UndonePart } from "@/domain/booking/failure";
 import type { RecordedPayment, RecordedSupplier } from "@/domain/retention/record";
 import type { SeenQuote } from "@/domain/quote/types";
 import type { VenueFacts } from "@/domain/schedule/venue";
@@ -116,6 +116,8 @@ export const bookingFailures = pgTable(
   {
     planId: uuid("plan_id").primaryKey().references(() => plans.id, { onDelete: "cascade" }),
     reason: text("reason").$type<BookingFailureKind>().notNull(),
+    /** What the supplier's answer said went wrong, more precisely than `reason`. Null when it did not say. */
+    cause: text("cause").$type<FailureCause>(),
     /** Null when no single hotel or flight is to blame. */
     partKind: text("part_kind").$type<PartKind>(),
     partTitle: text("part_title"),
@@ -131,6 +133,7 @@ export const bookingFailures = pgTable(
   (table) => [
     index("booking_failures_created_idx").on(table.createdAt),
     check("booking_failures_reason", sql`${table.reason} IN (${sql.raw(BOOKING_FAILURE_KINDS.map((kind) => `'${kind}'`).join(", "))})`),
+    check("booking_failures_cause", sql`${table.cause} IS NULL OR ${table.cause} IN (${sql.raw(FAILURE_CAUSES.map((cause) => `'${cause}'`).join(", "))})`),
   ],
 ).enableRLS();
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bookingFailedLine } from "./announce";
-import { BOOKING_FAILURE_KINDS, isRetryable, shortName, type FailedPart } from "./failure";
+import { bookingFailedLine, failureSummary, undoneSentence } from "./announce";
+import { BOOKING_FAILURE_KINDS, FAILURE_CAUSES, isRetryable, shortName, type FailedPart } from "./failure";
 
 const part = (overrides: Partial<FailedPart> = {}): FailedPart => ({ pickId: "p", kind: "hotel", title: "Riverside Hotel", listingId: "l", offeredMinor: 100, currency: "USD", ...overrides });
 
@@ -26,6 +26,12 @@ describe("isRetryable", () => {
   });
 });
 
+describe("undoneSentence", () => {
+  it("is null when nothing had been booked", () => {
+    expect(undoneSentence([])).toBeNull();
+  });
+});
+
 describe("bookingFailedLine", () => {
   it("names the part and why, and says nobody was charged", () => {
     expect(bookingFailedLine({ reason: "price", part: part(), undone: [] })).toBe("The hotel Riverside Hotel could not be booked because its price went up. Nothing was charged and every card hold was let go. Mention @trippy to plan again.");
@@ -47,6 +53,23 @@ describe("bookingFailedLine", () => {
       expect(line).toContain("Nothing was charged and every card hold was let go.");
       expect(line).toContain("@trippy");
     }
+  });
+
+  it("says what the partner's answer said when it said more than no, in a fixed sentence per cause", () => {
+    for (const cause of FAILURE_CAUSES) {
+      const line = bookingFailedLine({ reason: "rejected", cause, part: part(), undone: [] });
+      expect(line).toContain("The hotel Riverside Hotel could not be booked because ");
+      expect(line).not.toContain("the booking partner refused it");
+    }
+    expect(bookingFailedLine({ reason: "rejected", cause: "meal_plan_changed", part: part(), undone: [] })).toContain("because the hotel changed the meal plan on that room");
+  });
+
+  it("says when the problem is on our side, so nobody doubts their card or details", () => {
+    expect(failureSummary({ reason: "rejected", cause: "access_refused", part: part() })).toContain("a problem on our side and not with your card or details");
+  });
+
+  it("keeps the old reason when there is no cause", () => {
+    expect(failureSummary({ reason: "rejected", cause: null, part: part() })).toBe("The hotel Riverside Hotel could not be booked because the booking partner refused it.");
   });
 
   it("falls back to a plain reason for a part that failed for none of the usual ones", () => {

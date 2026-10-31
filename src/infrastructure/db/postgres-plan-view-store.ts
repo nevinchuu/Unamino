@@ -1,10 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { err, ok, type Result } from "@/lib/result";
 import type { RepositoryError } from "@/domain/plan/repository";
-import type { PlanViewRaw, PlanViewStore } from "@/domain/plan/view-store";
+import type { PlanViewRaw, PlanViewStore, ViewFailure } from "@/domain/plan/view-store";
 import type { Database } from "./client";
 import { readCovers } from "./postgres-cover-store";
-import { members, planMembers, planPicks, plans, scheduleSuggestions, supplierBookings, tripBriefs } from "./schema";
+import { bookingFailures, members, planMembers, planPicks, plans, scheduleSuggestions, supplierBookings, tripBriefs } from "./schema";
 
 const unavailable = (): Result<never, RepositoryError> => err({ code: "unavailable", message: "The database could not be reached" });
 
@@ -31,6 +31,8 @@ export class PostgresPlanViewStore implements PlanViewStore {
 
       const booked = await this.db.select({ pickId: supplierBookings.pickId, confirmation: supplierBookings.confirmation, status: supplierBookings.status }).from(supplierBookings).where(eq(supplierBookings.planId, planId)).orderBy(asc(supplierBookings.createdAt));
 
+      const failure = plan.status === "expired" ? await this.failureOf(planId) : null;
+
       return ok({
         id: plan.id,
         groupId: plan.groupId,
@@ -49,9 +51,21 @@ export class PostgresPlanViewStore implements PlanViewStore {
         ideas: ideas.map((idea) => ({ id: idea.id, date: idea.date, startTime: idea.startTime, endTime: idea.endTime, category: idea.category, why: idea.why, venue: idea.venue })),
         // A cancelled booking is not part of the trip, so it is never shown as a confirmation.
         bookings: booked.filter((booking) => booking.status !== "cancelled").map(({ pickId, confirmation }) => ({ pickId, confirmation })),
+        failure,
       });
     } catch {
       return unavailable();
+    }
+  }
+
+  /** Why the plan's booking failed, if it did. The screen still works without it, so a failed read is no reason to fail the plan. */
+  private async failureOf(planId: string): Promise<ViewFailure | null> {
+    try {
+      const [row] = await this.db.select().from(bookingFailures).where(eq(bookingFailures.planId, planId)).limit(1);
+      if (!row) return null;
+      return { reason: row.reason, cause: row.cause, part: row.partKind && row.partTitle ? { kind: row.partKind, title: row.partTitle } : null, undone: row.undone, retryable: row.retryable };
+    } catch {
+      return null;
     }
   }
 

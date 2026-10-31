@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { flight, hotel } from "@/domain/plan/test-support";
 import { SAMPLE_TRAVELLER } from "@/domain/booking/test-support";
-import { LiteApiBookingHttp } from "./booking-http";
+import { classifyFailure, LiteApiBookingHttp } from "./booking-http";
 import { clientReferenceFor, LiteApiHotelSupplier } from "./hotel-booking";
 import { LiteApiFlightSupplier } from "./flight-booking";
 
@@ -33,6 +33,27 @@ const request = (overrides: Partial<Parameters<LiteApiHotelSupplier["book"]>[0]>
 
 const hotelPrebook = (price = 400, extra: Record<string, unknown> = {}) => ({ body: { data: { prebookId: "pb-1", price, currency: "USD", ...extra } } });
 const hotelBooked = (status = "CONFIRMED") => ({ body: { data: { bookingId: "hb-1", status, hotelConfirmationCode: "HC1" }, sandbox: true } });
+
+describe("classifyFailure", () => {
+  const classify = (status: number, code?: number) => classifyFailure({ status, body: code === undefined ? null : { error: { code } } });
+
+  it.each([
+    ["our own access refused", 401, undefined, "rejected", "access_refused"],
+    ["access forbidden", 403, undefined, "rejected", "access_refused"],
+    ["a request it will not accept", 400, undefined, "rejected", "request_not_accepted"],
+    ["a request it cannot process", 422, undefined, "rejected", "request_not_accepted"],
+    ["a booking it declines for good", 400, 43002, "rejected", "booking_declined"],
+    ["a partner that is too busy", 429, undefined, "temporary", "partner_busy"],
+    ["a partner that errs", 503, undefined, "temporary", "partner_error"],
+  ] as const)("says why for %s", (_name, status, code, expectedCode, cause) => {
+    expect(classify(status, code)).toMatchObject({ code: expectedCode, cause });
+  });
+
+  it("gives no cause for a price rise or a sold-out offer: those already say it all", () => {
+    expect(classify(404)).not.toHaveProperty("cause");
+    expect(classify(409, 52020)).not.toHaveProperty("cause");
+  });
+});
 
 describe("LiteApiHotelSupplier", () => {
   it("prebooks, then books with one lead guest, the full phone number and a short client reference", async () => {

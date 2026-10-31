@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import { toMinorUnits } from "@/domain/money/currency";
+import type { FailureCause } from "@/domain/booking/failure";
 import type { BookingTraveller, CancelOutcome, FlightBookingRequest, FlightSupplier, SupplierError, SupplierReceipt } from "@/domain/booking/ports";
 import { classifyFailure, succeeded, type LiteApiBookingHttp } from "./booking-http";
 
@@ -26,7 +27,7 @@ const bookSchema = z.object({
   data: z.array(z.object({ booking: z.object({ bookingId: z.string().min(1), bookingRef: z.string().nullish(), status: z.string() }) })).min(1),
 });
 
-const bad = (message: string): Result<never, SupplierError> => err({ code: "rejected", message });
+const bad = (message: string, cause?: FailureCause): Result<never, SupplierError> => err({ code: "rejected", message, ...(cause && { cause }) });
 
 function passengerOf({ details }: BookingTraveller): Record<string, unknown> {
   return {
@@ -49,7 +50,7 @@ function passengerOf({ details }: BookingTraveller): Record<string, unknown> {
 /** Whether a total quoted in major units is within the most we may pay, in minor units. */
 function withinLimit(total: number, currency: string, request: FlightBookingRequest): Result<void, SupplierError> {
   const minor = toMinorUnits(total, currency);
-  if (minor === null || currency.toUpperCase() !== request.offer.currency) return bad("liteAPI's price could not be read");
+  if (minor === null || currency.toUpperCase() !== request.offer.currency) return bad("liteAPI's price could not be read", "answer_unreadable");
   return minor > request.maxTotalMinor ? err({ code: "price_changed", message: "The flight now costs more than the offer said" }) : ok(undefined);
 }
 
@@ -65,7 +66,7 @@ export class LiteApiFlightSupplier implements FlightSupplier {
     if (!verified.ok) return verified;
     if (!succeeded(verified.value)) return err(classifyFailure(verified.value));
     const verify = verifySchema.safeParse(verified.value.body);
-    if (!verify.success) return bad("liteAPI's verify answer was not in the expected shape");
+    if (!verify.success) return bad("liteAPI's verify answer was not in the expected shape", "answer_unreadable");
     const [checked] = verify.data.data;
     const display = checked.journey.pricing.display;
     const verifiedPrice = withinLimit(display.total, display.currency, request);
@@ -89,7 +90,7 @@ export class LiteApiFlightSupplier implements FlightSupplier {
     if (!prebooked.ok) return prebooked;
     if (!succeeded(prebooked.value)) return err(classifyFailure(prebooked.value));
     const prebook = prebookSchema.safeParse(prebooked.value.body);
-    if (!prebook.success) return bad("liteAPI's prebook answer was not in the expected shape");
+    if (!prebook.success) return bad("liteAPI's prebook answer was not in the expected shape", "answer_unreadable");
     const [reserved] = prebook.data.data;
     const reservedPrice = withinLimit(reserved.price, reserved.currency, request);
     if (!reservedPrice.ok) return reservedPrice;
@@ -99,13 +100,13 @@ export class LiteApiFlightSupplier implements FlightSupplier {
     if (!booked.ok) return booked;
     if (!succeeded(booked.value)) return err(classifyFailure(booked.value));
     const booking = bookSchema.safeParse(booked.value.body);
-    if (!booking.success) return bad("liteAPI's booking answer was not in the expected shape");
+    if (!booking.success) return bad("liteAPI's booking answer was not in the expected shape", "answer_unreadable");
     const made = booking.data.data[0].booking;
 
     // The airline may take a moment to confirm, which counts as booked. Anything else is undone.
     if (made.status !== "CONFIRMED" && made.status !== "PENDING_CONFIRMATION") {
       await this.cancel(made.bookingId);
-      return bad(`The flight was not confirmed (${made.status})`);
+      return bad(`The flight was not confirmed (${made.status})`, "not_confirmed");
     }
     return ok({ bookingId: made.bookingId, confirmation: made.bookingRef ?? null });
   }

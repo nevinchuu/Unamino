@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import { toMinorUnits } from "@/domain/money/currency";
+import type { FailureCause } from "@/domain/booking/failure";
 import type { BookingTraveller, CancelOutcome, HotelBookingRequest, HotelSupplier, SupplierError, SupplierReceipt } from "@/domain/booking/ports";
 import { classifyFailure, succeeded, type LiteApiBookingHttp } from "./booking-http";
 
@@ -24,7 +25,7 @@ const bookSchema = z.object({
 
 const cancelSchema = z.object({ data: z.object({ status: z.string() }) });
 
-const bad = (message: string): Result<never, SupplierError> => err({ code: "rejected", message });
+const bad = (message: string, cause?: FailureCause): Result<never, SupplierError> => err({ code: "rejected", message, ...(cause && { cause }) });
 
 /** liteAPI limits how long a client reference may be, and ours holds two ids, so it is shortened to a fixed length. */
 export const clientReferenceFor = (reference: string): string => createHash("sha256").update(reference).digest("hex").slice(0, 32);
@@ -44,13 +45,13 @@ export class LiteApiHotelSupplier implements HotelSupplier {
     if (!prebooked.ok) return prebooked;
     if (!succeeded(prebooked.value)) return err(classifyFailure(prebooked.value));
     const prebook = prebookSchema.safeParse(prebooked.value.body);
-    if (!prebook.success) return bad("liteAPI's prebook answer was not in the expected shape");
+    if (!prebook.success) return bad("liteAPI's prebook answer was not in the expected shape", "answer_unreadable");
 
     const price = toMinorUnits(prebook.data.data.price, prebook.data.data.currency);
-    if (price === null || prebook.data.data.currency.toUpperCase() !== request.offer.currency) return bad("liteAPI's price could not be read");
+    if (price === null || prebook.data.data.currency.toUpperCase() !== request.offer.currency) return bad("liteAPI's price could not be read", "answer_unreadable");
     if (price > request.maxTotalMinor) return err({ code: "price_changed", message: "The room now costs more than the offer said" });
     // A different meal plan is a different product from what the group agreed to.
-    if (prebook.data.data.boardChanged) return bad("The room's meal plan changed");
+    if (prebook.data.data.boardChanged) return bad("The room's meal plan changed", "meal_plan_changed");
 
     const { details } = request.lead;
     const person = { firstName: details.firstName, lastName: details.lastName, email: details.email };
@@ -66,12 +67,12 @@ export class LiteApiHotelSupplier implements HotelSupplier {
     if (!booked.ok) return booked;
     if (!succeeded(booked.value)) return err(classifyFailure(booked.value));
     const booking = bookSchema.safeParse(booked.value.body);
-    if (!booking.success) return bad("liteAPI's booking answer was not in the expected shape");
+    if (!booking.success) return bad("liteAPI's booking answer was not in the expected shape", "answer_unreadable");
 
     if (booking.data.data.status !== "CONFIRMED") {
       // Not confirmed, but it exists: undo it so nothing is left behind.
       await this.cancel(booking.data.data.bookingId);
-      return bad(`The room was not confirmed (${booking.data.data.status})`);
+      return bad(`The room was not confirmed (${booking.data.data.status})`, "not_confirmed");
     }
     return ok({ bookingId: booking.data.data.bookingId, confirmation: booking.data.data.hotelConfirmationCode ?? null });
   }

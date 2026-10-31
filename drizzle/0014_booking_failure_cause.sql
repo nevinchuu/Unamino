@@ -1,0 +1,2 @@
+ALTER TABLE "booking_failures" ADD COLUMN "cause" text;--> statement-breakpoint
+ALTER TABLE "booking_failures" ADD CONSTRAINT "booking_failures_cause" CHECK ("booking_failures"."cause" IS NULL OR "booking_failures"."cause" IN ('request_not_accepted', 'access_refused', 'booking_declined', 'meal_plan_changed', 'not_confirmed', 'answer_unreadable', 'no_answer', 'partner_busy', 'partner_error'));

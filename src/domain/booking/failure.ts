@@ -8,6 +8,17 @@
 export const BOOKING_FAILURE_KINDS = ["price", "unavailable", "rejected", "temporary", "details", "hold", "deadline", "stuck", "other"] as const;
 export type BookingFailureKind = (typeof BOOKING_FAILURE_KINDS)[number];
 
+/**
+ * What lies behind a "rejected" or "temporary" failure, so the group is told more than "the partner refused it".
+ * Our own closed set, never the supplier's words: "request_not_accepted": the request or a traveller detail was not
+ * accepted. "access_refused": our own access was refused, which is on our side and not the group's. "booking_declined":
+ * declined, and asking again gets the same answer. "meal_plan_changed": the hotel changed the room's meal plan.
+ * "not_confirmed": the supplier did not confirm it. "answer_unreadable": its answer could not be understood.
+ * "no_answer": it did not reply in time. "partner_busy": too busy to take it. "partner_error": an error on its side.
+ */
+export const FAILURE_CAUSES = ["request_not_accepted", "access_refused", "booking_declined", "meal_plan_changed", "not_confirmed", "answer_unreadable", "no_answer", "partner_busy", "partner_error"] as const;
+export type FailureCause = (typeof FAILURE_CAUSES)[number];
+
 export type PartKind = "hotel" | "flight";
 
 /** The one hotel or flight that could not be booked. `listingId` is the supplier's stable id for it, so it can be kept out of the next plan. */
@@ -31,6 +42,8 @@ export interface UndonePart {
 export interface BookingFailureRecord {
   readonly planId: string;
   readonly reason: BookingFailureKind;
+  /** More precise than `reason`, when the supplier's answer allowed it. Null when it did not. */
+  readonly cause?: FailureCause | null;
   /** Null when no single hotel or flight is to blame, such as a missing detail or a lost card hold. */
   readonly part: FailedPart | null;
   readonly undone: readonly UndonePart[];

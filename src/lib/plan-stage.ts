@@ -17,6 +17,7 @@ export function describeStage(view: PlanViewDto): StageView {
   const total = view.people.length;
 
   if (status === "expired") {
+    if (view.failure) return { step: null, headline: "Booking didn't go through", detail: "Nothing was charged and every card hold was let go.", tone: "ended" };
     return {
       step: null,
       headline: "This plan ended",

@@ -17,6 +17,7 @@ export class PostgresBookingFailureStore implements BookingFailureStore, Booking
         .values({
           planId: record.planId,
           reason: record.reason,
+          cause: record.cause ?? null,
           partKind: record.part?.kind ?? null,
           partTitle: record.part?.title ?? null,
           listingId: record.part?.listingId ?? null,

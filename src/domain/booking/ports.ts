@@ -1,7 +1,7 @@
 import type { Result } from "@/lib/result";
 import type { FlightOffer, HotelOffer } from "@/domain/offers/schema";
 import type { TravellerDetails } from "@/domain/travellers/details";
-import type { BookingFailureRecord } from "./failure";
+import type { BookingFailureRecord, FailureCause } from "./failure";
 
 /** A person on a booking, with the details the airline or hotel needs. Only ever held in memory while booking. */
 export interface BookingTraveller {
@@ -19,6 +19,8 @@ export type SupplierErrorCode = "price_changed" | "unavailable" | "rejected" | "
 
 export interface SupplierError {
   readonly code: SupplierErrorCode;
+  /** Why it was refused, when the answer says. It reaches the group in plain words, unlike `message`. */
+  readonly cause?: FailureCause;
   /** For logs. It can name internals, so it is never shown to people. */
   readonly message: string;
 }

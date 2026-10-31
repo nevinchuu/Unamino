@@ -100,6 +100,23 @@ describe("the plan as the screen shows it", () => {
   });
 });
 
+describe("a plan whose booking failed", () => {
+  const failure = { reason: "rejected", cause: "meal_plan_changed", part: { kind: "hotel", title: "Riverside Hotel - near the pier" }, undone: [{ kind: "flight", title: "SIN to BKK" }], retryable: false } as const;
+
+  it("carries the reason in the chat's own words, what was cancelled, and whether to try again", () => {
+    expect(view({ status: "expired", failure }).failure).toEqual({
+      summary: "The hotel Riverside Hotel could not be booked because the hotel changed the meal plan on that room, so it is no longer what the group agreed to.",
+      undone: "The flight SIN to BKK had already been booked and was cancelled.",
+      retryable: false,
+    });
+  });
+
+  it("has no failure for a plan that did not fail", () => {
+    expect(view().failure).toBeNull();
+    expect(view({ status: "expired", failure: null }).failure).toBeNull();
+  });
+});
+
 describe("who pays what", () => {
   it("gives each person their share and the parts it is made of", () => {
     const { people } = view();

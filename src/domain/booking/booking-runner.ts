@@ -6,7 +6,7 @@ import type { PlanRepository } from "@/domain/plan/repository";
 import type { PlanEffect } from "@/domain/plan/types";
 import type { TravellerService } from "@/domain/travellers/service";
 import { bookingFailedLine } from "./announce";
-import { isRetryable, type BookingFailureKind, type BookingFailureRecord, type FailedPart, type UndonePart } from "./failure";
+import { isRetryable, type BookingFailureKind, type BookingFailureRecord, type FailedPart, type FailureCause, type UndonePart } from "./failure";
 import type {
   BookingFailureStore,
   BookingTraveller,
@@ -47,9 +47,11 @@ interface BookingFailure {
   readonly message: string;
   /** The hotel or flight that could not be booked, when one is to blame. */
   readonly part?: FailedPart;
+  /** More precise than `kind`, when the supplier's answer said why. */
+  readonly cause?: FailureCause;
 }
 
-const fail = (kind: BookingFailureKind, message: string, part?: FailedPart): Result<never, BookingFailure> => err({ kind, message, ...(part && { part }) });
+const fail = (kind: BookingFailureKind, message: string, part?: FailedPart, cause?: FailureCause): Result<never, BookingFailure> => err({ kind, message, ...(part && { part }), ...(cause && { cause }) });
 /** Which reason fits a supplier's refusal. */
 const kindOf = (error: SupplierError): BookingFailureKind =>
   error.code === "price_changed" ? "price" : error.code === "unavailable" ? "unavailable" : error.code === "rejected" ? "rejected" : "temporary";
@@ -124,7 +126,7 @@ export class SupplierBookingRunner implements EffectRunner {
 
   /** Keeps why the booking failed, then tells the group which part it was. Neither failing changes the outcome: the plan has already ended. */
   private async report(planId: string, failure: BookingFailure, undone: readonly UndonePart[]): Promise<void> {
-    const record: BookingFailureRecord = { planId, reason: failure.kind, part: failure.part ?? null, undone, retryable: isRetryable(failure.kind) };
+    const record: BookingFailureRecord = { planId, reason: failure.kind, cause: failure.cause ?? null, part: failure.part ?? null, undone, retryable: isRetryable(failure.kind) };
     try {
       await this.deps.failures?.save(record);
     } catch {
@@ -238,7 +240,7 @@ export class SupplierBookingRunner implements EffectRunner {
         ? await this.deps.hotels.book({ offer, reference, lead, maxTotalMinor })
         : await this.deps.flights.book({ offer, reference, passengers: people, maxTotalMinor });
     const part: FailedPart = { pickId: pick.id, kind: offer.kind, title: offer.title, listingId: offer.listingId, offeredMinor: offer.totalMinor, currency: offer.currency };
-    if (!receipt.ok) return fail(kindOf(receipt.error), describe(`${offer.kind} booking failed`, receipt.error), part);
+    if (!receipt.ok) return fail(kindOf(receipt.error), describe(`${offer.kind} booking failed`, receipt.error), part, receipt.error.cause);
 
     const kind: SupplierBookingKind = offer.kind;
     const recorded = await this.deps.bookings.record({ planId, pickId: pick.id, kind, bookingId: receipt.value.bookingId, confirmation: receipt.value.confirmation, status: "booked" });

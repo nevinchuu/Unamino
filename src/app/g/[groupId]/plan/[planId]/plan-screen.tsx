@@ -181,6 +181,20 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           </section>
         )}
 
+        {view.failure ? (
+          <section role="alert" className="space-y-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p className="flex items-start gap-2 font-semibold">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+              <span>{view.failure.summary}</span>
+            </p>
+            {view.failure.undone ? <p>{view.failure.undone}</p> : null}
+            <p>{view.failure.retryable ? "You can ask Trippy to try the same plan once more, or to plan something different." : "Ask Trippy in the chat to plan something different."}</p>
+            <Link href={`/g/${view.groupId}`} className="inline-flex min-h-11 items-center font-semibold underline">
+              Back to the chat
+            </Link>
+          </section>
+        ) : null}
+
         {!view.reference && view.progress.length > 0 ? <BookingProgress steps={view.progress} /> : null}
 
         {view.demoBooking && view.status === "booked" ? (

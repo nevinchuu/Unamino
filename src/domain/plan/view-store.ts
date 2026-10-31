@@ -1,4 +1,5 @@
 import type { Result } from "@/lib/result";
+import type { BookingFailureKind, FailureCause, PartKind, UndonePart } from "@/domain/booking/failure";
 import type { Offer } from "@/domain/offers/schema";
 import type { VenueFacts } from "@/domain/schedule/venue";
 import type { Cover, FxRateTable } from "@/domain/split/types";
@@ -43,6 +44,15 @@ export interface ViewBooking {
   readonly confirmation: string | null;
 }
 
+/** Why a plan's booking failed, as kept: which part, the reason, and what was cancelled again. */
+export interface ViewFailure {
+  readonly reason: BookingFailureKind;
+  readonly cause: FailureCause | null;
+  readonly part: { readonly kind: PartKind; readonly title: string } | null;
+  readonly undone: readonly UndonePart[];
+  readonly retryable: boolean;
+}
+
 /** Everything the plan screen shows, as stored. `buildPlanView` turns it into what is sent to the browser. */
 export interface PlanViewRaw {
   readonly id: string;
@@ -64,6 +74,8 @@ export interface PlanViewRaw {
   readonly ideas: readonly ViewIdea[];
   /** What the suppliers confirmed. Empty until the trip is booked, and when booking is only pretended. */
   readonly bookings: readonly ViewBooking[];
+  /** Why booking failed, for a plan that ended that way. Absent (or null) for every other plan. */
+  readonly failure?: ViewFailure | null;
 }
 
 export interface PlanViewStore {

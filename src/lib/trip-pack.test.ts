@@ -16,7 +16,7 @@ const flight: PlanItemDto = {
 const view = (overrides: Partial<PlanViewDto> = {}): PlanViewDto => ({
   id: "7f3a2c11-0000-4000-8000-000000000000", groupId: "g", title: "Bangkok 3-night hotel stay", summary: null, status: "captured", city: "Bangkok", dates: "Tue 15 Dec to Fri 18 Dec",
   tripDates: { departDate: "2026-12-15", returnDate: "2026-12-18" }, keptUntil: "2027-01-17", headcount: 3, deadlineAt: "2026-12-01T00:00:00.000Z", replacedBy: null, reference: "UN-7F3A2C",
-  payments: "stripe", demoBooking: false, currency: "USD", pricesAvailable: true, items: [flight, hotel], ideas: [], confirmations: [], progress: [], people: [], covers: [],
+  payments: "stripe", demoBooking: false, currency: "USD", pricesAvailable: true, items: [flight, hotel], ideas: [], confirmations: [], progress: [], failure: null, people: [], covers: [],
   me: { id: "m", inPlan: true, agreement: "agreed", approval: "approved", shareMinor: 0, approvedMinor: 0, cardNeeded: false, awaitingDetails: false, details: { needed: false, passportRequired: false }, actions: { agree: false, decline: false, approve: false, declineAmount: false, requestChanges: false, cover: false } },
   ...overrides,
 });

@@ -46,11 +46,12 @@ export function classifyFailure(reply: LiteApiReply): SupplierError {
   // The hotel side words it in text: the price it would cost now is above the one it quoted, which is the same news.
   if ((reply.status === 409 || code === 2001) && /price/i.test(errorTextOf(reply.body))) return { code: "price_changed", message };
   if (code !== null && GONE_CODES.has(code)) return { code: "unavailable", message };
-  if (code !== null && REFUSED_CODES.has(code)) return { code: "rejected", message };
+  if (code !== null && REFUSED_CODES.has(code)) return { code: "rejected", cause: "booking_declined", message };
   if (reply.status === 404 || reply.status === 410) return { code: "unavailable", message };
-  if (reply.status === 400 || reply.status === 401 || reply.status === 403 || reply.status === 422) return { code: "rejected", message };
+  if (reply.status === 401 || reply.status === 403) return { code: "rejected", cause: "access_refused", message };
+  if (reply.status === 400 || reply.status === 422) return { code: "rejected", cause: "request_not_accepted", message };
   // 408, 409, 429 and 5xx: nothing was settled, so it is treated as a temporary problem.
-  return { code: "temporary", message };
+  return { code: "temporary", cause: reply.status >= 500 ? "partner_error" : "partner_busy", message };
 }
 
 export const succeeded = (reply: LiteApiReply): boolean => reply.status >= 200 && reply.status < 300;
@@ -80,7 +81,7 @@ export class LiteApiBookingHttp {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch {
-      return err({ code: "temporary", message: "liteAPI did not respond in time" });
+      return err({ code: "temporary", cause: "no_answer", message: "liteAPI did not respond in time" });
     }
     try {
       return ok({ status: response.status, body: await response.json() });

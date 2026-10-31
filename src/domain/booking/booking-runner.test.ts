@@ -219,7 +219,19 @@ describe("SupplierBookingRunner", () => {
       const next = reason === "temporary" ? "Mention @trippy to plan again, or to try the same plan once more." : "Mention @trippy to plan again.";
       expect(lines).toEqual([`The hotel Riverside Hotel could not be booked because ${phrase}. Nothing was charged and every card hold was let go. ${next}`]);
       expect(lines[0]).not.toContain("K1234567A");
-      expect(failures.saved).toEqual([{ planId: "plan-1", reason, part: HOTEL_PART, undone: [], retryable: reason === "temporary" }]);
+      expect(failures.saved).toEqual([{ planId: "plan-1", reason, cause: null, part: HOTEL_PART, undone: [], retryable: reason === "temporary" }]);
+    });
+
+    it("tells the group why the partner refused, and keeps the cause, when the supplier's answer said", async () => {
+      const world = bookingSetup();
+      world.hotels.failBooking = { code: "rejected", cause: "meal_plan_changed", message: "SECRET board changed" };
+      const { lines, announce } = told();
+      const failures = new MemoryFailureStore();
+      await runnerFor(world, () => NOW, undefined, announce, failures).run("plan-1", 5, BOOK);
+
+      expect(lines[0]).toContain("The hotel Riverside Hotel could not be booked because the hotel changed the meal plan on that room");
+      expect(lines[0]).not.toContain("SECRET");
+      expect(failures.saved[0]).toMatchObject({ reason: "rejected", cause: "meal_plan_changed" });
     });
 
     it("names the flight, and the hotel that was booked and then cancelled, when the flight fails", async () => {
@@ -230,7 +242,7 @@ describe("SupplierBookingRunner", () => {
       await runnerFor(world, () => NOW, undefined, announce, failures).run("plan-1", 5, BOOK);
 
       expect(lines).toEqual(["The flight SIN to BKK could not be booked because it is no longer available. The hotel Riverside Hotel had already been booked and was cancelled. Nothing was charged and every card hold was let go. Mention @trippy to plan again."]);
-      expect(failures.saved).toEqual([{ planId: "plan-1", reason: "unavailable", part: FLIGHT_PART, undone: [{ kind: "hotel", title: "Riverside Hotel" }], retryable: false }]);
+      expect(failures.saved).toEqual([{ planId: "plan-1", reason: "unavailable", cause: null, part: FLIGHT_PART, undone: [{ kind: "hotel", title: "Riverside Hotel" }], retryable: false }]);
     });
 
     it("names no single part when details are missing, a hold is gone or the time ran out", async () => {
