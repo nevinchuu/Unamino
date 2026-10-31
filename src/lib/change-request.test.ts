@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changeRequestText, cleanNote, isChangeReason, NOTE_MAX } from "./change-request";
+import { changeRequestText, cleanNote, isChangeReason, isChangeRequestText, NOTE_MAX } from "./change-request";
 
 describe("changeRequestText", () => {
   it("calls Trippy and asks for the plan to be changed, saying why", () => {
@@ -13,6 +13,13 @@ describe("changeRequestText", () => {
 
   it("puts the note at the end", () => {
     expect(changeRequestText("other", "leave a day later", null)).toBe("@trippy I need changes to the plan: something needs to change. leave a day later");
+  });
+});
+
+describe("isChangeRequestText", () => {
+  it("recognises what changeRequestText writes, and an ordinary message to Trippy is not one", () => {
+    expect(isChangeRequestText(changeRequestText("other", "later please", null))).toBe(true);
+    expect(isChangeRequestText("@trippy anything new?")).toBe(false);
   });
 });
 

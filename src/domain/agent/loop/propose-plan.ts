@@ -76,7 +76,10 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
   env.note("decision", { currentPlan: current ? { id: current.id, status: current.status, sameInputs: current.inputsHash === inputsHash } : null, inputsHash });
 
   const open = current && !FINISHED_STATUSES.includes(current.status) ? current : null;
-  if (open && open.inputsHash === inputsHash) {
+  // A change request is a reason to replace the plan even when no limit changed (the person may be objecting to
+  // something already on record). A plan made earlier in this same turn still counts as the answer to it.
+  const replaceable = env.changeRequested && open !== null && session.planId !== open.id;
+  if (open && open.inputsHash === inputsHash && !replaceable) {
     session.planId = open.id;
     return asJson({ alreadyExists: true, status: open.status, agreed: open.agreedCount, outOf: open.headcount, note: "Nothing has changed since this plan was made, so no new plan was created." });
   }

@@ -315,6 +315,23 @@ describe("calling the agent again", () => {
     expect(world.messages.agentMessages.at(-1)?.planId).toBe("plan-2");
   });
 
+  it("makes a new plan when someone asks for changes, even if no limit changed", async () => {
+    const world = await groupWithAPlan();
+    world.script(search(), (request) => proposeFrom(request), says("Here is a different split."));
+    await callAgent(world, "ana", "@trippy I need changes to the plan: I would like a different flight or hotel. I can't share a room.");
+    expect(world.plans.records).toHaveLength(2);
+    expect(world.plans.statusOf("plan-1")).toBe("expired");
+    expect(world.messages.agentMessages.at(-1)?.planId).toBe("plan-2");
+  });
+
+  it("does not replace the plan twice in one turn that asked for changes", async () => {
+    const world = await groupWithAPlan();
+    world.script(search(), (request) => proposeFrom(request), proposeFromEarlierSearch, says("Done."));
+    await callAgent(world, "ana", "@trippy I need changes to the plan: something needs to change.");
+    expect(world.plans.records).toHaveLength(2);
+    expect(toolMessages(world).at(-1)).toContain("alreadyExists");
+  });
+
   it("makes a new plan when the old one has ended, even if nothing else changed", async () => {
     const world = await groupWithAPlan();
     world.plans.force("plan-1", "expired");

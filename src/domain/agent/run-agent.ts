@@ -1,3 +1,4 @@
+import { isChangeRequestText } from "@/lib/change-request";
 import type { Result } from "@/lib/result";
 import type { ConstraintSet } from "@/domain/constraints/schema";
 import type { GroupRepository, MessageRepository } from "@/domain/group/repository";
@@ -149,7 +150,9 @@ async function execute(deps: AgentDeps, run: AgentRun, meter: UsageMeter): Promi
 
   const session = newSession();
   const researcher = deps.makeResearcher?.(meter) ?? null;
-  const env: ToolEnv = { deps, run, group: group.value, roster, now, constraints: () => limits, planner, session, researcher, note };
+  const trigger = recent.find((message) => message.id === run.triggerMessageId);
+  const changeRequested = trigger !== undefined && isChangeRequestText(trigger.body);
+  const env: ToolEnv = { deps, run, group: group.value, roster, now, changeRequested, constraints: () => limits, planner, session, researcher, note };
   const say = async (text: string): Promise<void> => {
     await deps.messages.postAgent(run.groupId, text, { replyToMessageId: run.triggerMessageId, planId: session.planId !== null ? session.planId : undefined });
   };

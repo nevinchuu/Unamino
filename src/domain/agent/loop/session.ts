@@ -35,6 +35,8 @@ export interface ToolEnv {
   readonly group: Group;
   readonly roster: readonly RosterEntry[];
   readonly now: Date;
+  /** This turn was started by someone asking for changes, so the open plan may be replaced even if no limit changed. */
+  readonly changeRequested: boolean;
   /** Reads people's limits from the chat. Started at the beginning of the turn, so a search does not wait for it. */
   readonly constraints: () => Promise<ConstraintSet>;
   /** For the free-time ideas, which still use structured answers. */

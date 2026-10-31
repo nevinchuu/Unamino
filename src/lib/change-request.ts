@@ -16,8 +16,12 @@ export const isChangeReason = (value: unknown): value is ChangeReason => typeof 
 /** One line, trimmed and cut to length: a note cannot carry line breaks into the chat. */
 export const cleanNote = (value: unknown): string => (typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, NOTE_MAX) : "");
 
+const CHANGE_REQUEST_PREFIX = "@trippy I need changes to the plan:";
+
+export const isChangeRequestText = (body: string): boolean => body.startsWith(CHANGE_REQUEST_PREFIX);
+
 /** What the person's request says in the chat. Written so Trippy reads it as a request to adjust the plan, not to end it. */
 export function changeRequestText(reason: ChangeReason, note: string, shareText: string | null): string {
   const share = reason === "too_expensive" && shareText ? ` (my share is ${shareText})` : "";
-  return `@trippy I need changes to the plan: ${PHRASES[reason]}${share}.${note ? ` ${note}` : ""}`;
+  return `${CHANGE_REQUEST_PREFIX} ${PHRASES[reason]}${share}.${note ? ` ${note}` : ""}`;
 }
