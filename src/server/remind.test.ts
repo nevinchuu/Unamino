@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { err, ok } from "@/lib/result";
+import { createUsageMeter } from "@/domain/agent/run-agent";
+import { calls, says, ScriptedChatModel, type ChatStep } from "@/domain/agent/test-support";
 import type { Member, Message } from "@/domain/group/types";
 import type { PlanStatus } from "@/domain/plan/statuses";
 import { flight, hotel } from "@/domain/plan/test-support";
@@ -21,33 +23,79 @@ const raw = (status: PlanStatus, members: ViewMember[], groupId = GROUP): PlanVi
 
 const message = (body: string, secondsAgo: number, kind: Message["kind"] = "system"): Message => ({ id: "m", seq: 1, groupId: GROUP, memberId: null, kind, body, replyToMessageId: null, mentionsAgent: false, planId: null, createdAt: new Date(NOW.getTime() - secondsAgo * 1000) });
 
-function setup(plan: PlanViewRaw | "missing" | "down", recent: Message[] = []) {
+function setup(plan: PlanViewRaw | "missing" | "down", recent: Message[] = [], wording?: ChatStep) {
   const posted: string[] = [];
+  const postedByTrippy: string[] = [];
+  const model = wording === undefined ? undefined : new ScriptedChatModel([wording], createUsageMeter());
   const deps: RemindDeps = {
     views: { load: async () => (plan === "missing" ? err({ code: "not_found" as const, message: "none" }) : plan === "down" ? err({ code: "unavailable" as const, message: "db" }) : ok(plan)) },
     messages: {
       recent: async () => recent,
       postSystem: async (_group, body) => (posted.push(body), ok(message(body, 0))),
+      postAgent: async (_group, body) => (postedByTrippy.push(body), ok(message(body, 0, "agent"))),
     },
+    groups: { memberNames: async () => new Map([["ana", "Ana"], ["ben", "Ben"], ["cai", "Cai"]]) },
+    payments: "demo",
+    ...(model && { model: () => model }),
     clock: () => NOW,
   };
-  return { deps, posted };
+  return { deps, posted, postedByTrippy, model };
 }
 
 const input = { groupId: GROUP, planId: PLAN };
 const agreed = { planAgreement: "agreed" } as const;
 
 describe("runRemind", () => {
-  it("nudges the people who have not agreed, naming the sender", async () => {
-    const { deps, posted } = setup(raw("reviewing", [person("ana", "Ana", agreed), person("ben", "Ben"), person("cai", "Cai")]));
+  it("says who asked, then nudges each person who has not agreed, in plain words when there is no model", async () => {
+    const { deps, posted, postedByTrippy } = setup(raw("reviewing", [person("ana", "Ana", agreed), person("ben", "Ben"), person("cai", "Cai")]));
     expect(await runRemind(deps, ana, input)).toEqual({ ok: true });
-    expect(posted).toEqual(["Ana is waiting for Ben and Cai to agree to the plan."]);
+    expect(posted).toEqual(["Ana asked Trippy to nudge Ben and Cai."]);
+    expect(postedByTrippy).toEqual([
+      "Ben, the plan is waiting for you to agree. Agreeing costs nothing and your money is not touched.",
+      "Cai, the plan is waiting for you to agree. Agreeing costs nothing and your money is not touched.",
+    ]);
   });
 
   it("nudges for the amount and the card once the plan is being paid for", async () => {
-    const { deps, posted } = setup(raw("approving", [person("ana", "Ana", { ...agreed, holdPlaced: true }), person("ben", "Ben", agreed)]));
+    const { deps, posted, postedByTrippy } = setup(raw("approving", [person("ana", "Ana", { ...agreed, holdPlaced: true }), person("ben", "Ben", agreed)]));
     expect(await runRemind(deps, ana, input)).toEqual({ ok: true });
-    expect(posted).toEqual(["Ana is waiting for Ben to approve their amount and add a card."]);
+    expect(posted).toEqual(["Ana asked Trippy to nudge Ben."]);
+    expect(postedByTrippy).toEqual(["Ben, the plan is waiting for you to approve your amount and add a card. Nothing is charged until everyone is in and the trip is booked."]);
+  });
+
+  it("posts the model's wording for each person when it follows the rules", async () => {
+    const { deps, postedByTrippy, model } = setup(raw("reviewing", [person("ana", "Ana", agreed), person("ben", "Ben")]), [message("Ben: I want my own room", 60, "human")], calls("write_nudge", { say: "Ben, Ana has agreed and the plan is waiting on you. Agreeing costs nothing." }));
+    expect(await runRemind(deps, ana, input)).toEqual({ ok: true });
+    expect(postedByTrippy).toEqual(["Ben, Ana has agreed and the plan is waiting on you. Agreeing costs nothing."]);
+    // The model is shown the chat and the facts as data, with no id in them.
+    const sent = model?.requests[0]?.messages[0];
+    expect(sent && sent.role === "user" ? sent.content : "").toContain("I want my own room");
+  });
+
+  it("uses the plain wording when the model breaks a rule: another person named, an amount it was not given, or pressure", async () => {
+    const plan = raw("reviewing", [person("ana", "Ana", agreed), person("ben", "Ben"), person("cai", "Cai", agreed)]);
+    const plain = "Ben, the plan is waiting for you to agree. Agreeing costs nothing and your money is not touched.";
+    for (const wording of ["Ben, Cai already agreed, so it is just you now.", "Ben, your share is $999, please agree.", "Ben, this is your last chance to agree."]) {
+      const { deps, postedByTrippy } = setup(plan, [], calls("write_nudge", { say: wording }));
+      await runRemind(deps, ana, input);
+      expect(postedByTrippy).toEqual([plain]);
+    }
+  });
+
+  it("uses the plain wording when the model cannot be reached", async () => {
+    const plan = raw("reviewing", [person("ana", "Ana", agreed), person("ben", "Ben")]);
+    const { deps, postedByTrippy } = setup(plan, [], err({ code: "planner_unavailable", message: "down" }));
+    expect(await runRemind(deps, ana, input)).toEqual({ ok: true });
+    expect(postedByTrippy).toEqual(["Ben, the plan is waiting for you to agree. Agreeing costs nothing and your money is not touched."]);
+  });
+
+  it("words only the first few people and gives the rest the plain wording, so one press costs a bounded amount", async () => {
+    const crowd = Array.from({ length: 8 }, (_, index) => person(`p${index}`, `Pat${index}`));
+    const { deps, postedByTrippy, model } = setup(raw("reviewing", [person("ana", "Ana", agreed), ...crowd]), [], says("Hello there."));
+    await runRemind(deps, ana, input);
+    expect(model?.requests).toHaveLength(6);
+    expect(postedByTrippy).toHaveLength(8);
+    expect(postedByTrippy[7]).toBe("Pat7, the plan is waiting for you to agree. Agreeing costs nothing and your money is not touched.");
   });
 
   it("asks the sender to do their own part first", async () => {
@@ -69,11 +117,11 @@ describe("runRemind", () => {
 
   it("holds a second reminder back for a few minutes, from anyone, and allows one after that", async () => {
     const plan = raw("reviewing", [person("ana", "Ana", agreed), person("ben", "Ben")]);
-    const justNow = setup(plan, [message("Cai is waiting for Ben to agree to the plan.", 60)]);
+    const justNow = setup(plan, [message("Cai asked Trippy to nudge Ben.", 60)]);
     expect(await runRemind(justNow.deps, ana, input)).toEqual({ ok: false, error: "A reminder went out a moment ago. Give them a few minutes." });
     expect(justNow.posted).toEqual([]);
 
-    const longAgo = setup(plan, [message("Cai is waiting for Ben to agree to the plan.", 10 * 60)]);
+    const longAgo = setup(plan, [message("Cai asked Trippy to nudge Ben.", 10 * 60)]);
     expect(await runRemind(longAgo.deps, ana, input)).toEqual({ ok: true });
   });
 

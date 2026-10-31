@@ -1,7 +1,7 @@
 "use server";
 
 import { after } from "next/server";
-import { runAgent } from "@/domain/agent/run-agent";
+import { createUsageMeter, runAgent } from "@/domain/agent/run-agent";
 import type { ChatMessageDto } from "@/server/chat";
 import { getContainer } from "@/server/container";
 import { groupErrorMessage, type FormState } from "@/server/forms";
@@ -48,10 +48,10 @@ export async function resetInviteLink(groupId: string): Promise<FormState> {
   return {};
 }
 
-/** Nudges the people the plan is waiting for, with a line in the chat in the sender's name. Held back for a few minutes after each one. */
+/** Nudges the people the plan is waiting for: a chat line says who asked, then Trippy writes a word to each person. Held back for a few minutes after each one. */
 export async function remindGroup(groupId: string, planId: string): Promise<RemindResult> {
-  const { views, messages, agent } = getContainer();
-  return runRemind({ views, messages, clock: agent.clock }, await currentMember(groupId), { groupId, planId });
+  const { views, messages, groups, agent, payments } = getContainer();
+  return runRemind({ views, messages, groups, payments: payments.mode, model: () => agent.makeChatModel(createUsageMeter()), clock: agent.clock }, await currentMember(groupId), { groupId, planId });
 }
 
 export type PersonaChoicesResult = { readonly ok: true; readonly choices: readonly PersonaChoice[] } | { readonly ok: false; readonly error: string };
