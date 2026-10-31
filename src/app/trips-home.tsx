@@ -18,7 +18,7 @@ export function TripsHeader() {
           <Plus className="size-6" />
         </Link>
       </div>
-      <p className="px-5 text-sm text-muted-foreground">Everything your groups are planning, in one place.</p>
+      <p className="px-5 text-sm text-muted-foreground">Who&apos;s in, and what is still open, across your groups.</p>
     </>
   );
 }

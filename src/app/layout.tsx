@@ -9,7 +9,7 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   title: "Unamino",
-  description: "Group trip planning where nobody is charged unless everyone is in.",
+  description: "Group trips where nobody is charged unless everyone is in.",
 };
 
 export const viewport: Viewport = {

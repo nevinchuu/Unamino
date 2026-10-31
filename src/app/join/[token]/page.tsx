@@ -61,7 +61,7 @@ async function Invite({ params }: { readonly params: PageProps<"/join/[token]">[
           <>
             <AboutBlurb className="mb-6 w-full rounded-2xl bg-card px-4 py-3 text-left text-sm leading-5 shadow-soft" />
             <JoinForm joinToken={token} />
-            <p className="mt-6 text-center text-xs text-muted-foreground">This group plans trips together with an AI helper. To join a booking you will later give traveller details, and a card is held, not charged, until everyone is in.</p>
+            <p className="mt-6 text-center text-xs text-muted-foreground">When the group agrees on a plan, you approve your own amount and your card is held, not charged. You will give traveller details later, for the booking.</p>
           </>
         )}
       </div>

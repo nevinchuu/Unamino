@@ -291,6 +291,7 @@ export function ChatView({ groupId, groupName, meId, isOrganiser, initial }: Cha
             <p className="text-sm text-muted-foreground">
               When you&apos;re ready to plan a trip, mention <span className="font-semibold text-link">@trippy</span>, like &ldquo;@trippy plan Bangkok, 11 to 13 Dec&rdquo;.
             </p>
+            <p className="text-sm text-muted-foreground">Then everyone agrees and approves their own amount. Nobody is charged unless everyone is in.</p>
             {isOrganiser ? (
               <Link href={`/g/${groupId}/info`} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
                 <UserPlus className="size-4" />
