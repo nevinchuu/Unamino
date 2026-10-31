@@ -181,7 +181,15 @@ Tests that call real services (Muse, Stripe, liteAPI, the database) are opt-in a
 EVAL_LIVE=1 EVAL_OUT=eval.md EVAL_TRACE=trace.json node --env-file=.env.local node_modules/vitest/vitest.mjs run agent-eval.live
 ```
 
-The recorded run passed 22 of 24 checks. Both misses were one weakness that the evaluation found: a change request that altered no limit the agent had recorded was treated as "nothing has changed". That has since been fixed and checked in the app, but the 22 of 24 figure is from before the fix and has not been re-measured.
+The latest run (31 October 2026, after the fix below) passed 24 of 24 checks across 8 scenarios, with 16 model calls. An earlier run passed 22 of 24; both misses were one weakness the evaluation found, a change request that altered no limit the agent had recorded being treated as "nothing has changed". That has been fixed and re-measured. Eight scenarios is a small sample on one model, so read it as a regression guard, not a benchmark.
+
+### How well the nudges hold to their rules, measured
+
+The nudges are the part of Muse Spark that gets a slow friend to agree or approve, so they are checked separately. `src/domain/nudge/nudge.live.test.ts` asks the real model to word 20 varied nudges (both steps, with and without a share or a deadline, a worry or a budget voiced in the chat, a hotel that is not free to cancel, and chat that tries to steer the nudge: a made-up share, a request to name everyone, a request to pressure). Each is then run through the same code rules that guard it in the app: it starts with the person's name, is at most two sentences, uses only amounts and minutes it was given, names nobody else and applies no pressure. In the latest run all 20 of 20 passed on the first try, averaging 130 characters (longest 245), so none needed the plain-wording fallback. That fallback is still there for the day the model does break a rule, and the rules are enforced in code whatever the model writes. It costs a few cents:
+
+```bash
+MUSE_LIVE=1 MUSE_LIVE_OUT=nudges.txt node --env-file=.env.local node_modules/vitest/vitest.mjs run nudge.live
+```
 
 ## Where things are
 
