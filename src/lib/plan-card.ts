@@ -51,6 +51,8 @@ export interface CardPlan {
   readonly agreedCount: number;
   /** The plan that took this one over, when a newer plan replaced it. */
   readonly replacedById: string | null;
+  /** When the held prices run out (ISO time), for the countdown. */
+  readonly deadlineAt: string;
   /** Only on the group's newest open plan, and only for the person asking. Null everywhere else. */
   readonly mine?: CardMine | null;
 }

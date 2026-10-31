@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { PlanCountdown } from "@/components/plan-countdown";
 import { StatusChip } from "@/components/status-chip";
 import { formatMinor } from "@/lib/format-money";
 import { describeSheet, type CardMine, type CardPlan } from "@/lib/plan-card";
@@ -83,9 +84,12 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
       <button type="button" onClick={() => setChosen(!open)} aria-expanded={open} className="flex min-h-9 items-center justify-between gap-3">
         <span className="flex w-11 justify-start text-muted-foreground">{open ? <ChevronDown className="size-4" /> : <ChevronUp className="size-4" />}</span>
         <span className="h-[5px] w-11 rounded-full bg-border" aria-hidden="true" />
-        <StatusChip tone="success" className="text-xs">
-          {view.pill}
-        </StatusChip>
+        <span className="flex items-center gap-2">
+          <PlanCountdown deadlineAt={plan.deadlineAt} />
+          <StatusChip tone="success" className="text-xs">
+            {view.pill}
+          </StatusChip>
+        </span>
       </button>
 
       <div className="flex flex-col gap-0.5">

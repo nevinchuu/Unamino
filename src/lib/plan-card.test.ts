@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PLAN_STATUSES } from "@/domain/plan/statuses";
 import { describePlanCard, describeSheet, type CardMine, type CardPerson, type CardPlan } from "./plan-card";
 
-const plan = (overrides: Partial<CardPlan> = {}): CardPlan => ({ id: "plan-2", title: "Bangkok weekend", status: "reviewing", headcount: 4, agreedCount: 1, replacedById: null, ...overrides });
+const plan = (overrides: Partial<CardPlan> = {}): CardPlan => ({ id: "plan-2", title: "Bangkok weekend", status: "reviewing", headcount: 4, agreedCount: 1, replacedById: null, deadlineAt: "2026-12-01T10:00:00.000Z", ...overrides });
 
 describe("describePlanCard", () => {
   it("shows the live plan with how many have agreed", () => {

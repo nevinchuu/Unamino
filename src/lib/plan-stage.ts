@@ -55,6 +55,25 @@ export function describeStage(view: PlanViewDto): StageView {
 /** Has the time the prices were held for run out? The screen then says they are being checked again, not that time is up, because the prices are renewed in the background. */
 export const priceHoldElapsed = (deadline: Date, now: Date): boolean => deadline.getTime() <= now.getTime();
 
+/** Under this long left, the countdown turns into a warning. */
+const URGENT_SECONDS = 120;
+
+/** "9:41", or "1:05:00" over an hour. Rounded up like `countdownText`, and never below "0:00". */
+export function clockText(deadline: Date, now: Date): string {
+  const total = Math.max(0, Math.ceil((deadline.getTime() - now.getTime()) / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
+/** Few enough minutes left that the group should hurry. False once the time has run out: the prices are renewed then, not lost. */
+export function isUrgent(deadline: Date, now: Date): boolean {
+  const seconds = Math.ceil((deadline.getTime() - now.getTime()) / 1000);
+  return seconds > 0 && seconds <= URGENT_SECONDS;
+}
+
 /** "8 min left", "45 sec left", or "Time's up". Rounded up, so the last second is not shown as zero. */
 export function countdownText(deadline: Date, now: Date): string {
   const seconds = Math.ceil((deadline.getTime() - now.getTime()) / 1000);

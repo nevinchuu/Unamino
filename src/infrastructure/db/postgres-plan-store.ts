@@ -30,7 +30,7 @@ export class PostgresPlanStore implements PlanStore {
       .where(and(inArray(planMembers.planId, rows.map((row) => row.id)), eq(planMembers.planAgreement, "agreed")))
       .groupBy(planMembers.planId);
     const agreedBy = new Map(agreed.map((row) => [row.planId, row.agreed]));
-    return rows.map((row) => ({ id: row.id, title: row.title, status: row.status, headcount: row.headcount, agreedCount: agreedBy.get(row.id) ?? 0, replacedById: row.replacedByPlanId }));
+    return rows.map((row) => ({ id: row.id, title: row.title, status: row.status, headcount: row.headcount, agreedCount: agreedBy.get(row.id) ?? 0, replacedById: row.replacedByPlanId, deadlineAt: row.deadlineAt.toISOString() }));
   }
 
   async committedTrips(groupId: string): Promise<readonly CommittedTrip[]> {

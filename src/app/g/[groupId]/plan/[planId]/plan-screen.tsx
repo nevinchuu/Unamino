@@ -7,7 +7,8 @@ import { AppBar } from "@/components/screen";
 import { Button } from "@/components/ui/button";
 import { FAST_POLL_STATUSES, LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
-import { countdownText, describeStage, priceHoldElapsed } from "@/lib/plan-stage";
+import { PlanCountdown } from "@/components/plan-countdown";
+import { describeStage } from "@/lib/plan-stage";
 import { cn } from "@/lib/utils";
 import type { PlanActionResult } from "@/server/plan-actions";
 import { agreeToPlan, approvePlanAmount, declinePlan, declinePlanAmount } from "./actions";
@@ -47,7 +48,6 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   const [cardOpen, setCardOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
 
   const live = LIVE_PLAN_STATUSES.includes(view.status);
   // Booking is quick but not instant, so the screen keeps asking while it happens, though it has no prices to count down.
@@ -106,13 +106,6 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [fastPoll, refetch]);
-
-  // The countdown ticks once a second, and only while it means something.
-  useEffect(() => {
-    if (!live) return;
-    const ticking = setInterval(() => setNow(Date.now()), 1_000);
-    return () => clearInterval(ticking);
-  }, [live]);
 
   // After the details are saved the view says they are no longer needed, which is what turns the sheet over to the card.
   const detailsSaved = useCallback(() => {
@@ -180,10 +173,9 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
             <p className="text-lg font-semibold">{stage.headline}</p>
             <p className="text-sm opacity-90">{stage.detail}</p>
             {live ? (
-              <p className="mt-2 text-xs opacity-80" suppressHydrationWarning>
-                {priceHoldElapsed(deadline, new Date(now))
-                  ? "Checking the latest prices again…"
-                  : `Prices held until ${deadline.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · ${countdownText(deadline, new Date(now))}`}
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 text-xs opacity-90" suppressHydrationWarning>
+                <span>Prices held until {deadline.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                <PlanCountdown deadlineAt={view.deadlineAt} className="text-base" />
               </p>
             ) : null}
           </section>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "@/domain/plan/statuses";
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
-import { countdownText, describeStage, priceHoldElapsed } from "./plan-stage";
+import { clockText, countdownText, describeStage, isUrgent, priceHoldElapsed } from "./plan-stage";
 
 const person = (id: string, agreement: PlanAgreementStatus = "pending", approval: ApprovalStatus = "pending"): PersonDto => ({ id, name: id, isMe: id === "ana", agreement, approval, holdPlaced: false, shareMinor: 30_000, currency: "USD", approvedMinor: null, chargedMinor: null, lines: [], ownPartMinor: 30_000, coveredByMe: null });
 
@@ -68,6 +68,32 @@ describe("describeStage", () => {
   it("explains to someone who joined later that the plan does not include them", () => {
     const stage = describeStage(view("reviewing", [person("ben")], {}, false));
     expect(stage).toMatchObject({ headline: "You joined after this plan was made", tone: "waiting" });
+  });
+});
+
+describe("clockText", () => {
+  const deadline = new Date("2026-10-27T01:10:00Z");
+  const at = (iso: string) => clockText(deadline, new Date(iso));
+
+  it("shows minutes and seconds, and hours only when there are some", () => {
+    expect(at("2026-10-27T01:00:19Z")).toBe("9:41");
+    expect(at("2026-10-27T01:09:55Z")).toBe("0:05");
+    expect(at("2026-10-26T23:04:59Z")).toBe("2:05:01");
+  });
+
+  it("rounds up and never goes below zero", () => {
+    expect(at("2026-10-27T01:09:59.500Z")).toBe("0:01");
+    expect(at("2026-10-27T05:00:00Z")).toBe("0:00");
+  });
+});
+
+describe("isUrgent", () => {
+  const deadline = new Date("2026-10-27T01:10:00Z");
+
+  it("turns urgent in the last two minutes, and not once the time has run out", () => {
+    expect(isUrgent(deadline, new Date("2026-10-27T01:07:59Z"))).toBe(false);
+    expect(isUrgent(deadline, new Date("2026-10-27T01:08:00Z"))).toBe(true);
+    expect(isUrgent(deadline, deadline)).toBe(false);
   });
 });
 

@@ -88,8 +88,8 @@ describe("loadTrips", () => {
   });
 
   it("marks who has agreed and says how far the plan is, from the newest plan only", async () => {
-    const old: PlanCardSummary = { id: "old", title: "Old", status: "expired", headcount: 2, agreedCount: 0, replacedById: "new" };
-    const current: PlanCardSummary = { id: "new", title: "New", status: "reviewing", headcount: 2, agreedCount: 1, replacedById: null };
+    const old: PlanCardSummary = { id: "old", title: "Old", status: "expired", headcount: 2, agreedCount: 0, replacedById: "new", deadlineAt: "2026-12-01T10:00:00.000Z" };
+    const current: PlanCardSummary = { id: "new", title: "New", status: "reviewing", headcount: 2, agreedCount: 1, replacedById: null, deadlineAt: "2026-12-01T10:00:00.000Z" };
     const deps = setup({
       tokens: { ta: ana },
       groups: { [GROUP_A]: { name: "A", people: [ana, ben], plans: [old, current] } },

@@ -46,7 +46,7 @@ describe("previewOf", () => {
   });
 });
 
-const plan = (overrides: Partial<CardPlan> = {}): CardPlan => ({ id: "p1", title: "Bangkok", status: "reviewing", headcount: 4, agreedCount: 2, replacedById: null, ...overrides });
+const plan = (overrides: Partial<CardPlan> = {}): CardPlan => ({ id: "p1", title: "Bangkok", status: "reviewing", headcount: 4, agreedCount: 2, replacedById: null, deadlineAt: "2026-12-01T10:00:00.000Z", ...overrides });
 const person = (name: string, overrides: Partial<CardPerson> = {}): CardPerson => ({ name, isMe: false, agreed: false, approved: false, held: false, ...overrides });
 
 describe("latestPlan", () => {

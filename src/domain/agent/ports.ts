@@ -125,6 +125,8 @@ export interface PlanCardSummary {
   readonly headcount: number;
   readonly agreedCount: number;
   readonly replacedById: string | null;
+  /** When the held prices run out (ISO time). It moves later when the prices are renewed. */
+  readonly deadlineAt: string;
 }
 
 /** A trip the group has paid for or is paying for now. Its dates are taken, so a new plan cannot overlap them. */

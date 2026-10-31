@@ -12,7 +12,7 @@ const message = (seq: number, overrides: Partial<Message> = {}): Message => ({
 
 const NAMES = new Map([["ana", "Ana"], ["ben", "Ben"]]);
 const ana: Member = { id: "ana", groupId: GROUP, displayName: "Ana", currency: "USD", isOrganiser: false };
-const PLAN: PlanCardSummary = { id: "plan-1", title: "Bangkok weekend", status: "reviewing", headcount: 4, agreedCount: 1, replacedById: null };
+const PLAN: PlanCardSummary = { id: "plan-1", title: "Bangkok weekend", status: "reviewing", headcount: 4, agreedCount: 1, replacedById: null, deadlineAt: "2026-12-01T10:00:00.000Z" };
 
 interface Setup {
   stored?: Message[];

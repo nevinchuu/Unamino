@@ -278,7 +278,7 @@ export class FakePlans implements PlanStore, PlanRepository {
   constructor(private readonly briefs: FakeBriefs) {}
 
   async cards(): Promise<readonly PlanCardSummary[]> {
-    return this.records.map((record) => ({ id: record.id, title: record.input.title, status: record.snapshot.status, headcount: record.input.headcount, agreedCount: record.snapshot.members.filter((m) => m.planAgreement === "agreed").length, replacedById: record.replacedBy }));
+    return this.records.map((record) => ({ id: record.id, title: record.input.title, status: record.snapshot.status, headcount: record.input.headcount, agreedCount: record.snapshot.members.filter((m) => m.planAgreement === "agreed").length, replacedById: record.replacedBy, deadlineAt: record.input.deadlineAt.toISOString() }));
   }
 
   async committedTrips(): Promise<readonly CommittedTrip[]> {
