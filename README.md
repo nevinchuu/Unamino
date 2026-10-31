@@ -1,6 +1,6 @@
 # Unamino
 
-**Nobody is charged unless everyone is in.** Friends plan a trip in a group chat with an agent called Trippy, built on Meta's Muse Spark. Trippy's job is not to find the best trip. It is to get the whole group to a plan everyone can say yes to. Each person then approves their own capped amount and puts a card **hold** on it. Only when everyone is in are the flights and hotel booked, and only then are the holds charged. If anything fails, the bookings are cancelled and every hold is released. Nobody pays for a trip that did not happen.
+**Nobody is charged unless everyone has approved.** Friends plan a trip in a group chat with an agent called Trippy, built on Meta's Muse Spark. Trippy's job is not to find the best trip. It is to get the whole group to a plan everyone can say yes to. Each person then approves their own capped amount and puts a card **hold** on it. Only when everyone has approved are the flights and hotel booked, and only then are the holds charged. If anything fails, the bookings are cancelled and every hold is released. Nobody pays for a trip that did not happen.
 
 Built for the Meta Global AI Developer Hackathon (Indie Developer track, "Build for Your World").
 
@@ -21,13 +21,13 @@ The planner is the way in. The product is the commitment engine behind it:
 1. **Agree.** Everyone looks at the same plan and taps **Agree**. It costs nothing and no card is involved. Anyone can tap **I need changes** instead, and Trippy adjusts the plan rather than ending it.
 2. **Approve your own amount.** Each person approves *their own* share, which becomes a **cap**: the most they can ever be charged. Everyone pays only for what they take part in, so a friend already at the destination pays for the hotel and not a flight.
 3. **Hold.** A card hold reserves the capped amount at the person's bank. It is a hold, not a charge, and Unamino never holds anyone's money.
-4. **Everyone is in.** Only when the last hold lands does booking start.
+4. **Everyone has approved.** Only when the last hold lands, so every approval is backed by a card hold, does booking start.
 5. **Book, then charge.** The parts of the trip are booked, and only after every booking is confirmed is each person charged their real share (never above their cap, and the rest of the hold is released).
 6. **If anything fails,** whether a flight sells out, a price rises past someone's cap or the clock runs out, every booking made so far is cancelled, every hold is released, and the group is told which part failed and why.
 
 ### The rules the code enforces
 
-- **Nobody is charged unless everyone is in.** A pure state machine (`src/domain/plan/transition.ts`) decides every step.
+- **Nobody is charged unless everyone has approved.** A pure state machine (`src/domain/plan/transition.ts`) decides every step.
 - **The cap rule.** A charge can never exceed what the person approved. It is checked in four places: the state machine, the hold service, a database constraint, and Stripe itself.
 - **Book first, charge last.** Cards are charged only after the suppliers confirm.
 - **The rollback is true because of the order things are booked in.** Whatever can be cancelled for free is booked first and the part that cannot is booked last (`src/domain/booking/order.ts`), so a failure always leaves what was already booked undoable. The hotel search asks liteAPI for refundable rates as well as the cheapest ones, and a free-cancel room is always on the shortlist. If two or more parts of a plan cannot be cancelled for free, the plan page says plainly which part a later failed booking would not refund. The rollback is tested against the real liteAPI sandbox: a free-cancel hotel is really booked, a stand-in airline refuses the flight, and the runner must cancel the hotel and release the holds (`src/infrastructure/liteapi/rollback.live.test.ts`).
@@ -216,7 +216,7 @@ MUSE_LIVE=1 MUSE_LIVE_OUT=nudges.txt node --env-file=.env.local node_modules/vit
 
 - Sandbox and test mode only, as described above. How liteAPI behaves for real flights, payments and cancellation charges has not been verified.
 - Everyone pays in USD.
-- A hold lasts as long as the card's bank allows, typically up to about 7 days. The app books as soon as everyone is in and cancels the holds if the plan ends first, but it cannot control when a bank frees the money.
+- A hold lasts as long as the card's bank allows, typically up to about 7 days. The app books as soon as everyone has approved and cancels the holds if the plan ends first, but it cannot control when a bank frees the money.
 - There is no refund or dispute path in the app after a charge.
 - The comparison "Was $X on the previous plan" finds the earlier plan from the same group and dates, so it can occasionally compare with the wrong one.
 - Nudges are manual: Trippy never messages anyone on its own, and there are no notifications outside the app.

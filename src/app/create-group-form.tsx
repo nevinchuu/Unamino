@@ -46,7 +46,7 @@ export function CreateGroupForm({ currency }: { readonly currency: string }) {
         />
       </div>
 
-      <p className="text-sm text-muted-foreground">Everyone pays in {currency} for now. Nobody is charged unless everyone is in.</p>
+      <p className="text-sm text-muted-foreground">Everyone pays in {currency} for now. Nobody is charged unless everyone has approved.</p>
       {state.message ? (
         <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {state.message}
