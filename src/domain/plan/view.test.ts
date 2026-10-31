@@ -53,6 +53,21 @@ describe("the plan as the screen shows it", () => {
     expect(view({ status: "captured", trip: { city: "Bangkok", departDate: null, returnDate: null } }).keptUntil).toBeNull();
   });
 
+
+  it("shows a hotel once, with its rooms joined, when the group takes several rooms there", () => {
+    const rooms = ["ana", "ben", "cy"].map((id) => ({ id: `room-${id}`, offer: hotel({ totalMinor: 10_000, guests: 1 }), memberIds: [id], reason: "r", notes: {} }));
+    const { items } = view({ picks: rooms });
+    const hotels = items.filter((item) => item.kind === "hotel");
+
+    expect(hotels).toHaveLength(1);
+    expect(hotels[0]).toMatchObject({ id: "room-ana", totalMinor: 30_000, roomName: expect.stringContaining("3 rooms"), memberNames: ["Ana", "Ben", "Someone"], reason: "r" });
+  });
+
+  it("keeps hotels with different names or dates, and flights, as separate cards", () => {
+    const stays = [hotel({ title: "Hotel A" }), hotel({ title: "Hotel B" }), hotel({ title: "Hotel A", checkIn: "2099-01-05", checkOut: "2099-01-07" })];
+    const picks = stays.map((offer, index) => ({ id: `h${index}`, offer, memberIds: ["ana"], reason: "r", notes: {} }));
+    expect(view({ picks }).items).toHaveLength(3);
+  });
   it("lists flights before hotels, with who each is for and why", () => {
     const { items } = view();
     expect(items.map((item) => item.kind)).toEqual(["flight", "hotel"]);

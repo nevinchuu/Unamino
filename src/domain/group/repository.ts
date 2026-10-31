@@ -7,6 +7,8 @@ export interface NewGroup {
   readonly organiser: { readonly displayName: string; readonly currency: string };
   /** Who is making it, as a keyed hash that cannot be turned back into an address, for limiting how many one person makes. */
   readonly creatorKey?: string | null;
+  /** Only for the demo that shows a failed booking: booking will end with a pretend failure. */
+  readonly demoFailure?: boolean;
 }
 
 export interface CreatedGroup {
@@ -33,6 +35,8 @@ export interface GroupRepository {
   /** Who is acting? Only members who are currently in the group are recognised. */
   authenticate(memberToken: string): Promise<Result<Member, GroupError>>;
   find(groupId: string): Promise<Result<Group, GroupError>>;
+  /** Whether this group is the demo whose booking is made to fail at the end. False for an unknown group. */
+  forcesBookingFailure(groupId: string): Promise<boolean>;
   /** Everyone who was ever in the group, by id, so old messages keep the name of someone who has since left. */
   memberNames(groupId: string): Promise<ReadonlyMap<string, string>>;
   /** The people in the group right now, in the order they joined. This is the headcount for every search. */

@@ -13,6 +13,8 @@ export const groups = pgTable("groups", {
   joinEnabled: boolean("join_enabled").notNull().default(true),
   /** Who made the group, as a keyed hash of their network address, only so one person cannot make groups without limit. Null when the address was not known. It goes when the group does. */
   creatorKey: text("creator_key"),
+  /** Set only by the demo that shows a booking falling through: booking ends with a pretend failure after the hotel is really booked, so the undoing can be seen. */
+  demoFailure: boolean("demo_failure").notNull().default(false),
   createdAt: createdAt(),
 }, (table) => [index("groups_creator_idx").on(table.creatorKey, table.createdAt)]).enableRLS();
 

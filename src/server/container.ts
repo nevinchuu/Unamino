@@ -240,6 +240,10 @@ function build(): Container {
           if (group.ok && group.value) await messages.postSystem(group.value, line);
         },
         failures: bookingFailures,
+        forcedFailure: async (planId) => {
+          const group = await views.groupIdOf(planId);
+          return group.ok && group.value !== null && groups.forcesBookingFailure(group.value);
+        },
       });
       bookingSweeper = new BookingSweeper(bookingStore, booking, agent.clock);
       // The last card hold is placed inside a request; booking takes far longer than a person should wait.

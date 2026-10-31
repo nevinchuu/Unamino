@@ -1,0 +1,3 @@
+ALTER TABLE "booking_failures" DROP CONSTRAINT "booking_failures_reason";--> statement-breakpoint
+ALTER TABLE "groups" ADD COLUMN "demo_failure" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "booking_failures" ADD CONSTRAINT "booking_failures_reason" CHECK ("booking_failures"."reason" IN ('price', 'unavailable', 'rejected', 'temporary', 'details', 'hold', 'deadline', 'stuck', 'demo', 'other'));

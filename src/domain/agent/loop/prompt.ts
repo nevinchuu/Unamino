@@ -54,6 +54,7 @@ const FAILURE_REASONS: Readonly<Record<BookingFailureKind, string>> = {
   hold: "a card hold was no longer valid",
   deadline: "the plan ran out of time while booking",
   stuck: "booking took too long",
+  demo: "a demo made the final fare check fail on purpose",
   other: "booking did not go through",
 };
 

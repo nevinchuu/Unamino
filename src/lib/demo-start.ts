@@ -1,6 +1,8 @@
 /** What the "Try the demo" button sets up: a group of the person and three simulated friends, and a first plan asked for on their behalf. */
 
 export const DEMO_GROUP_NAME = "Bangkok demo";
+/** The same demo, made so that booking falls through at the end, to show the hotel cancelled and every hold let go. */
+export const DEMO_FAILING_GROUP_NAME = "Bangkok demo (booking fails)";
 /** The name the person goes by until they change it in Group info. */
 export const DEMO_ORGANISER_NAME = "Guest";
 /** Who joins as simulated friends: a tight budget, a room of their own, and an easygoing one. */

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { runAgent } from "@/domain/agent/run-agent";
-import { DEMO_FRIEND_KEYS, DEMO_GROUP_NAME, DEMO_ORGANISER_NAME, demoPlanRequest } from "@/lib/demo-start";
+import { DEMO_FAILING_GROUP_NAME, DEMO_FRIEND_KEYS, DEMO_GROUP_NAME, DEMO_ORGANISER_NAME, demoPlanRequest } from "@/lib/demo-start";
 import { clientAddressOf, creatorKeyFor } from "@/server/client-key";
 import { getContainer } from "@/server/container";
 import { GROUP_CURRENCY } from "@/server/group-currency";
@@ -17,7 +17,7 @@ import { rememberInviteToken, rememberMember } from "@/server/session";
 type MadeGroup = { readonly ok: true; readonly groupId: string } | { readonly ok: false; readonly state: FormState };
 
 /** Makes a group and signs its creator in as the organiser, keeping the invite link for them to share. Holds a person to the limit on how many groups they may make. */
-async function makeGroup(groupName: string, yourName: string): Promise<MadeGroup> {
+async function makeGroup(groupName: string, yourName: string, demoFailure = false): Promise<MadeGroup> {
   const { groups, groupCounter, cronSecret } = getContainer();
   const creatorKey = creatorKeyFor(clientAddressOf(await headers()), cronSecret);
   const verdict = await groupCreationVerdict(groupCounter, new Date(), creatorKey);
@@ -28,6 +28,7 @@ async function makeGroup(groupName: string, yourName: string): Promise<MadeGroup
     baseCurrency: GROUP_CURRENCY,
     organiser: { displayName: yourName, currency: GROUP_CURRENCY },
     creatorKey,
+    demoFailure,
   });
   if (!created.ok) return { ok: false, state: { message: groupErrorMessage(created.error), values: { groupName, yourName } } };
 
@@ -54,10 +55,19 @@ export async function createGroup(_previous: FormState, formData: FormData): Pro
  * around. All of that runs after the person has landed in the chat, so they watch it happen instead of waiting for it.
  */
 export async function startDemoGroup(): Promise<FormState> {
+  return runDemo(DEMO_GROUP_NAME, false);
+}
+
+/** The same demo, made so that booking falls through at the end: the hotel is booked and cancelled again, and every hold is let go. */
+export async function startFailingDemoGroup(): Promise<FormState> {
+  return runDemo(DEMO_FAILING_GROUP_NAME, true);
+}
+
+async function runDemo(groupName: string, demoFailure: boolean): Promise<FormState> {
   const { personas, groups, messages, agent } = getContainer();
   if (!personas) return { message: "The demo is switched off on this server." };
 
-  const made = await makeGroup(DEMO_GROUP_NAME, DEMO_ORGANISER_NAME);
+  const made = await makeGroup(groupName, DEMO_ORGANISER_NAME, demoFailure);
   if (!made.ok) return made.state;
   const organiser = (await groups.joinedMembers(made.groupId)).find((member) => member.isOrganiser);
   if (!organiser) return { message: "Something went wrong on our side. Try again in a moment." };

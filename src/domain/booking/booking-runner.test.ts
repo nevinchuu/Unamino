@@ -7,7 +7,7 @@ import { bookingSetup, MemoryFailureStore } from "./test-support";
 
 const BOOK = [{ type: "book" }] as const;
 
-function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = () => NOW, renew?: (planId: string) => Promise<void>, announce?: (planId: string, line: string) => Promise<void>, failures?: MemoryFailureStore) {
+function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = () => NOW, renew?: (planId: string) => Promise<void>, announce?: (planId: string, line: string) => Promise<void>, failures?: MemoryFailureStore, forcedFailure?: (planId: string) => Promise<boolean>) {
   return new SupplierBookingRunner({
     plans: world.plans,
     details: world.details,
@@ -21,6 +21,7 @@ function runnerFor(world: ReturnType<typeof bookingSetup>, clock: () => Date = (
     renew,
     announce,
     failures,
+    forcedFailure,
   });
 }
 
@@ -219,6 +220,29 @@ describe("SupplierBookingRunner", () => {
     expect(await runner.cancelBookings("plan-1")).toEqual(ok(undefined));
 
     expect(world.hotels.cancelled).toEqual(["H-1"]);
+  });
+
+  describe("the demo that makes booking fail at the end", () => {
+    it("books everything for real, then cancels it, ends the plan and lets go of the holds", async () => {
+      const world = bookingSetup();
+      const lines: string[] = [];
+      const failures = new MemoryFailureStore();
+      await runnerFor(world, () => NOW, undefined, async (_planId, line) => { lines.push(line); }, failures, async () => true).run("plan-1", 5, BOOK);
+
+      expect(world.log).toEqual(["book H", "book F", "cancel H-1", "cancel F-1"]);
+      expect(world.plans.plan.status).toBe("expired");
+      expect(world.onward.types).toEqual(["release_holds"]);
+      expect(failures.saved).toEqual([{ planId: "plan-1", reason: "demo", cause: null, part: null, undone: [{ kind: "hotel", title: "Riverside Hotel" }, { kind: "flight", title: "SIN to BKK" }], retryable: false }]);
+      expect(lines).toEqual(["The final fare check failed (demo: we made it fail on purpose). The hotel Riverside Hotel and flight SIN to BKK had already been booked and were cancelled. Nothing was charged and every card hold was let go. Mention @trippy to plan again."]);
+    });
+
+    it("books normally when the plan is not the demo", async () => {
+      const world = bookingSetup();
+      await runnerFor(world, () => NOW, undefined, undefined, undefined, async () => false).run("plan-1", 5, BOOK);
+
+      expect(world.plans.plan.status).toBe("booked");
+      expect(world.onward.types).toEqual(["capture_holds"]);
+    });
   });
 
   describe("telling the group which part failed", () => {

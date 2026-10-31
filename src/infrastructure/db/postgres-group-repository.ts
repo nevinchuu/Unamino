@@ -65,7 +65,7 @@ export class PostgresGroupRepository implements GroupRepository {
     const memberToken = generateToken();
     try {
       return await this.db.transaction(async (tx) => {
-        const [group] = await tx.insert(groups).values({ name, baseCurrency: input.baseCurrency, joinTokenHash: hashToken(joinToken), creatorKey: input.creatorKey ?? null }).returning();
+        const [group] = await tx.insert(groups).values({ name, baseCurrency: input.baseCurrency, joinTokenHash: hashToken(joinToken), creatorKey: input.creatorKey ?? null, demoFailure: input.demoFailure ?? false }).returning();
         const [organiser] = await tx
           .insert(members)
           .values({ groupId: group.id, displayName: input.organiser.displayName.trim(), currency: input.organiser.currency, status: "joined", joinedAt: new Date(), isOrganiser: true, inviteTokenHash: hashToken(memberToken) })
@@ -127,6 +127,16 @@ export class PostgresGroupRepository implements GroupRepository {
       return row ? ok(toMember(row)) : failure("not_found", "Nobody is signed in with that token");
     } catch {
       return failure("unavailable", "The database could not be reached");
+    }
+  }
+
+  async forcesBookingFailure(groupId: string): Promise<boolean> {
+    try {
+      const [row] = await this.db.select({ demoFailure: groups.demoFailure }).from(groups).where(eq(groups.id, groupId)).limit(1);
+      return row?.demoFailure ?? false;
+    } catch {
+      // Not knowing must never fail a real booking.
+      return false;
     }
   }
 

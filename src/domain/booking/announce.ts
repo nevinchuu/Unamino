@@ -12,6 +12,7 @@ const HEADLINES: Readonly<Record<BookingFailureKind, string>> = {
   hold: "A card hold was no longer valid.",
   deadline: "The plan ran out of time while booking.",
   stuck: "Booking took too long.",
+  demo: "The final fare check failed (demo: we made it fail on purpose).",
   other: "Booking did not go through.",
 };
 
@@ -44,10 +45,17 @@ interface Failure {
   readonly undone: readonly UndonePart[];
 }
 
-const listOf = (parts: readonly UndonePart[]): string => {
-  const names = parts.map((part) => `${part.kind} ${shortName(part.title)}`);
-  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+/** Each part once, with how many bookings it was when there were several (a hotel booked room by room). */
+const namesOf = (parts: readonly UndonePart[]): readonly string[] => {
+  const counts = new Map<string, number>();
+  for (const part of parts) {
+    const name = `${part.kind} ${shortName(part.title)}`;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts].map(([name, count]) => (count > 1 ? `${name} (${count} bookings)` : name));
 };
+
+const joinNames = (names: readonly string[]): string => (names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 
 /** Which part failed and why, as one sentence: the same words in the chat and on the plan screen. */
 export function failureSummary(failure: Pick<Failure, "reason" | "cause" | "part">): string {
@@ -58,7 +66,8 @@ export function failureSummary(failure: Pick<Failure, "reason" | "cause" | "part
 
 /** What had been booked and was cancelled again, or null when nothing had been. */
 export function undoneSentence(undone: readonly UndonePart[]): string | null {
-  return undone.length > 0 ? `The ${listOf(undone)} had already been booked and ${undone.length === 1 ? "was" : "were"} cancelled.` : null;
+  const names = namesOf(undone);
+  return names.length > 0 ? `The ${joinNames(names)} had already been booked and ${names.length === 1 ? "was" : "were"} cancelled.` : null;
 }
 
 /**

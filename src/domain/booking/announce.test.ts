@@ -45,6 +45,7 @@ describe("bookingFailedLine", () => {
   it("says what had been booked and was cancelled, in the singular and the plural", () => {
     expect(bookingFailedLine({ reason: "unavailable", part: part({ kind: "flight", title: "SIN to BKK" }), undone: [{ kind: "hotel", title: "Riverside Hotel" }] })).toContain("The hotel Riverside Hotel had already been booked and was cancelled.");
     expect(bookingFailedLine({ reason: "deadline", part: null, undone: [{ kind: "hotel", title: "A" }, { kind: "flight", title: "B" }] })).toContain("The hotel A and flight B had already been booked and were cancelled.");
+    expect(bookingFailedLine({ reason: "demo", part: null, undone: [{ kind: "hotel", title: "A" }, { kind: "hotel", title: "A" }, { kind: "hotel", title: "A" }] })).toContain("The hotel A (3 bookings) had already been booked and was cancelled.");
   });
 
   it("has a plain line for every reason when no single part is to blame", () => {

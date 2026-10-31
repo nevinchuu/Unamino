@@ -49,6 +49,17 @@ describe.skipIf(!ENABLED)("groups and chat on the real database", () => {
       expect(memberToken).not.toEqual(joinToken);
     }, 30_000);
 
+    it("keeps whether a group is the demo whose booking fails, false unless asked and for an unknown group", async () => {
+      const ordinary = await newGroup();
+      const made = await groupRepo.create({ name: "db-test-demo-failure", baseCurrency: "USD", organiser: ME, demoFailure: true });
+      if (!made.ok) throw new Error(made.error.message);
+      created.push(made.value.group.id);
+
+      expect(await groupRepo.forcesBookingFailure(ordinary.group.id)).toBe(false);
+      expect(await groupRepo.forcesBookingFailure(made.value.group.id)).toBe(true);
+      expect(await groupRepo.forcesBookingFailure("00000000-0000-4000-8000-000000000000")).toBe(false);
+    }, 30_000);
+
     it("never stores either secret, only hashes", async () => {
       const { group, memberToken, joinToken } = await newGroup();
       const [row] = await handle.db.select().from(groups).where(eq(groups.id, group.id));

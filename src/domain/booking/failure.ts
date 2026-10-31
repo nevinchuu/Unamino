@@ -3,9 +3,9 @@
  * "price": a supplier now wants more than the offer said. "unavailable": the offer is gone. "rejected": a supplier
  * refused what we sent. "temporary": a supplier could not be reached, so trying again may work. "details": someone's
  * traveller details were missing. "hold": a card hold was no longer good. "deadline": the plan ran out of time.
- * "stuck": booking took too long. "other": anything else.
+ * "stuck": booking took too long. "demo": the demo that shows a failed booking made it fail on purpose. "other": anything else.
  */
-export const BOOKING_FAILURE_KINDS = ["price", "unavailable", "rejected", "temporary", "details", "hold", "deadline", "stuck", "other"] as const;
+export const BOOKING_FAILURE_KINDS = ["price", "unavailable", "rejected", "temporary", "details", "hold", "deadline", "stuck", "demo", "other"] as const;
 export type BookingFailureKind = (typeof BOOKING_FAILURE_KINDS)[number];
 
 /**

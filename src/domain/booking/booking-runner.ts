@@ -36,6 +36,8 @@ export interface BookingRunnerDeps {
    * good. It can move the plan on (a price past someone's cap sends them back to approve), which stops the booking.
    */
   readonly renew?: (planId: string) => Promise<void>;
+  /** Whether this plan is the demo whose booking is made to fail once everything else has been booked. Left out, no plan is. */
+  readonly forcedFailure?: (planId: string) => Promise<boolean>;
   /** Tells the group something in the chat. A failure to tell does not change the booking. */
   readonly announce?: (planId: string, line: string) => Promise<void>;
   /** Keeps why a booking failed. A failure to keep it does not change the booking. */
@@ -205,6 +207,8 @@ export class SupplierBookingRunner implements EffectRunner {
       const booked = await this.bookPick(planId, pick, travellers.value);
       if (!booked.ok) return booked;
     }
+    // The demo that shows a failed booking: everything above is really booked, then this pretend last check fails, so the undoing is real.
+    if (await this.deps.forcedFailure?.(planId)) return fail("demo", "The demo made the final fare check fail on purpose");
     return ok(undefined);
   }
 

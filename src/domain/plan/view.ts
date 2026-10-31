@@ -246,6 +246,57 @@ function itemOf(pick: ViewPick, names: ReadonlyMap<string, string>, codes: Reado
   }
 }
 
+type HotelItem = Extract<PlanItemDto, { readonly kind: "hotel" }>;
+
+const distinct = <T>(values: readonly T[]): T[] => [...new Set(values)];
+
+/** What a hotel's extra charges come to when its rooms are shown together: the same charge at several rooms is added up. */
+function sumCharges(charges: HotelItem["extraCharges"]): HotelItem["extraCharges"] {
+  const byDescription = new Map<string, HotelItem["extraCharges"][number]>();
+  for (const charge of charges) {
+    const seen = byDescription.get(charge.description);
+    byDescription.set(charge.description, seen ? { ...seen, minor: seen.minor + charge.minor } : charge);
+  }
+  return [...byDescription.values()];
+}
+
+/** One card for the rooms a group takes at the same hotel on the same dates, so the hotel is named once, however many rooms there are. */
+function mergeRooms(rooms: readonly HotelItem[]): HotelItem {
+  const [first] = rooms;
+  if (rooms.length === 1) return first;
+  const roomNames = distinct(rooms.map((room) => room.roomName));
+  return {
+    ...first,
+    roomName: roomNames.length === 1 ? `${roomNames[0]} · ${rooms.length} rooms` : `${rooms.length} rooms`,
+    memberNames: distinct(rooms.flatMap((room) => room.memberNames)),
+    reason: distinct(rooms.map((room) => room.reason).filter((reason) => reason.length > 0)).join(" "),
+    notes: rooms.flatMap((room) => room.notes),
+    totalMinor: rooms.reduce((sum, room) => sum + room.totalMinor, 0),
+    bookingCode: rooms.find((room) => room.bookingCode !== null)?.bookingCode ?? null,
+    extraCharges: sumCharges(rooms.flatMap((room) => room.extraCharges)),
+  };
+}
+
+/** The plan's items with rooms of one hotel (same name, same dates) joined into one. Everything else keeps its place and its own card. */
+export function mergeSameHotel(items: readonly PlanItemDto[]): readonly PlanItemDto[] {
+  const roomsByStay = new Map<string, HotelItem[]>();
+  for (const item of items) {
+    if (item.kind !== "hotel") continue;
+    const key = `${item.title}
+${item.stay}`;
+    roomsByStay.set(key, [...(roomsByStay.get(key) ?? []), item]);
+  }
+  const placed = new Set<string>();
+  return items.flatMap((item): PlanItemDto[] => {
+    if (item.kind !== "hotel") return [item];
+    const key = `${item.title}
+${item.stay}`;
+    if (placed.has(key)) return [];
+    placed.add(key);
+    return [mergeRooms(roomsByStay.get(key) ?? [item])];
+  });
+}
+
 function ideaOf(idea: ViewIdea): IdeaDto {
   const start = dayAndTime(`${idea.date}T${idea.startTime}`);
   return { id: idea.id, when: `${start} to ${clock(`${idea.date}T${idea.endTime}`) ?? idea.endTime}`, category: idea.category, name: idea.venue.name, address: idea.venue.address, mapsUrl: httpsUrlOrNull(idea.venue.mapsUrl), why: idea.why };
@@ -412,7 +463,7 @@ export function buildPlanView(
     currency: raw.baseCurrency,
     pricesAvailable: priced.ok,
     refundWarning: LIVE_PLAN_STATUSES.includes(raw.status) ? refundWarningOf(raw.picks, options.now ?? new Date()) : null,
-    items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names, bookingCodes)),
+    items: mergeSameHotel([...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names, bookingCodes))),
     ideas: raw.ideas.map(ideaOf),
     confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],
     progress: bookingProgressOf(raw),
