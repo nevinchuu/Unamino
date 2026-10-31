@@ -93,6 +93,35 @@ describe("hotels", () => {
     const rooms = [hotel("c", 3, 43000), hotel("a", 3, 41000), hotel("b", 3, 42000), hotel("d", 3, 44000)];
     expect(idsOf(run(rooms).offers)).toEqual(["c", "a", "b"]);
   });
+
+  describe("a room that can be cancelled for free", () => {
+    const FREE_UNTIL = "2026-12-08T10:00:00Z";
+    const fixed = (id: string, totalMinor: number): HotelOffer => ({ ...hotel(id, 3, totalMinor), freeCancellationUntil: undefined });
+    const withFreeCancel = (id: string, totalMinor: number): HotelOffer => ({ ...hotel(id, 3, totalMinor), freeCancellationUntil: FREE_UNTIL });
+    const limits = { flightsPerSlot: 5, hotelsPerSlot: 2, activitiesPerDay: 4 };
+    const runWith = (offers: readonly Offer[]) => prefilterOffers({ offers, constraints: {}, now: NOW, limits });
+
+    it("is shown even when it costs more than the cheapest rooms, in place of the last pick", () => {
+      const rooms = [fixed("cheap-1", 40_000), fixed("cheap-2", 41_000), fixed("cheap-3", 42_000), withFreeCancel("flexible", 48_000)];
+      expect(idsOf(runWith(rooms).offers)).toEqual(["cheap-1", "flexible"]);
+    });
+
+    it("does not displace anything when one is already among the cheapest", () => {
+      const rooms = [fixed("cheap-1", 40_000), withFreeCancel("flexible", 41_000), fixed("cheap-3", 42_000)];
+      expect(idsOf(runWith(rooms).offers)).toEqual(["cheap-1", "flexible"]);
+    });
+
+    it("keeps the two cheapest when no room can be cancelled for free", () => {
+      const rooms = [fixed("a", 40_000), fixed("b", 41_000), fixed("c", 42_000)];
+      expect(idsOf(runWith(rooms).offers)).toEqual(["a", "b"]);
+    });
+
+    it("ignores a room whose free-cancellation time has already passed", () => {
+      const lapsed: HotelOffer = { ...fixed("lapsed", 48_000), freeCancellationUntil: "2026-10-26T10:00:00Z" };
+      const rooms = [fixed("a", 40_000), fixed("b", 41_000), lapsed];
+      expect(idsOf(runWith(rooms).offers)).toEqual(["a", "b"]);
+    });
+  });
 });
 
 describe("activities", () => {

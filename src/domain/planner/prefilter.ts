@@ -1,5 +1,6 @@
 import type { ConstraintSet } from "@/domain/constraints/schema";
 import { isOfferExpired, type ActivityOffer, type FlightOffer, type HotelOffer, type Offer } from "@/domain/offers/schema";
+import { isFreeToCancel } from "@/domain/booking/order";
 import { checkOffer } from "./check-constraints";
 
 export interface PrefilterLimits {
@@ -72,12 +73,24 @@ function pickActivities(candidates: readonly ActivityOffer[], limit: number): re
 }
 
 /** Flights and hotels: fewest unhappy members first, then price per guest, then id so the result never wobbles. */
-function pickBest(candidates: readonly Offer[], limit: number, constraints: ConstraintSet): readonly Offer[] {
+function rank(candidates: readonly Offer[], constraints: ConstraintSet): readonly Offer[] {
   return candidates
     .map((offer) => ({ offer, violations: violationCount(offer, constraints) }))
     .sort((a, b) => a.violations - b.violations || comparePricePerGuest(a.offer, b.offer) || a.offer.id.localeCompare(b.offer.id))
-    .slice(0, limit)
     .map(({ offer }) => offer);
+}
+
+/**
+ * The best few of a slot. A slot that has a hotel which can be cancelled for free always shows one, in place of the last
+ * pick if need be, even when it costs more than the cheapest: whether the extra is worth it is for the group to decide,
+ * and it cannot decide on a room it was never shown.
+ */
+function pickBest(candidates: readonly Offer[], limit: number, constraints: ConstraintSet, now: Date): readonly Offer[] {
+  const ranked = rank(candidates, constraints);
+  const chosen = ranked.slice(0, limit);
+  if (limit < 2 || chosen.some((offer) => offer.kind === "hotel" && isFreeToCancel(offer, now))) return chosen;
+  const refundable = ranked.find((offer) => offer.kind === "hotel" && isFreeToCancel(offer, now));
+  return refundable ? [...chosen.slice(0, limit - 1), refundable] : chosen;
 }
 
 /**
@@ -104,7 +117,7 @@ export function prefilterOffers(input: PrefilterInput): PrefilterResult {
     const chosen =
       first.kind === "activity"
         ? pickActivities(candidates as ActivityOffer[], limits.activitiesPerDay)
-        : pickBest(candidates, first.kind === "flight" ? limits.flightsPerSlot : limits.hotelsPerSlot, constraints);
+        : pickBest(candidates, first.kind === "flight" ? limits.flightsPerSlot : limits.hotelsPerSlot, constraints, now);
     for (const offer of chosen) kept.add(offer);
   }
 

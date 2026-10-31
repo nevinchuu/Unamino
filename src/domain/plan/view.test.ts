@@ -3,7 +3,7 @@ import type { Cover } from "@/domain/split/types";
 import type { ApprovalStatus, PlanAgreementStatus, PlanStatus } from "./statuses";
 import { flight, hotel } from "./test-support";
 import { buildPlanView, FAST_POLL_STATUSES, LIVE_PLAN_STATUSES } from "./view";
-import type { PlanViewRaw, ViewIdea, ViewMember } from "./view-store";
+import type { PlanViewRaw, ViewIdea, ViewMember, ViewPick } from "./view-store";
 
 const DEADLINE = new Date("2026-10-27T01:09:00.000Z");
 
@@ -97,6 +97,26 @@ describe("the plan as the screen shows it", () => {
       expect(cardNeeded("approving", {}, "demo")).toBe(false);
       expect(cardNeeded("approving", {}, "none")).toBe(false);
     });
+  });
+});
+
+describe("the warning about parts that cannot be cancelled for free", () => {
+  const NOW = new Date("2026-11-01T10:00:00Z");
+  const pickOf = (id: string, offer: ViewPick["offer"]): ViewPick => ({ id, offer, memberIds: ["ana", "ben"], reason: "r", notes: {} });
+  const warn = (picks: ViewPick[], status: PlanStatus = "reviewing") => buildPlanView(raw({ picks, status }), "ana", { payments: "none", now: NOW }).refundWarning;
+
+  it("names the part that would not be refunded when two parts cannot be cancelled for free", () => {
+    expect(warn([pickOf("f", flight({ refundable: false })), pickOf("h", hotel({ title: "Riverside Hotel" }))])).toBe("Riverside Hotel can't be cancelled for free. If a booking made after it failed, it would not be refunded.");
+  });
+
+  it("is empty when a free-cancel hotel goes first, or the fixed part is booked last", () => {
+    expect(warn([pickOf("f", flight({ refundable: false })), pickOf("h", hotel({ freeCancellationUntil: "2026-12-08T10:00:00Z" }))])).toBeNull();
+    expect(warn([pickOf("f", flight({ refundable: true })), pickOf("h", hotel())])).toBeNull();
+  });
+
+  it("is empty for a hotel-only plan, and once the plan is no longer being decided", () => {
+    expect(warn([pickOf("h", hotel())])).toBeNull();
+    expect(warn([pickOf("f", flight({ refundable: false })), pickOf("h", hotel())], "booked")).toBeNull();
   });
 });
 

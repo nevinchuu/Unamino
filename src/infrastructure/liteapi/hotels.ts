@@ -49,6 +49,8 @@ export interface HotelRequestOptions {
   readonly currency: string;
   readonly guestNationality: string;
   readonly limit: number;
+  /** Ask only for rates that can be cancelled for free, so each hotel's cheapest refundable room is found even when a cheaper fixed one exists. */
+  readonly refundableOnly?: boolean;
 }
 
 /** One room for `guests` people per search, so each offer's price is for exactly one room. */
@@ -63,6 +65,7 @@ export function buildHotelRequest(query: HotelQuery, options: HotelRequestOption
     cityName: query.city,
     maxRatesPerHotel: 1,
     limit: options.limit,
+    ...(options.refundableOnly && { refundableRatesOnly: true }),
   };
 }
 

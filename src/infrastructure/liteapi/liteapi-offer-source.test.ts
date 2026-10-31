@@ -56,7 +56,7 @@ describe("hotel search", () => {
   it("sends one room for the guests, with the key in a header and not in the body", async () => {
     const { source, calls } = sourceWith(() => json(hotelsSingleRoom));
     await source.search(hotelQuery);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
     expect(calls[0].url).toBe("https://api.liteapi.travel/v3.0/hotels/rates");
     expect(calls[0].headers["X-API-Key"]).toBe(API_KEY);
     expect(JSON.stringify(calls[0].body)).not.toContain(API_KEY);
@@ -64,6 +64,43 @@ describe("hotel search", () => {
       checkin: "2026-12-11", checkout: "2026-12-13", currency: "USD", guestNationality: "SG",
       occupancies: [{ adults: 3 }], countryCode: "TH", cityName: "Bangkok", maxRatesPerHotel: 1,
     });
+  });
+
+  it("asks once for the cheapest rates and once for refundable rates only, so a free-cancel room is found even when a cheaper fixed one exists", async () => {
+    const { source, calls } = sourceWith(() => json(hotelsSingleRoom));
+    await source.search(hotelQuery);
+    expect(calls[0].body).not.toHaveProperty("refundableRatesOnly");
+    expect(calls[1].body).toMatchObject({ refundableRatesOnly: true, maxRatesPerHotel: 1 });
+  });
+
+  it("keeps a room once when both searches return it, and keeps the refundable room the cheapest search missed", async () => {
+    const [first, second] = hotelsSingleRoom.data;
+    const refundableRate = { cancellationPolicies: { refundableTag: "RFN", cancelPolicyInfos: [{ cancelTime: "2026-12-08 06:00:00", timezone: "GMT" }] } };
+    const refundableOnly: unknown = {
+      ...hotelsSingleRoom,
+      data: [{ ...second, roomTypes: second.roomTypes.map((room) => ({ ...room, offerId: "refundable-offer", rates: room.rates.map((rate) => ({ ...rate, ...refundableRate })) })) }, first],
+    };
+    let call = 0;
+    const { source } = sourceWith(() => json(call++ === 0 ? hotelsSingleRoom : refundableOnly));
+    const result = await source.search(hotelQuery);
+    const offers = result.ok ? result.value : [];
+    // Two hotels from the cheapest search plus the refundable variant. The first hotel came back in both and is not doubled.
+    expect(offers).toHaveLength(3);
+    const refundableRoom = offers.filter((offer) => offer.id === "refundable-offer");
+    expect(refundableRoom).toHaveLength(1);
+    expect(refundableRoom[0]).toMatchObject({ kind: "hotel", freeCancellationUntil: "2026-12-08T06:00:00.000Z" });
+  });
+
+  it("still returns the cheapest rates when only the refundable search fails", async () => {
+    let call = 0;
+    const { source } = sourceWith(() => (call++ === 0 ? json(hotelsSingleRoom) : new Response("down", { status: 503 })));
+    const result = await source.search(hotelQuery);
+    expect(result.ok && result.value.length).toBe(2);
+  });
+
+  it("fails when the search for the cheapest rates fails", async () => {
+    const { source } = sourceWith(() => new Response("down", { status: 503 }));
+    expect((await source.search(hotelQuery)).ok).toBe(false);
   });
 
   it("maps real responses to offers", async () => {

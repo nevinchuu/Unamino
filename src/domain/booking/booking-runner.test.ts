@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ok } from "@/lib/result";
-import { DEADLINE, NOW } from "@/domain/plan/test-support";
+import { DEADLINE, flight, hotel, NOW } from "@/domain/plan/test-support";
 import { SupplierBookingRunner } from "./booking-runner";
 import { bookingFailedLine } from "./announce";
 import { bookingSetup, MemoryFailureStore } from "./test-support";
@@ -36,6 +36,31 @@ describe("SupplierBookingRunner", () => {
       ["pick-hotel", "hotel", "H-1", "booked"],
       ["pick-flight", "flight", "F-1", "booked"],
     ]);
+  });
+
+  it("books a refundable flight before a hotel that cannot be cancelled free, and undoes the flight if the hotel then fails", async () => {
+    const world = bookingSetup();
+    world.details.details = { ...world.details.details, picks: [
+      { id: "pick-hotel", offer: hotel(), searchId: null, memberIds: ["ana", "ben"] },
+      { id: "pick-flight", offer: flight({ refundable: true }), searchId: null, memberIds: ["ana", "ben"] },
+    ] };
+    world.hotels.failBooking = { code: "unavailable", message: "sold out" };
+    await runnerFor(world).run("plan-1", 5, BOOK);
+
+    expect(world.log).toEqual(["book F", "book H", "cancel F-1"]);
+    expect(world.plans.plan.status).toBe("expired");
+  });
+
+  it("keeps a free-cancel hotel first and undoes it when the flight fails", async () => {
+    const world = bookingSetup();
+    world.details.details = { ...world.details.details, picks: [
+      { id: "pick-flight", offer: flight({ refundable: false }), searchId: null, memberIds: ["ana", "ben"] },
+      { id: "pick-hotel", offer: hotel({ freeCancellationUntil: "2099-01-01T00:00:00Z" }), searchId: null, memberIds: ["ana", "ben"] },
+    ] };
+    world.flights.failBooking = { code: "unavailable", message: "sold out" };
+    await runnerFor(world).run("plan-1", 5, BOOK);
+
+    expect(world.log).toEqual(["book H", "book F", "cancel H-1"]);
   });
 
   it("books each flight for everyone on it and each room with one lead guest, naming the booking after the plan", async () => {

@@ -1,9 +1,11 @@
 import { failureSummary, undoneSentence } from "@/domain/booking/announce";
+import { unprotectedParts } from "@/domain/booking/order";
 import type { Offer } from "@/domain/offers/schema";
 import type { PaymentsMode } from "@/domain/payments/types";
 import { tripKeptUntil } from "@/domain/retention/policy";
 import { passportRequiredFor } from "@/domain/travellers/requirements";
 import { clock, dateRange, dayAndTime, nightsBetween, shortDay } from "@/lib/plan-format";
+import { listOf } from "@/lib/plan-card";
 import { planReference } from "@/lib/plan-reference";
 import { httpsUrlOrNull } from "@/lib/safe-url";
 import type { CoverLine } from "@/domain/split/types";
@@ -181,6 +183,8 @@ export interface PlanViewDto {
   readonly demoBooking: boolean;
   readonly currency: string;
   readonly pricesAvailable: boolean;
+  /** Said plainly while the plan is being decided, when two or more parts cannot be cancelled for free, so a later failed booking would leave the earlier ones paid for. Null when every part can be undone. */
+  readonly refundWarning: string | null;
   readonly items: readonly PlanItemDto[];
   readonly ideas: readonly IdeaDto[];
   /** The suppliers own codes, once the trip is booked. Empty when none were given. */
@@ -308,6 +312,14 @@ function bookingProgressOf(raw: PlanViewRaw): ProgressStepDto[] {
   return lines;
 }
 
+/** The parts a failed later booking would leave paid for, in plain words. Null when everything booked before the last part can be cancelled for free. */
+function refundWarningOf(picks: readonly ViewPick[], now: Date): string | null {
+  const lost = unprotectedParts(picks, now).map((pick) => pick.offer.title);
+  if (lost.length === 0) return null;
+  const many = lost.length > 1;
+  return `${listOf(lost)} can't be cancelled for free. If a booking made after ${many ? "them" : "it"} failed, ${many ? "they" : "it"} would not be refunded.`;
+}
+
 /**
  * What one person sees of a plan, worked out from what is stored. Prices are today's, from the stored offers, and
  * what the person may do is decided here from the plan's state and their own, so the screen never has to guess.
@@ -318,6 +330,8 @@ export function buildPlanView(
   options: {
     readonly payments: PaymentsMode;
     readonly demoBooking?: boolean;
+    /** What "now" is, for whether a hotel's free cancellation has run out. The real time when left out. */
+    readonly now?: Date;
     /** Present when this server takes traveller details. `given` is whether the viewer has already given theirs. */
     readonly travellers?: { readonly given: boolean };
   },
@@ -397,6 +411,7 @@ export function buildPlanView(
     demoBooking: options.demoBooking ?? false,
     currency: raw.baseCurrency,
     pricesAvailable: priced.ok,
+    refundWarning: LIVE_PLAN_STATUSES.includes(raw.status) ? refundWarningOf(raw.picks, options.now ?? new Date()) : null,
     items: [...raw.picks].sort((a, b) => KIND_ORDER[a.offer.kind] - KIND_ORDER[b.offer.kind]).map((pick) => itemOf(pick, names, bookingCodes)),
     ideas: raw.ideas.map(ideaOf),
     confirmations: raw.status === "booked" || raw.status === "captured" ? confirmationsOf(raw) : [],

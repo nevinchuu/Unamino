@@ -6,6 +6,7 @@ import type { PlanRepository } from "@/domain/plan/repository";
 import type { PlanEffect } from "@/domain/plan/types";
 import type { TravellerService } from "@/domain/travellers/service";
 import { bookingFailedLine } from "./announce";
+import { bookingOrder } from "./order";
 import { isRetryable, type BookingFailureKind, type BookingFailureRecord, type FailedPart, type FailureCause, type UndonePart } from "./failure";
 import type {
   BookingFailureStore,
@@ -60,8 +61,8 @@ const describe = (what: string, error: SupplierError): string => `${what}: ${err
 /**
  * Books the plan's hotels and flights with their suppliers, and only then lets the holds be charged. It is
  * all or nothing: if anything fails, every booking already made is cancelled and every hold is let go of, so
- * nobody is charged for a trip that did not happen. Hotels go first because they can be cancelled at once,
- * while an airline may take its time to confirm a cancellation.
+ * nobody is charged for a trip that did not happen. Parts that can be cancelled for free go first and the part that
+ * cannot goes last (see `bookingOrder`), so what is booked before a failure can always be undone.
  */
 export class SupplierBookingRunner implements EffectRunner {
   constructor(private readonly deps: BookingRunnerDeps) {}
@@ -199,13 +200,10 @@ export class SupplierBookingRunner implements EffectRunner {
     const travellers = await this.loadTravellers(picks);
     if (!travellers.ok) return travellers;
 
-    // Hotels first: a hotel can be cancelled at once, a flight may take time to cancel.
-    for (const kind of ["hotel", "flight"] as const) {
-      for (const pick of picks) {
-        if (pick.offer.kind !== kind) continue;
-        const booked = await this.bookPick(planId, pick, travellers.value);
-        if (!booked.ok) return booked;
-      }
+    // What can be cancelled for free goes first and what cannot goes last, so a failure part-way undoes cleanly.
+    for (const pick of bookingOrder(picks, this.deps.clock())) {
+      const booked = await this.bookPick(planId, pick, travellers.value);
+      if (!booked.ok) return booked;
     }
     return ok(undefined);
   }

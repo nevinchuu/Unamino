@@ -44,11 +44,26 @@ export class LiteApiOfferSource implements OfferSource {
     }
   }
 
+  /**
+   * Each hotel is asked for twice, once for its cheapest rate and once for its cheapest rate that can be cancelled for free,
+   * because the two are often different rooms at different prices and the group should be able to choose. A hotel whose
+   * cheapest rate is already refundable comes back in both and is kept once. If only the refundable search fails, the
+   * cheapest rates still stand.
+   */
   private async searchHotels(query: Extract<OfferQuery, { kind: "hotel" }>): Promise<Result<readonly Offer[], OfferSourceError>> {
+    const [cheapest, refundable] = await Promise.all([this.hotelRates(query, false), this.hotelRates(query, true)]);
+    if (!cheapest.ok) return cheapest;
+    const byId = new Map<string, Offer>(cheapest.value.map((offer) => [offer.id, offer]));
+    if (refundable.ok) for (const offer of refundable.value) byId.set(offer.id, offer);
+    return ok([...byId.values()]);
+  }
+
+  private async hotelRates(query: Extract<OfferQuery, { kind: "hotel" }>, refundableOnly: boolean): Promise<Result<readonly Offer[], OfferSourceError>> {
     const body = buildHotelRequest(query, {
       currency: this.config.currency,
       guestNationality: this.config.guestNationality,
       limit: this.config.hotelLimit ?? DEFAULT_HOTEL_LIMIT,
+      refundableOnly,
     });
     const raw = await this.http.post("/hotels/rates", body);
     if (!raw.ok) return raw;

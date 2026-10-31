@@ -233,6 +233,13 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
           </section>
         ) : null}
 
+        {view.refundWarning ? (
+          <p role="note" className="flex items-start gap-2 rounded-xl bg-accent px-4 py-3 text-sm text-accent-foreground">
+            <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+            {view.refundWarning}
+          </p>
+        ) : null}
+
         {moneyAmount !== null ? <MoneyExplainer amountMinor={moneyAmount} currency={view.currency} demo={view.payments === "demo"} /> : null}
 
         <WhoPays people={view.people} status={view.status} currency={view.currency} payments={view.payments} />
