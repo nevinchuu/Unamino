@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { MoneyExplainer } from "@/components/money-explainer";
 import { PlanCountdown } from "@/components/plan-countdown";
 import { StatusChip } from "@/components/status-chip";
 import { formatMinor } from "@/lib/format-money";
@@ -128,15 +129,15 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
           ) : null}
 
           {view.step === "approve" && view.actionable && share ? (
-            <p className="text-[13px] leading-[19px] text-muted-foreground">
-              {covered
-                ? "A friend is covering your whole share, so there is no card to add. Open the plan to give your traveller details."
-                : `Nothing is charged until everyone is in. Your card is only held, for up to ${share}, and anything above today's share is let go.`}
-            </p>
+            covered ? (
+              <p className="text-[13px] leading-[19px] text-muted-foreground">A friend is covering your whole share, so there is no card to add. Open the plan to give your traveller details.</p>
+            ) : mine.shareMinor !== null ? (
+              <MoneyExplainer amountMinor={mine.shareMinor} currency={mine.currency} />
+            ) : null
           ) : null}
 
           {view.step === "agree" && view.actionable && share ? (
-            <p className="text-[13px] leading-[19px] text-muted-foreground">Agreeing costs nothing. Next you approve your own amount: your card is only held, and nothing is charged until everyone is in.</p>
+            <p className="text-[13px] leading-[19px] text-muted-foreground">Agreeing costs nothing and your money is not touched. Next you approve your own amount, and only then does your bank set that amount aside. Nothing is charged until everyone is in and the trip is booked.</p>
           ) : null}
 
           <button type="button" onClick={() => setDetailsOpen(!detailsOpen)} aria-expanded={detailsOpen} className="flex min-h-11 items-center justify-center gap-1 self-center text-sm font-semibold text-link">

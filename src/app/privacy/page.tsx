@@ -30,7 +30,7 @@ export default function PrivacyPage() {
               <strong>Traveller details</strong> (name as on your passport, date of birth, nationality, email, phone and, for flights, passport details). Only to make the booking. They are stored encrypted, never shown to the group or to the AI, and deleted as soon as the trip is booked or the plan ends, and always within 72 hours.
             </li>
             <li>
-              <strong>Your card.</strong> We never see or store it. Our payment provider, Stripe, holds it for the amount you approve and charges it only when every booking is made.
+              <strong>Your card.</strong> We never see or store it. Our payment provider, Stripe, asks your bank to set aside the amount you approve (a hold, not a charge) and takes your share only when every booking is made. Unamino never holds your money.
             </li>
           </ul>
         </section>

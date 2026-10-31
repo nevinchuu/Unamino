@@ -88,7 +88,7 @@ export function TripConfirmed({ view }: { readonly view: PlanViewDto }) {
             <span>Charged to your card</span>
             <span>{formatMinor(charged, mine.currency)}</span>
           </p>
-          {released > 0 ? <p className="mt-1 text-xs text-muted-foreground">{formatMinor(released, mine.currency)} of your hold was let go, so you were not charged it.</p> : null}
+          {released > 0 ? <p className="mt-1 text-xs text-muted-foreground">{formatMinor(released, mine.currency)} of your hold was released, so you were not charged it. Your bank may take a few days to show that.</p> : null}
         </div>
       ) : null}
     </section>

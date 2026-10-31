@@ -7,6 +7,7 @@ import { AppBar } from "@/components/screen";
 import { Button } from "@/components/ui/button";
 import { FAST_POLL_STATUSES, LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
 import { formatMinor } from "@/lib/format-money";
+import { MoneyExplainer } from "@/components/money-explainer";
 import { PlanCountdown } from "@/components/plan-countdown";
 import { describeStage } from "@/lib/plan-stage";
 import { cn } from "@/lib/utils";
@@ -142,6 +143,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
   const { me } = view;
   // A friend covering the whole share leaves nothing to pay, which reads better as a word than as $0.00.
   const covered = me.shareMinor === 0;
+  // What the "where your money is" block is about: the amount being approved, then the amount being held.
+  const moneyAmount = me.actions.approve && !covered ? me.shareMinor : me.cardNeeded ? me.approvedMinor : null;
   const stage = describeStage(view);
   const deadline = new Date(view.deadlineAt);
   const subtitle = [view.dates, `${view.headcount} ${view.headcount === 1 ? "person" : "people"}`].filter(Boolean).join(" · ");
@@ -229,6 +232,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
             ))}
           </section>
         ) : null}
+
+        {moneyAmount !== null ? <MoneyExplainer amountMinor={moneyAmount} currency={view.currency} demo={view.payments === "demo"} /> : null}
 
         <WhoPays people={view.people} status={view.status} currency={view.currency} payments={view.payments} />
       </div>
@@ -352,6 +357,8 @@ export function PlanScreen({ initial }: { readonly initial: PlanViewDto }) {
         groupId={view.groupId}
         planId={view.id}
         amountText={me.approvedMinor !== null ? formatMinor(me.approvedMinor, view.currency) : ""}
+        amountMinor={me.approvedMinor}
+        currency={view.currency}
         publishableKey={PUBLISHABLE_KEY}
         onPlaced={cardPlaced}
         detailsNeeded={me.details.needed}

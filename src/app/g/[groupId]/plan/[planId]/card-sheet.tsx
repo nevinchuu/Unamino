@@ -4,6 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { Loader2, Lock, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { MoneyExplainer } from "@/components/money-explainer";
 import { StickyFooter } from "@/components/sticky-footer";
 import { Button } from "@/components/ui/button";
 import { getStripe, isTestKey, outcomeOfCardEntry, TEST_CARD_HINT } from "@/lib/stripe-browser";
@@ -17,6 +18,9 @@ interface CardSheetProps {
   readonly planId: string;
   /** The amount being held, already written for a person: "$290.09". */
   readonly amountText: string;
+  /** The same amount in minor units, for explaining where the money is. Null before the person has approved one. */
+  readonly amountMinor: number | null;
+  readonly currency: string;
   /** Stripe's publishable key, which is public by design. Null when the server has none. */
   readonly publishableKey: string | null;
   /** Called once the hold is recorded, so the screen can move on. */
@@ -38,7 +42,7 @@ const APPEARANCE = {
 } as const;
 
 /** The card form for one person's hold, in a sheet over the plan. The card number goes straight to Stripe's own fields. */
-export function CardSheet({ open, onOpenChange, groupId, planId, amountText, publishableKey, onPlaced, detailsNeeded, cardRequired, passportRequired, onDetailsSaved }: CardSheetProps) {
+export function CardSheet({ open, onOpenChange, groupId, planId, amountText, amountMinor, currency, publishableKey, onPlaced, detailsNeeded, cardRequired, passportRequired, onDetailsSaved }: CardSheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -50,13 +54,15 @@ export function CardSheet({ open, onOpenChange, groupId, planId, amountText, pub
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                 {detailsNeeded
                   ? `The airline and the hotel need these to book your place.${cardRequired ? " Then you add your card." : " A friend covers your share, so there is no card to add."}`
-                  : `We hold ${amountText} on your card. It is not a charge. You are only charged once everyone is in and the trip is booked, and the hold is let go if the plan ends.`}
+                  : `Your bank will set aside ${amountText} for this trip. That is a hold, not a charge: we only take your share once everyone is in and the trip is booked, and the hold is cancelled if the plan ends.`}
               </Dialog.Description>
             </div>
             <Dialog.Close aria-label="Close" className="-mt-1 -mr-1 rounded-full p-2 text-muted-foreground hover:bg-muted">
               <X className="size-5" />
             </Dialog.Close>
           </div>
+
+          {!detailsNeeded && cardRequired && amountMinor !== null ? <MoneyExplainer amountMinor={amountMinor} currency={currency} className="mt-4" /> : null}
 
           {/* The card form is only mounted once the details are in and the sheet is open, so the hold is made when it is asked for and not before. */}
           {open && detailsNeeded ? <TravellerForm groupId={groupId} planId={planId} passportRequired={passportRequired} onSaved={onDetailsSaved} /> : null}
