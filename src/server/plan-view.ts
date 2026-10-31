@@ -1,7 +1,7 @@
 import type { Member } from "@/domain/group/types";
 import type { PaymentsMode } from "@/domain/payments/types";
 import { buildPlanView, LIVE_PLAN_STATUSES, type PlanViewDto } from "@/domain/plan/view";
-import type { PlanViewStore } from "@/domain/plan/view-store";
+import type { PlanViewRaw, PlanViewStore } from "@/domain/plan/view-store";
 import type { TravellerService } from "@/domain/travellers/service";
 import { isUuid } from "./ids";
 
@@ -19,6 +19,8 @@ export interface PlanViewDeps {
   readonly scheduleRefresh: (planId: string) => void;
   /** Asks for a plan that has been booking for too long to be settled once the response is on its way. Never waited for. */
   readonly scheduleSettle?: (planId: string) => void;
+  /** Asks for the holds of a plan that is waiting for them to be checked against the payment provider once the response is on its way. Never waited for. */
+  readonly scheduleReconcile?: (plan: PlanViewRaw) => void;
 }
 
 export type LoadedPlanView = { readonly ok: true; readonly view: PlanViewDto } | { readonly ok: false; readonly reason: "not_found" | "unavailable" };
@@ -40,6 +42,8 @@ export async function loadPlanViewFor(deps: PlanViewDeps, planId: string): Promi
   if (LIVE_PLAN_STATUSES.includes(raw.value.status)) deps.scheduleRefresh(planId);
   // A plan stuck booking would otherwise wait for the next scheduled sweep, which on the free plan can be a day away.
   if (raw.value.status === "booking") deps.scheduleSettle?.(planId);
+  // A person may have closed the page after putting a card on the hold and before the app heard about it.
+  if (raw.value.status === "approving") deps.scheduleReconcile?.(raw.value);
   return { ok: true, view: buildPlanView(raw.value, member.id, { payments: deps.payments, demoBooking: deps.demoBooking, travellers: await travellerStatus(deps, member.id) }) };
 }
 

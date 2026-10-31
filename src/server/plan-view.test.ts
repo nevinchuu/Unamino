@@ -27,15 +27,37 @@ function setup({ status, member = ana, load }: Setup = {}) {
   const refreshed: string[] = [];
   const loaded: string[] = [];
   const settled: string[] = [];
+  const reconciled: string[] = [];
   const deps: PlanViewDeps = {
     views: { load: load ?? (async (id) => (loaded.push(id), ok(raw(status)))) },
     memberOf: async () => member,
     payments: "none",
     scheduleRefresh: (id) => void refreshed.push(id),
     scheduleSettle: (id) => void settled.push(id),
+    scheduleReconcile: (plan) => void reconciled.push(plan.id),
   };
-  return { deps, refreshed, loaded, settled };
+  return { deps, refreshed, loaded, settled, reconciled };
 }
+
+describe("loadPlanViewFor, recording holds that were never reported", () => {
+  it("asks for the holds of a plan that is waiting for them to be checked", async () => {
+    const { deps, reconciled } = setup({ status: "approving" });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(reconciled).toEqual([PLAN_ID]);
+  });
+
+  it.each<PlanStatus>(["draft", "reviewing", "held", "booking", "booked", "captured", "expired"])("does not ask when the plan is %s", async (status) => {
+    const { deps, reconciled } = setup({ status });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(reconciled).toEqual([]);
+  });
+
+  it("does not ask for someone who is not in the group", async () => {
+    const { deps, reconciled } = setup({ status: "approving", member: null });
+    await loadPlanViewFor(deps, PLAN_ID);
+    expect(reconciled).toEqual([]);
+  });
+});
 
 describe("loadPlanViewFor, settling a stuck booking", () => {
   it("asks for a plan that is booking to be checked for being stuck, and does not refresh its prices", async () => {
