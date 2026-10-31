@@ -90,7 +90,7 @@ You do not need other people: simulated friends can fill the group. A group of o
 
 1. Open [unamino.vercel.app](https://unamino.vercel.app), tap **+** and make a group (any name).
 2. Tap the flask in the chat header and add two **test friends**, for example Maya (tight budget) and Leo (wants his own room). They chat in character, agree, approve and place a Stripe test hold on their own. They are for the hotel only and never fly.
-3. Write: `@trippy plan a Bangkok hotel stay for the 3 of us, 11 to 13 Dec 2026, about $200 each`. Planning takes 30 to 40 seconds.
+3. Write: `@trippy plan a Bangkok hotel stay for the 3 of us, hotel only, we are all already there, 11 to 13 Dec 2026, about $200 each`. Planning takes 30 to 40 seconds.
 4. Tap **Agree**, then **Approve**, give made-up traveller details, and use the test card `4242 4242 4242 4242` with any future expiry and any CVC.
 5. Watch the progress list: hotel, charge. To see the rollback, tap **Back out** on the plan page before the last hold lands: every hold is released and nobody is charged.
 6. Try the commitment features: tap **I need changes** and watch Trippy adjust the plan, or remove a test friend in Group info (the menu next to their name) and watch Trippy make a new plan for the people left.
@@ -133,7 +133,7 @@ You need Node 24 and pnpm 12, and your own accounts for the services below. All 
 | `MUSE_SPARK_API_KEY` | Meta Model API key for Muse Spark. |
 | `LITEAPI_KEY` | liteAPI **sandbox** key. |
 | `STRIPE_SECRET_KEY` and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe **test** keys. |
-| `TRAVELLER_ENCRYPTION_KEY` | A 32-byte base64 key: `openssl rand -base64 32`. |
+| `TRAVELLER_ENCRYPTION_KEY` | A 32-byte base64 key: `openssl rand -base64 32`, or without OpenSSL (for example on Windows) `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. |
 | `CRON_SECRET` | Any long random string. Protects the scheduled routes and keys the per-person group limit. |
 | `GOOGLE_PLACES_API_KEY` | Optional. Without it, free-time ideas are skipped. |
 | `MUSE_WEB_SEARCH` | Optional. Web research is on unless this is `off`. |
@@ -166,9 +166,8 @@ Optionally run `stripe listen --forward-to localhost:3000/api/stripe/webhook` an
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm exec next typegen          # a fresh clone needs this once, before typecheck
 pnpm test        # about 1,700 tests
-pnpm typecheck
+pnpm typecheck   # also generates the route types a fresh clone needs
 pnpm lint
 ```
 
@@ -200,6 +199,10 @@ The recorded run passed 22 of 24 checks. Both misses were one weakness that the 
 | `src/infrastructure/` | Muse, liteAPI, Stripe, Google Places, Postgres |
 | `src/app/` | The mobile web app (Trips home, chat, action sheet, plan screens) and its API routes |
 | `src/server/` | What the pages and routes read: chat, trips list, plan views, sessions, the wired-up services |
+
+## License
+
+[MIT](LICENSE).
 
 ## Known limits
 
