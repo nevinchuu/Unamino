@@ -11,8 +11,10 @@ export const groups = pgTable("groups", {
   /** Only a hash of the shared join link's secret is stored. Anyone holding the link can join while it is enabled. */
   joinTokenHash: text("join_token_hash").unique(),
   joinEnabled: boolean("join_enabled").notNull().default(true),
+  /** Who made the group, as a keyed hash of their network address, only so one person cannot make groups without limit. Null when the address was not known. It goes when the group does. */
+  creatorKey: text("creator_key"),
   createdAt: createdAt(),
-}).enableRLS();
+}, (table) => [index("groups_creator_idx").on(table.creatorKey, table.createdAt)]).enableRLS();
 
 /**
  * A person in a group. The headcount used for every search is the number of `joined` members; names live

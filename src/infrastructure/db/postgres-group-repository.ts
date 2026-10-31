@@ -46,6 +46,12 @@ export class PostgresGroupRepository implements GroupRepository {
     return row.total;
   }
 
+  /** How many groups one person (by their key) made since a moment. */
+  async createdBySince(creatorKey: string, since: Date): Promise<number> {
+    const [row] = await this.db.select({ total: count() }).from(groups).where(and(eq(groups.creatorKey, creatorKey), gte(groups.createdAt, since)));
+    return row.total;
+  }
+
   constructor(private readonly db: Database) {}
 
   async create(input: NewGroup): Promise<Result<CreatedGroup, GroupError>> {
@@ -59,7 +65,7 @@ export class PostgresGroupRepository implements GroupRepository {
     const memberToken = generateToken();
     try {
       return await this.db.transaction(async (tx) => {
-        const [group] = await tx.insert(groups).values({ name, baseCurrency: input.baseCurrency, joinTokenHash: hashToken(joinToken) }).returning();
+        const [group] = await tx.insert(groups).values({ name, baseCurrency: input.baseCurrency, joinTokenHash: hashToken(joinToken), creatorKey: input.creatorKey ?? null }).returning();
         const [organiser] = await tx
           .insert(members)
           .values({ groupId: group.id, displayName: input.organiser.displayName.trim(), currency: input.organiser.currency, status: "joined", joinedAt: new Date(), isOrganiser: true, inviteTokenHash: hashToken(memberToken) })

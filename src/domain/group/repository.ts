@@ -5,6 +5,8 @@ export interface NewGroup {
   readonly name: string;
   readonly baseCurrency: string;
   readonly organiser: { readonly displayName: string; readonly currency: string };
+  /** Who is making it, as a keyed hash that cannot be turned back into an address, for limiting how many one person makes. */
+  readonly creatorKey?: string | null;
 }
 
 export interface CreatedGroup {
