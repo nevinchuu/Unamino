@@ -1,7 +1,7 @@
 import { Check, Sparkles } from "lucide-react";
 import { avatarColour, initialsOf } from "@/lib/avatar";
 import { splitForStack } from "@/lib/avatar-stack";
-import { commitmentLabel, type Commitment } from "@/lib/commitment";
+import { commitmentLabel, isCommitted, type Commitment } from "@/lib/commitment";
 import { cn } from "@/lib/utils";
 
 interface AvatarProps {
@@ -11,13 +11,14 @@ interface AvatarProps {
   readonly size?: number;
   /** A small green dot at the bottom right: this person has agreed or put their card on hold. */
   readonly dot?: boolean;
-  /** Whether this person has approved, drawn as a ring: dashed grey until then, and solid green with a tick once they have. */
+  /** Whether this person has done the plan's current step (agreed, then approved), drawn as a ring: dashed grey until then, and solid green with a tick once they have. */
   readonly commitment?: Commitment | null;
   readonly className?: string;
 }
 
 const RING: Readonly<Record<Commitment, string>> = {
   not_yet: "border-dashed border-muted-foreground/40",
+  agreed: "border-success",
   approved: "border-success",
 };
 
@@ -35,7 +36,7 @@ export function Avatar({ name, size = 40, dot = false, commitment = null, classN
       {dot ? (
         <span className="absolute -right-0.5 -bottom-0.5 rounded-full border-[1.5px] border-card bg-presence" style={{ width: Math.max(8, size * 0.3), height: Math.max(8, size * 0.3) }} />
       ) : null}
-      {commitment === "approved" ? (
+      {commitment && isCommitted(commitment) ? (
         <span className="absolute -right-1 -bottom-1 flex items-center justify-center rounded-full border-[1.5px] border-card bg-success text-primary-foreground" style={{ width: Math.max(10, size * 0.38), height: Math.max(10, size * 0.38) }}>
           <Check style={{ width: "70%", height: "70%" }} strokeWidth={3.5} />
         </span>

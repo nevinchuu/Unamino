@@ -109,7 +109,7 @@ export interface ActionSheetView {
   readonly step: SheetStep;
   /** Which of the three steps (agree, approve, book) this is, for the dots. */
   readonly stepNumber: 1 | 2;
-  /** How many have approved, like "1/4 approved". It stays at "0/4" while the plan is still being agreed to. */
+  /** How many have done the current step: "2/4 agreed" while it is agreed to, then from "0/4 approved" once everyone has agreed. */
   readonly pill: string;
   /** One quiet line of who is done and who the plan is waiting for. */
   readonly note: string;
@@ -137,11 +137,12 @@ export function describeSheet(plan: CardPlan, mine: CardMine): ActionSheetView {
     waitingNames.length > 0 ? `Waiting for ${listOf(waitingNames)}.` : "",
   ].filter((part) => part !== "");
 
-  const approved = mine.people.filter((person) => person.held).length;
+  // Counts the current step only, so it starts again at 0 when everyone has agreed and approving begins.
+  const doneCount = mine.people.filter(done).length;
   return {
     step,
     stepNumber: step === "approve" ? 2 : 1,
-    pill: `${approved}/${plan.headcount} approved`,
+    pill: `${doneCount}/${plan.headcount} ${step === "approve" ? "approved" : "agreed"}`,
     note: parts.join(" "),
     actionable: step === "approve" ? mine.needsAmount : mine.canAgree && !mine.agreed,
     canRemind: waiting.length > 0 && !waiting.some((person) => person.isMe),

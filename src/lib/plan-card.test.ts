@@ -46,13 +46,19 @@ const mineWith = (people: readonly CardPerson[], overrides: Partial<CardMine> = 
 describe("describeSheet", () => {
   const people = [person("Nev", { isMe: true }), person("Ana", { agreed: true }), person("Ben"), person("Jia", { agreed: true })];
 
-  it("counts who agreed, and says who the plan is waiting for, naming the viewer as you", () => {
-    expect(describeSheet(plan({ headcount: 4 }), mineWith(people))).toEqual({ step: "agree", stepNumber: 1, pill: "0/4 approved", note: "Ana and Jia agreed. Waiting for you and Ben.", actionable: true, canRemind: false });
+  it("counts who agreed in the pill, and says who the plan is waiting for, naming the viewer as you", () => {
+    expect(describeSheet(plan({ headcount: 4 }), mineWith(people))).toEqual({ step: "agree", stepNumber: 1, pill: "2/4 agreed", note: "Ana and Jia agreed. Waiting for you and Ben.", actionable: true, canRemind: false });
   });
 
   it("has nothing for the viewer to do once they have agreed", () => {
     const agreed = people.map((p) => (p.isMe ? { ...p, agreed: true } : p));
-    expect(describeSheet(plan({ headcount: 4 }), mineWith(agreed, { canAgree: false, agreed: true }))).toMatchObject({ pill: "0/4 approved", note: "Ana and Jia agreed. Waiting for Ben.", actionable: false });
+    expect(describeSheet(plan({ headcount: 4 }), mineWith(agreed, { canAgree: false, agreed: true }))).toMatchObject({ pill: "3/4 agreed", note: "Ana and Jia agreed. Waiting for Ben.", actionable: false });
+  });
+
+  it("starts the count again at 0 when everyone has agreed and approving begins", () => {
+    const allAgreed = [person("Nev", { isMe: true, agreed: true }), person("Ana", { agreed: true }), person("Ben", { agreed: true })];
+    expect(describeSheet(plan({ headcount: 3 }), mineWith(allAgreed, { canAgree: false, agreed: true })).pill).toBe("3/3 agreed");
+    expect(describeSheet(plan({ status: "approving", headcount: 3 }), mineWith(allAgreed, { canAgree: false, agreed: true, needsAmount: true })).pill).toBe("0/3 approved");
   });
 
   it("moves to approving the amount, counting who has approved instead of who agreed", () => {
@@ -86,6 +92,6 @@ describe("describeSheet", () => {
   });
 
   it("copes with a plan whose people are not known", () => {
-    expect(describeSheet(plan({ headcount: 4 }), mineWith([]))).toMatchObject({ pill: "0/4 approved", note: "" });
+    expect(describeSheet(plan({ headcount: 4 }), mineWith([]))).toMatchObject({ pill: "0/4 agreed", note: "" });
   });
 });

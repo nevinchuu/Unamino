@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import type { PersonDto, PlanViewDto } from "@/domain/plan/view";
 import { chargeProgressOf, owesCharge } from "@/lib/charge-progress";
-import { commitmentLabel, commitmentOf } from "@/lib/commitment";
+import { commitmentLabel, commitmentOf, commitmentStepOf } from "@/lib/commitment";
 import { formatMinor } from "@/lib/format-money";
 import { previousShareNote } from "@/lib/share-change";
 
@@ -57,7 +57,7 @@ export function WhoPays({ people, status, currency, payments }: { readonly peopl
           return (
             <li key={person.id} className="rounded-lg px-2 py-2">
               <div className="flex items-center gap-3">
-                <Avatar name={person.name} size={36} commitment={commitmentOf({ held: person.holdPlaced || (payments !== "stripe" && person.approval === "approved") })} />
+                <Avatar name={person.name} size={36} commitment={commitmentOf(commitmentStepOf(status), { agreed: person.agreement === "agreed", held: person.holdPlaced || (payments !== "stripe" && person.approval === "approved") })} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">
                     {person.name}

@@ -96,7 +96,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
         </span>
       </button>
 
-      <ApprovalStrip people={mine.people} />
+      <ApprovalStrip people={mine.people} step={view.step} />
 
       <div className="flex flex-col gap-0.5">
         <h2 className="text-base font-extrabold">{view.step === "approve" ? "Approve your amount" : plan.title}</h2>
@@ -118,7 +118,7 @@ export function ActionSheet({ groupId, plan, mine, onChangesSent, folded = false
 
       {open ? (
         <>
-          <ApprovalList people={mine.people} />
+          <ApprovalList people={mine.people} step={view.step} />
 
           {view.step === "agree" && share ? (
             <div className="flex flex-col gap-2 rounded-2xl bg-background px-3.5 py-3">
