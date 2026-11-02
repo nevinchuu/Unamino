@@ -3,6 +3,7 @@ import { z } from "zod";
 import { err, ok, type Result } from "@/lib/result";
 import { toMinorUnits } from "@/domain/money/currency";
 import type { FailureCause } from "@/domain/booking/failure";
+import type { HotelOffer } from "@/domain/offers/schema";
 import type { BookingTraveller, CancelOutcome, HotelBookingRequest, HotelSupplier, SupplierError, SupplierReceipt } from "@/domain/booking/ports";
 import { classifyFailure, succeeded, type LiteApiBookingHttp } from "./booking-http";
 
@@ -40,23 +41,39 @@ const phoneOf = ({ details }: BookingTraveller): string => `+${details.phoneCoun
 export class LiteApiHotelSupplier implements HotelSupplier {
   constructor(private readonly http: LiteApiBookingHttp) {}
 
-  async book(request: HotelBookingRequest): Promise<Result<SupplierReceipt, SupplierError>> {
-    const prebooked = await this.http.send("hotels", "POST", "/rates/prebook", { offerId: request.offer.id, usePaymentSdk: false });
+  /**
+   * Asks the hotel whether this room can be booked at the offer's price, without booking it. A prebook holds nothing
+   * and costs nothing, so a plan can be checked before anyone is asked to approve it.
+   */
+  async checkBookable(offer: HotelOffer): Promise<Result<void, SupplierError>> {
+    const prebooked = await this.prebook(offer, offer.totalMinor);
+    return prebooked.ok ? ok(undefined) : prebooked;
+  }
+
+  /** The hotel's own price check. Returns the id to book with, or why the room cannot be booked for at most `maxTotalMinor`. */
+  private async prebook(offer: HotelOffer, maxTotalMinor: number): Promise<Result<string, SupplierError>> {
+    const prebooked = await this.http.send("hotels", "POST", "/rates/prebook", { offerId: offer.id, usePaymentSdk: false });
     if (!prebooked.ok) return prebooked;
     if (!succeeded(prebooked.value)) return err(classifyFailure(prebooked.value));
     const prebook = prebookSchema.safeParse(prebooked.value.body);
     if (!prebook.success) return bad("liteAPI's prebook answer was not in the expected shape", "answer_unreadable");
 
     const price = toMinorUnits(prebook.data.data.price, prebook.data.data.currency);
-    if (price === null || prebook.data.data.currency.toUpperCase() !== request.offer.currency) return bad("liteAPI's price could not be read", "answer_unreadable");
-    if (price > request.maxTotalMinor) return err({ code: "price_changed", message: "The room now costs more than the offer said" });
+    if (price === null || prebook.data.data.currency.toUpperCase() !== offer.currency) return bad("liteAPI's price could not be read", "answer_unreadable");
+    if (price > maxTotalMinor) return err({ code: "price_changed", message: "The room now costs more than the offer said" });
     // A different meal plan is a different product from what the group agreed to.
     if (prebook.data.data.boardChanged) return bad("The room's meal plan changed", "meal_plan_changed");
+    return ok(prebook.data.data.prebookId);
+  }
+
+  async book(request: HotelBookingRequest): Promise<Result<SupplierReceipt, SupplierError>> {
+    const prebookId = await this.prebook(request.offer, request.maxTotalMinor);
+    if (!prebookId.ok) return prebookId;
 
     const { details } = request.lead;
     const person = { firstName: details.firstName, lastName: details.lastName, email: details.email };
     const booked = await this.http.send("hotels", "POST", "/rates/book", {
-      prebookId: prebook.data.data.prebookId,
+      prebookId: prebookId.value,
       // The same reference never books twice, and a failed attempt cannot be tried again with it.
       clientReference: clientReferenceFor(request.reference),
       holder: { ...person, phone: phoneOf(request.lead) },

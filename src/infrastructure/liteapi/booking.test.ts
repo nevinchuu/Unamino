@@ -81,6 +81,24 @@ describe("LiteApiHotelSupplier", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("checks a room can be booked at its price with a prebook alone, and books nothing", async () => {
+    const { http, calls } = fakeLiteApi({ "/rates/prebook": hotelPrebook(), "/rates/book": hotelBooked() });
+    const result = await new LiteApiHotelSupplier(http).checkBookable(hotel());
+
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(calls.map((call) => call.url)).toEqual(["https://book.liteapi.travel/v3.0/rates/prebook"]);
+  });
+
+  it("says a room cannot be booked when the hotel refuses its price check", async () => {
+    const { http } = fakeLiteApi({ "/rates/prebook": { status: 409, body: { error: { code: 2001, description: "The price has changed" } } } });
+    expect(await new LiteApiHotelSupplier(http).checkBookable(hotel())).toMatchObject({ ok: false, error: { code: "price_changed" } });
+  });
+
+  it("says a room cannot be booked when it now costs more than the offer", async () => {
+    const { http } = fakeLiteApi({ "/rates/prebook": hotelPrebook(400.01) });
+    expect(await new LiteApiHotelSupplier(http).checkBookable(hotel())).toMatchObject({ ok: false, error: { code: "price_changed" } });
+  });
+
   it("reads the hotel's own words about a price that moved as a price change, not as a passing hiccup", async () => {
     const { http } = fakeLiteApi({ "/rates/prebook": hotelPrebook(), "/rates/book": { status: 409, body: { error: { code: 2001, message: "provider price exceeds locked selling price, please search again" } } } });
     expect(await new LiteApiHotelSupplier(http).book(request())).toMatchObject({ ok: false, error: { code: "price_changed" } });

@@ -26,6 +26,8 @@ export interface Session {
   planId: string | null;
   /** How many times the web has been searched this turn, which is limited. */
   researchCalls: number;
+  /** Listings the hotel said cannot be booked this turn, so a later search does not offer them again. */
+  readonly unbookableListingIds: Set<string>;
 }
 
 /** Everything a tool needs, gathered once per turn. */
@@ -47,6 +49,6 @@ export interface ToolEnv {
   readonly note: (stage: string, data: unknown) => void;
 }
 
-export const newSession = (): Session => ({ trip: null, searches: [], offersByAlias: new Map(), flyerIds: null, planId: null, researchCalls: 0 });
+export const newSession = (): Session => ({ trip: null, searches: [], offersByAlias: new Map(), flyerIds: null, planId: null, researchCalls: 0, unbookableListingIds: new Set() });
 
 export const members = (env: ToolEnv): readonly Member[] => env.roster.map((entry) => entry.member);

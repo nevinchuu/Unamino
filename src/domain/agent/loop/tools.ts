@@ -228,7 +228,8 @@ async function searchTrip(env: ToolEnv, argumentsJson: string): Promise<string> 
   const prefiltered = prefilterOffers({ offers: searched.value.offers, constraints, now: env.now, limits: SEARCH_LIMITS }).offers;
   // A hotel or flight that could not be booked a moment ago would fail the same way, so it is never shown again for a while.
   const blocked = await env.deps.failures?.blockedListingIds(env.group.id, new Date(env.now.getTime() - BLOCK_FAILED_LISTING_MS)).catch(() => new Set<string>());
-  const kept = blocked && blocked.size > 0 ? prefiltered.filter((offer) => !blocked.has(offer.listingId)) : prefiltered;
+  const unbookable = env.session.unbookableListingIds;
+  const kept = prefiltered.filter((offer) => !blocked?.has(offer.listingId) && !unbookable.has(offer.listingId));
   const leftOut = prefiltered.length - kept.length;
   const flights = kept.filter((offer): offer is FlightOffer => offer.kind === "flight");
   const hotels = kept.filter((offer): offer is HotelOffer => offer.kind === "hotel");

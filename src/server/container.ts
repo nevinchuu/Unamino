@@ -75,6 +75,8 @@ import { GROUP_CURRENCY } from "./group-currency";
 
 /** A flight search can take several seconds, and slower when run alongside the hotel searches. */
 const OFFER_TIMEOUT_MS = 45_000;
+/** How long Trippy waits for a hotel to confirm a room can be booked before saving a plan with it. */
+const BOOKABILITY_TIMEOUT_MS = 15_000;
 /** A serverless function opens its own connections, so each keeps few. */
 const MAX_CONNECTIONS = 5;
 
@@ -167,6 +169,8 @@ function build(): Container {
     ...(env.value.webSearch && { makeResearcher: (meter) => new MuseResearcher(new MuseHttp({ ...env.value.muse, onUsage: (usage) => meter.add(usage), onTrace })) }),
     trace,
     failures: bookingFailures,
+    // A shorter wait than booking: a slow hotel only skips the check, it does not hold the plan up.
+    hotelBookability: new LiteApiHotelSupplier(new LiteApiBookingHttp({ apiKey: env.value.liteApiKey, timeoutMs: BOOKABILITY_TIMEOUT_MS })),
     clock: () => new Date(),
   };
 

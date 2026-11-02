@@ -285,6 +285,90 @@ describe("when the model's pick is not good enough", () => {
   });
 });
 
+describe("checking with the hotel before a plan is saved", () => {
+  /** The trip with a second single room, so a turned-down single leaves another to choose. */
+  const withSpareSingle = (world: World) => {
+    world.source.offers = [flight4, triple, single, { ...single, id: "single-b", listingId: "single-b" }];
+  };
+
+  it("saves nothing when a hotel turns its room down, and tells the model to choose again", async () => {
+    const world = buildWorld();
+    withSpareSingle(world);
+    world.bookability.refused.add(single.id);
+    chat(world);
+    world.script(search(), (request) => proposeFrom(request), says("Let me find another room."));
+    await callAgent(world);
+
+    expect(world.plans.records).toEqual([]);
+    const { error } = JSON.parse(toolMessages(world).at(-1) as string) as { error: string };
+    expect(error).toContain(`the hotel says ${single.title} cannot be booked`);
+    expect(world.bookability.asked).toEqual(expect.arrayContaining([triple.id, single.id]));
+  });
+
+  it("picks another room after one is turned down, and a new search no longer shows it", async () => {
+    const world = buildWorld();
+    withSpareSingle(world);
+    world.bookability.refused.add(single.id);
+    chat(world);
+    let researched: SearchResult | null = null;
+    world.script(
+      search(),
+      (request) => proposeFrom(request),
+      search(),
+      (request) => {
+        researched = lastToolResult(request) as unknown as SearchResult;
+        return proposeFrom(request);
+      },
+      says("Here's the plan."),
+    );
+    await callAgent(world);
+
+    expect((researched as SearchResult | null)?.hotels.filter((hotel) => hotel.roomIsFor === 1)).toHaveLength(1);
+    expect(world.plans.records).toHaveLength(1);
+    expect(world.plans.records[0].input.picks.map((p) => p.offer.id)).toContain("single-b");
+    expect(world.plans.records[0].input.picks.map((p) => p.offer.id)).not.toContain(single.id);
+  });
+
+  it("does not let the model pick a turned-down room again by its old id", async () => {
+    const world = buildWorld();
+    withSpareSingle(world);
+    world.bookability.refused.add(single.id);
+    chat(world);
+    let first: ReturnType<typeof proposeFrom> | null = null;
+    world.script(
+      search(),
+      (request) => {
+        first = proposeFrom(request);
+        return first;
+      },
+      () => first as ReturnType<typeof proposeFrom>,
+      says("Hmm."),
+    );
+    await callAgent(world);
+
+    expect(world.plans.records).toEqual([]);
+    expect(toolMessages(world).at(-1)).toContain("not from the latest search");
+  });
+
+  it("still saves the plan when a hotel cannot be reached, since booking checks again", async () => {
+    const world = buildWorld();
+    world.bookability.unreachable.add(triple.id);
+    chat(world);
+    world.script(...planTurns("Here's the plan."));
+    await callAgent(world);
+    expect(world.plans.records).toHaveLength(1);
+  });
+
+  it("asks only about hotels, never flights", async () => {
+    const world = buildWorld();
+    chat(world);
+    world.script(...planTurns("Here's the plan."));
+    await callAgent(world);
+    expect(world.bookability.asked).not.toContain(flight4.id);
+    expect(world.bookability.asked.length).toBeGreaterThan(0);
+  });
+});
+
 describe("what a search can tell the model", () => {
   it("rejects dates that have already passed, so it can ask what was meant", async () => {
     const world = buildWorld();

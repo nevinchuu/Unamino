@@ -3,7 +3,8 @@ import type { ConstraintSet } from "@/domain/constraints/schema";
 import type { MessageRepository } from "@/domain/group/repository";
 import type { Group, Member, Message } from "@/domain/group/types";
 import type { OfferSource } from "@/domain/offers/offer-source";
-import type { Offer } from "@/domain/offers/schema";
+import type { HotelOffer, Offer } from "@/domain/offers/schema";
+import type { SupplierError } from "@/domain/booking/ports";
 import type { PlanRepository, RepositoryError, StoredPlan } from "@/domain/plan/repository";
 import type { PlanStatus } from "@/domain/plan/statuses";
 import type { MemberSnapshot, PlanSnapshot } from "@/domain/plan/types";
@@ -12,6 +13,7 @@ import type { ExtractConstraintsInput, Planner, ProposePlanInput, SuggestFreeTim
 import type { PlannerOutput } from "@/domain/planner/schema";
 import type { ChatModel, ModelRequest, ModelTurn } from "./loop/model";
 import type { Research, ResearchError, WebResearcher } from "./loop/research";
+import type { HotelBookability } from "./loop/bookability";
 import { BANGKOK_CONSTRAINTS, BANGKOK_OFFERS, NOW, pick } from "@/domain/planner/test-support";
 import type { SuggestionOutput } from "@/domain/schedule/suggestion-schema";
 import type { SearchRecord } from "@/domain/trip/search";
@@ -352,6 +354,19 @@ export class FakeFailures implements BookingFailureReader {
   }
 }
 
+/** Answers each hotel's "can this room be booked?" by offer id: refused, unreachable, or fine when not named. */
+export class FakeBookability implements HotelBookability {
+  readonly refused = new Set<string>();
+  readonly unreachable = new Set<string>();
+  readonly asked: string[] = [];
+  async checkBookable(offer: HotelOffer): Promise<Result<void, SupplierError>> {
+    this.asked.push(offer.id);
+    if (this.refused.has(offer.id)) return err({ code: "price_changed", message: "prebook refused" });
+    if (this.unreachable.has(offer.id)) return err({ code: "temporary", cause: "no_answer", message: "no answer" });
+    return ok(undefined);
+  }
+}
+
 export class FakeOfferSource implements OfferSource {
   readonly queries: Parameters<OfferSource["search"]>[0][] = [];
   failWith: { code: "source_unavailable"; message: string } | null = null;
@@ -390,6 +405,7 @@ export interface World {
   readonly plans: FakePlans;
   readonly source: FakeOfferSource;
   readonly failures: FakeFailures;
+  readonly bookability: FakeBookability;
   readonly planners: RecordingPlanner[];
   readonly planner: () => RecordingPlanner;
   /** What the model does on each turn of the next run. */
@@ -409,6 +425,7 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
   const plans = new FakePlans(briefs);
   const source = new FakeOfferSource();
   const failures = new FakeFailures();
+  const bookability = new FakeBookability();
   const planners: RecordingPlanner[] = [];
   const models: ScriptedChatModel[] = [];
   const researcher = new FakeResearcher();
@@ -422,6 +439,7 @@ export function buildWorld(behaviour: PlannerBehaviour = {}, people: readonly Me
     clock: () => NOW,
     searchOptions: { retryDelayMs: 0 },
     failures,
+    hotelBookability: bookability,
   };
-  return { deps, researcher, groups, messages, runs, briefs, constraints, searches, plans, source, failures, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
+  return { deps, researcher, groups, messages, runs, briefs, constraints, searches, plans, source, failures, bookability, planners, planner: () => planners[planners.length - 1], script: (...next) => { steps = next; }, models, model: () => models[models.length - 1] };
 }

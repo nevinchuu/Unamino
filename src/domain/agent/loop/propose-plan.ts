@@ -15,7 +15,9 @@ import { findClash } from "@/domain/trip/clash";
 import { nameMembers } from "../aliasing-planner";
 import { computeInputsHash } from "../inputs-hash";
 import { MESSAGES } from "../announce";
-import { members, type ToolEnv } from "./session";
+import type { HotelOffer } from "@/domain/offers/schema";
+import { unbookableHotels } from "./bookability";
+import { members, type Session, type ToolEnv } from "./session";
 import type { PlanStatus } from "@/domain/plan/statuses";
 
 const REQUIRED_KINDS = ["flight", "hotel"] as const;
@@ -33,6 +35,19 @@ const unmetNeedsMessage = (reasons: readonly string[]): string =>
   "Do not propose a plan that breaks a need. Search again for options that meet it. If none exist, or a need cannot be checked (such as a meal requirement), do not make a plan at all: " +
   "tell the group honestly that it is not available, suggest ONE concrete alternative (for example economy instead of business), and ask that person whether they accept it. " +
   "For a meal need that cannot be checked, ask whether they will confirm it with the airline or hotel themselves.";
+
+/** What the model is told when a hotel turned down its room before the plan was saved. Nothing was saved. */
+const unbookableMessage = (titles: readonly string[]): string =>
+  `Not saved: the hotel says ${titles.join(" and ")} cannot be booked at the price shown, so it has been removed from the options. ` +
+  "Propose the plan again with another room from the same search results that still meets everyone's needs. If none is left, call search_trip again. " +
+  "Do not mention this check to the group unless no workable option remains.";
+
+/** Takes rooms the hotel turned down out of this turn's options, so the model cannot pick them again and a new search leaves them out. */
+function dropOffers(session: Session, offers: readonly HotelOffer[]): void {
+  const ids = new Set(offers.map((offer) => offer.id));
+  offers.forEach((offer) => session.unbookableListingIds.add(offer.listingId));
+  session.offersByAlias = new Map([...session.offersByAlias].filter(([, offer]) => !ids.has(offer.id)));
+}
 
 /** Turns the model's short ids (F1, m2) back into real ones. Reports every id it cannot place, not just the first. */
 function toRealIds(output: PlannerOutput, env: ToolEnv): Result<PlannerOutput, string> {
@@ -120,6 +135,13 @@ export async function proposePlan(env: ToolEnv, argumentsJson: string): Promise<
   if (violations.length > 0) {
     env.note("plan_refused", { violations: violations.map((violation) => violation.message) });
     return problem(unmetNeedsMessage(violations.map((violation) => nameMembers(violation.message, people))));
+  }
+  // The hotel is asked before anyone approves, so the group is never asked to pay for a room that cannot be booked.
+  const unbookable = deps.hotelBookability ? await unbookableHotels(deps.hotelBookability, plan.picks.map((pick) => pick.offer)) : [];
+  if (unbookable.length > 0) {
+    dropOffers(session, unbookable);
+    env.note("plan_unbookable", { offers: unbookable.map((offer) => ({ offerId: offer.id, listingId: offer.listingId, title: offer.title })) });
+    return problem(unbookableMessage(unbookable.map((offer) => offer.title)));
   }
   env.note("plan_built", { title: plan.title, totalMinor: plan.totalMinor, currency: plan.currency, picks: plan.picks.map((pick) => ({ offerId: pick.offer.id, kind: pick.offer.kind, members: pick.memberIds.map((id) => people.find((member) => member.id === id)?.displayName), reason: pick.reason })), shares, violations: violations.map((violation) => violation.message) });
 

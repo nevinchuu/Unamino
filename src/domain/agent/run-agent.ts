@@ -9,6 +9,7 @@ import type { VenueLookup } from "@/domain/schedule/venue";
 import type { SearchOptions } from "@/domain/trip/search";
 import { AliasingPlanner } from "./aliasing-planner";
 import { MESSAGES } from "./announce";
+import type { HotelBookability } from "./loop/bookability";
 import { runConversation } from "./loop/conversation";
 import type { ChatModel } from "./loop/model";
 import { buildOpening, SYSTEM_PROMPT } from "./loop/prompt";
@@ -57,6 +58,8 @@ export interface AgentDeps {
   readonly staleRunMs?: number;
   /** Where Trippy learns why a booking failed, and which listings not to offer again. Without it, neither is known. */
   readonly failures?: BookingFailureReader;
+  /** Checks with each hotel that a room can be booked before a plan with it is saved. Without it, rooms are first checked at booking. */
+  readonly hotelBookability?: HotelBookability;
   /** How failed searches are retried. Tests turn the pause off. */
   readonly searchOptions?: SearchOptions;
 }
